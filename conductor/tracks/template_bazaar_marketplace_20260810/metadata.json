@@ -1,0 +1,16 @@
+{
+  "id": "template_bazaar_marketplace_20260810",
+  "trackId": "template_bazaar_marketplace_20260810",
+  "title": "The Bazaar — Community Template Directory & 1-Click Customization Engine",
+  "description": "Public showcase directory for vetted app templates, enabling 1-click natural language customization, staging previews, automated container deployment, and revenue sharing.",
+  "type": "feature",
+  "status": "Planned",
+  "subproject": "taawun-go-core",
+  "phases": 4,
+  "tasks": 12,
+  "created": "2026-08-10",
+  "created_at": "2026-08-10T00:00:00.000Z",
+  "updated_at": "2026-08-10T00:00:00.000Z",
+  "depends_on": ["go_iac_control_plane_20260810", "taqwa_ethics_guardrails_20260810"],
+  "blocked_by": []
+}

@@ -1,0 +1,16 @@
+{
+  "id": "shura_rbac_governance_20260810",
+  "trackId": "shura_rbac_governance_20260810",
+  "title": "Shura Workspace Dynamics & Granular RBAC",
+  "description": "Establishes multi-tenant community workspace dynamics with Architect, Maintainer, and Viewer roles for organizations (Mosques, Non-Profits, Student Groups).",
+  "type": "feature",
+  "status": "Planned",
+  "subproject": "taawun-go-core",
+  "phases": 4,
+  "tasks": 10,
+  "created": "2026-08-10",
+  "created_at": "2026-08-10T00:00:00.000Z",
+  "updated_at": "2026-08-10T00:00:00.000Z",
+  "depends_on": ["go_iac_control_plane_20260810"],
+  "blocked_by": []
+}

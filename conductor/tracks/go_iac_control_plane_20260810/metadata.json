@@ -1,0 +1,20 @@
+{
+  "id": "go_iac_control_plane_20260810",
+  "trackId": "go_iac_control_plane_20260810",
+  "title": "Infrastructure-as-Code Control Plane & Docker Provider Engine",
+  "description": "Refactors the Go control plane server and implements the Docker API container provider for dynamic app provisioning, resource limit manifests, and staging URLs.",
+  "type": "feature",
+  "status": "Completed",
+  "subproject": "taawun-go-core",
+  "phases": 4,
+  "tasks": 12,
+  "created": "2026-08-10",
+  "created_at": "2026-08-10T00:00:00.000Z",
+  "updated_at": "2026-08-10T00:00:00.000Z",
+  "depends_on": [],
+  "blocked_by": [],
+  "keyDecisions": [
+    "DOCKER ENGINE API OVER KUBERNETES. Community applications require minimal overhead and instant spin-up. Docker API via Go exec/SDK provides maximum compatibility and ultra-low resource footprint for VPS hosting.",
+    "EXPLICIT RAM & CPU MANIFESTS. Every app manifest requires explicit memory (MemoryMB) and CPU limits (CPULimit) to ensure zero hidden charges or unpredictable scaling."
+  ]
+}
