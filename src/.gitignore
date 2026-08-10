@@ -1,0 +1,85 @@
+bin/
+data/
+logs/
+.go-cache/
+*.db
+*.exe
+vendor/
+
+# ==========================================
+# Central vault / generated artifacts
+# ==========================================
+bin/
+data/
+logs/
+.go-cache/
+
+# Database files
+*.db
+*.db.backup-*
+*.sqlite
+*.sqlite3
+
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+app
+main
+user-auth-api-dashboard
+user-auth-api-dashboard_unix
+
+# Old module/vendor artifacts
+vendor/
+
+# Backup files
+*.bak
+*.backup
+*.zip
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ==========================================
+# Central vault / generated artifacts
+# ==========================================
+bin/
+data/
+logs/
+.go-cache/
+
+# Database files
+*.db
+*.db.backup-*
+*.sqlite
+*.sqlite3
+
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+app
+main
+user-auth-api-dashboard
+user-auth-api-dashboard_unix
+
+# Old module/vendor artifacts
+vendor/
+
+# Backup files
+*.bak
+*.backup
+*.zip
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

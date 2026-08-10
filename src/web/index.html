@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>User Auth API Dashboard</title>
+    <style>
+        :root {
+            --bg: #f0f4f8; --card: #ffffff; --text: #1a202c; --muted: #64748b;
+            --border: #e2e8f0; --accent: #2563eb; --accent-hover: #1d4ed8;
+            --success: #10b981; --success-bg: #ecfdf5; --error: #ef4444; --error-bg: #fef2f2;
+            --sidebar-width: 240px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        
+        /* Auth Page */
+        .auth-container { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+        .auth-card { background: var(--card); border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); padding: 40px; width: 100%; max-width: 420px; }
+        .auth-card h1 { font-size: 24px; margin-bottom: 8px; }
+        .auth-card p { color: var(--muted); margin-bottom: 24px; font-size: 14px; }
+        .auth-tabs { display: flex; gap: 4px; background: var(--bg); border-radius: 8px; padding: 4px; margin-bottom: 24px; }
+        .auth-tab { flex: 1; padding: 10px; text-align: center; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 14px; transition: all 0.2s; border: none; background: transparent; }
+        .auth-tab.active { background: var(--card); box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: var(--accent); }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+        .form-group input, .form-group textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; transition: border-color 0.2s; }
+        .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: white; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        .btn:hover { background: var(--accent-hover); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; display: none; }
+        .alert.error { display: block; background: var(--error-bg); color: var(--error); }
+        .alert.success { display: block; background: var(--success-bg); color: var(--success); }
+        
+        /* App Layout */
+        .app-container { display: none; }
+        .app-container.active { display: flex; min-height: 100vh; }
+        .sidebar { width: var(--sidebar-width); background: var(--card); border-right: 1px solid var(--border); padding: 20px 0; position: fixed; height: 100vh; overflow-y: auto; }
+        .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+        .sidebar-header h2 { font-size: 16px; color: var(--accent); }
+        .sidebar-header p { font-size: 12px; color: var(--muted); margin-top: 4px; }
+        .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; font-size: 14px; color: var(--muted); transition: all 0.2s; border-left: 3px solid transparent; }
+        .nav-item:hover { background: var(--bg); color: var(--text); }
+        .nav-item.active { background: var(--bg); color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+        .nav-item .icon { width: 20px; text-align: center; }
+        .main-content { margin-left: var(--sidebar-width); flex: 1; padding: 30px; }
+        .main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .main-header h1 { font-size: 22px; }
+        .user-badge { display: flex; align-items: center; gap: 12px; }
+        .user-badge span { font-size: 14px; color: var(--muted); }
+        .btn-logout { padding: 8px 16px; background: var(--error); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        
+        /* Pages & Cards */
+        .page-section { display: none; }
+        .page-section.active { display: block; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
+        .stat-card .label { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+        .stat-card .value { font-size: 28px; font-weight: 700; color: var(--accent); }
+        .table-card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+        .table-card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .table-card-header h3 { font-size: 15px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 20px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; }
+        th { background: var(--bg); font-weight: 600; color: var(--muted); }
+        tr:last-child td { border-bottom: none; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+        .badge.active { background: var(--success-bg); color: var(--success); }
+        .badge.admin { background: #eff6ff; color: var(--accent); }
+        .badge.user { background: var(--bg); color: var(--muted); }
+        .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-danger { background: var(--error); color: white; }
+        .loading { text-align: center; padding: 40px; color: var(--muted); }
+        .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* MODALS */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+        .modal-overlay.active { display: flex; }
+        .modal { background: var(--card); border-radius: 16px; padding: 28px; width: 100%; max-width: 480px; box-shadow: 0 25px 50px rgba(0,0,0,0.25); animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal h2 { margin-bottom: 20px; font-size: 18px; color: var(--text); }
+        .modal-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+        .btn-secondary { padding: 10px 20px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; }
+        .btn-secondary:hover { background: #e2e8f0; }
+        .modal .btn { width: auto; padding: 10px 24px; }
+    </style>
+</head>
+<body>
+    <!-- AUTH PAGE -->
+    <div id="authPage" class="auth-container">
+        <div class="auth-card">
+            <h1>Welcome</h1>
+            <p>User Auth API Dashboard</p>
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchTab('login')">Sign In</button>
+                <button class="auth-tab" onclick="switchTab('register')">Register</button>
+            </div>
+            <div id="authAlert" class="alert"></div>
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-group"><label>Email</label><input type="email" id="loginEmail" placeholder="admin@example.com" required></div>
+                <div class="form-group"><label>Password</label><input type="password" id="loginPassword" placeholder="Enter your password" required></div>
+                <button type="submit" class="btn" id="loginBtn">Sign In</button>
+            </form>
+            <form id="registerForm" style="display:none" onsubmit="handleRegister(event)">
+                <div class="form-group"><label>Username</label><input type="text" id="regUsername" placeholder="Choose a username" required minlength="3"></div>
+                <div class="form-group"><label>Email</label><input type="email" id="regEmail" placeholder="you@example.com" required></div>
+                <div class="form-group"><label>Password</label><input type="password" id="regPassword" placeholder="Minimum 8 characters" required minlength="8"></div>
+                <button type="submit" class="btn" id="registerBtn">Create Account</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- MAIN APP -->
+    <div id="appPage" class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header"><h2>Dashboard</h2><p id="sidebarUser">Welcome back</p></div>
+            <div class="nav-item active" onclick="showPage('dashboard')"><span class="icon">📊</span> Dashboard</div>
+            <div class="nav-item" onclick="showPage('workspaces')"><span class="icon">🏢</span> Workspaces</div>
+            <div class="nav-item" onclick="showPage('notifications')"><span class="icon">🔔</span> Notifications</div>
+            <div class="nav-item" onclick="showPage('users')"><span class="icon">👥</span> Users</div>
+            <div class="nav-item" onclick="showPage('admin')"><span class="icon">🛡️</span> Admin Panel</div>
+            <div class="nav-item" onclick="showPage('profile')"><span class="icon">👤</span> Profile</div>
+        </nav>
+        <main class="main-content">
+            <div class="main-header">
+                <h1 id="pageTitle">Dashboard</h1>
+                <div class="user-badge"><span id="headerUser"></span><button class="btn-logout" onclick="logout()">Logout</button></div>
+            </div>
+            
+            <div id="page-dashboard" class="page-section active">
+                <div class="stats-grid" id="statsGrid"><div class="loading"><div class="spinner"></div></div></div>
+                <div class="table-card"><div class="table-card-header"><h3>Recent Activity</h3></div><div id="recentActivity"><div class="loading"><div class="spinner"></div></div></div></div>
+            </div>
+            
+            <div id="page-workspaces" class="page-section">
+                <div class="table-card">
+                    <div class="table-card-header"><h3>My Workspaces</h3><button class="btn-sm btn-primary" onclick="showCreateWorkspace()">+ New Workspace</button></div>
+                    <div id="workspacesList"><div class="loading"><div class="spinner"></div></div></div>
+                </div>
+            </div>
+            
+            <div id="page-notifications" class="page-section">
+                <div class="table-card"><div class="table-card-header"><h3>Notifications</h3><button class="btn-sm btn-primary" onclick="markAllRead()">Mark All Read</button></div><div id="notificationsList"><div class="loading"><div class="spinner"></div></div></div></div>
+            </div>
+            
+            <div id="page-users" class="page-section">
+                <div class="table-card"><div class="table-card-header"><h3>All Users</h3></div><div id="usersList"><div class="loading"><div class="spinner"></div></div></div></div>
+            </div>
+            
+            <div id="page-admin" class="page-section">
+                <div class="stats-grid" id="adminStats"><div class="loading"><div class="spinner"></div></div></div>
+                <div class="table-card"><div class="table-card-header"><h3>Admin Statistics</h3></div><div id="adminDetails"><div class="loading"><div class="spinner"></div></div></div></div>
+            </div>
+            
+            <div id="page-profile" class="page-section">
+                <div class="table-card"><div class="table-card-header"><h3>My Profile</h3></div><div id="profileContent"><div class="loading"><div class="spinner"></div></div></div></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL OVERLAY -->
+    <div id="modalOverlay" class="modal-overlay">
+        <div class="modal">
+            <h2 id="modalTitle">Modal</h2>
+            <div id="modalContent"></div>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn" id="modalConfirmBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem('auth_token');
+        let currentUser = JSON.parse(localStorage.getItem('current_user') || 'null');
+        
+        async function api(endpoint, method = 'GET', body = null) {
+            const options = { method, headers: { 'Content-Type': 'application/json' } };
+            if (token) options.headers['Authorization'] = 'Bearer ' + token;
+            if (body) options.body = JSON.stringify(body);
+            const response = await fetch('/api' + endpoint, options);
+            if (!response.ok) throw new Error(await response.text());
+            if (response.status === 204) return null;
+            return response.json();
+        }
+        
+        function switchTab(tab) {
+            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
+            document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
+            hideAlert();
+        }
+        function showAlert(msg, type) { const a = document.getElementById('authAlert'); a.className = 'alert ' + type; a.textContent = msg; }
+        function hideAlert() { document.getElementById('authAlert').className = 'alert'; }
+        
+        async function handleLogin(e) {
+            e.preventDefault(); const btn = document.getElementById('loginBtn'); btn.disabled = true; btn.textContent = 'Signing in...';
+            try {
+                const res = await api('/login', 'POST', { email: document.getElementById('loginEmail').value, password: document.getElementById('loginPassword').value });
+                token = res.token; currentUser = res.user; localStorage.setItem('auth_token', token); localStorage.setItem('current_user', JSON.stringify(currentUser));
+                showAlert('Login successful!', 'success'); setTimeout(() => showApp(), 500);
+            } catch (err) { showAlert(err.message, 'error'); } finally { btn.disabled = false; btn.textContent = 'Sign In'; }
+        }
+        
+        async function handleRegister(e) {
+            e.preventDefault(); const btn = document.getElementById('registerBtn'); btn.disabled = true; btn.textContent = 'Creating...';
+            try {
+                await api('/register', 'POST', { username: document.getElementById('regUsername').value, email: document.getElementById('regEmail').value, password: document.getElementById('regPassword').value });
+                showAlert('Account created! Please sign in.', 'success'); setTimeout(() => switchTab('login'), 1500);
+            } catch (err) { showAlert(err.message, 'error'); } finally { btn.disabled = false; btn.textContent = 'Create Account'; }
+        }
+        
+        function logout() { token = null; currentUser = null; localStorage.removeItem('auth_token'); localStorage.removeItem('current_user'); document.getElementById('authPage').style.display = 'flex'; document.getElementById('appPage').classList.remove('active'); }
+        
+        function showApp() {
+            document.getElementById('authPage').style.display = 'none'; document.getElementById('appPage').classList.add('active');
+            document.getElementById('sidebarUser').textContent = currentUser.username; document.getElementById('headerUser').textContent = currentUser.email; loadDashboard();
+        }
+        
+        function showPage(page) {
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            event.target.closest('.nav-item').classList.add('active');
+            document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+            document.getElementById('page-' + page).classList.add('active');
+            const titles = { dashboard: 'Dashboard', workspaces: 'Workspaces', notifications: 'Notifications', users: 'Users', admin: 'Admin Panel', profile: 'Profile' };
+            document.getElementById('pageTitle').textContent = titles[page];
+            if(page==='dashboard') loadDashboard(); if(page==='workspaces') loadWorkspaces(); if(page==='notifications') loadNotifications(); if(page==='users') loadUsers(); if(page==='admin') loadAdmin(); if(page==='profile') loadProfile();
+        }
+
+        // --- MODAL SYSTEM ---
+        function openModal(title, contentHtml, onConfirm, showConfirm = true) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalContent').innerHTML = contentHtml;
+            document.getElementById('modalOverlay').classList.add('active');
+            const confirmBtn = document.getElementById('modalConfirmBtn');
+            if (showConfirm) { confirmBtn.style.display = 'inline-block'; confirmBtn.onclick = onConfirm; } 
+            else { confirmBtn.style.display = 'none'; }
+        }
+        function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
+
+        // --- DASHBOARD ---
+        async function loadDashboard() {
+            try {
+                const stats = await api('/dashboard/stats');
+                document.getElementById('statsGrid').innerHTML = `<div class="stat-card"><div class="label">Total Users</div><div class="value">${stats.total_users}</div></div><div class="stat-card"><div class="label">Active Users</div><div class="value">${stats.active_users}</div></div><div class="stat-card"><div class="label">Workspaces</div><div class="value">${stats.total_workspaces}</div></div><div class="stat-card"><div class="label">Unread Notifications</div><div class="value">${stats.unread_notifications}</div></div>`;
+                const act = await api('/dashboard/recent');
+                document.getElementById('recentActivity').innerHTML = act && act.length > 0 ? `<table><thead><tr><th>Action</th><th>User</th><th>Type</th><th>Time</th></tr></thead><tbody>${act.map(a => `<tr><td>${a.action}</td><td>${a.user}</td><td>${a.type}</td><td>${a.timestamp}</td></tr>`).join('')}</tbody></table>` : '<div style="padding:20px;color:var(--muted)">No recent activity</div>';
+            } catch (e) { document.getElementById('statsGrid').innerHTML = `<div class="alert error">${e.message}</div>`; }
+        }
+        
+        // --- WORKSPACES ---
+        async function loadWorkspaces() {
+            try {
+                const ws = await api('/workspaces');
+                document.getElementById('workspacesList').innerHTML = ws && ws.length > 0 ? `<table><thead><tr><th>Name</th><th>Description</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody>${ws.map(w => `<tr><td>${w.name}</td><td>${w.description || '-'}</td><td><span class="badge ${w.status}">${w.status}</span></td><td>${new Date(w.created_at).toLocaleDateString()}</td><td><button class="btn-sm btn-primary" onclick="viewWorkspace(${w.id})">View</button></td></tr>`).join('')}</tbody></table>` : '<div style="padding:20px;color:var(--muted)">No workspaces yet. Create one!</div>';
+            } catch (e) { document.getElementById('workspacesList').innerHTML = `<div class="alert error">${e.message}</div>`; }
+        }
+        
+        function showCreateWorkspace() {
+            const content = `<div class="form-group"><label>Workspace Name</label><input type="text" id="newWsName" placeholder="e.g. Marketing Team"></div><div class="form-group"><label>Description</label><input type="text" id="newWsDesc" placeholder="Optional description"></div>`;
+            openModal('Create New Workspace', content, async () => {
+                const name = document.getElementById('newWsName').value;
+                if (!name) return alert('Name is required');
+                try { await api('/workspaces', 'POST', { name, description: document.getElementById('newWsDesc').value }); closeModal(); loadWorkspaces(); } 
+                catch (e) { alert('Error: ' + e.message); }
+            });
+        }
+        
+        async function viewWorkspace(id) {
+            try {
+                const ws = await api('/workspaces/' + id);
+                const content = `<p style="margin-bottom:12px"><strong>Name:</strong> ${ws.name}</p><p style="margin-bottom:12px"><strong>Description:</strong> ${ws.description || 'None'}</p><p style="margin-bottom:12px"><strong>Status:</strong> <span class="badge ${ws.status}">${ws.status}</span></p><p style="margin-bottom:20px"><strong>Created:</strong> ${new Date(ws.created_at).toLocaleDateString()}</p><hr style="border-color:var(--border); margin-bottom:16px"><button class="btn-sm btn-danger" onclick="deleteWorkspace(${id})">Delete Workspace</button>`;
+                openModal('Workspace Details', content, null, false);
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        async function deleteWorkspace(id) {
+            if (!confirm('Are you sure you want to permanently delete this workspace?')) return;
+            try { await api('/workspaces/' + id, 'DELETE'); closeModal(); loadWorkspaces(); } 
+            catch (e) { alert('Error: ' + e.message); }
+        }
+        
+        // --- OTHER PAGES ---
+        async function loadNotifications() { try { const n = await api('/notifications'); document.getElementById('notificationsList').innerHTML = n && n.length > 0 ? n.map(x => `<div style="padding:16px 20px; border-bottom:1px solid var(--border)"><strong>${x.title}</strong><div style="font-size:13px;color:var(--muted)">${x.message}</div></div>`).join('') : '<div style="padding:20px;color:var(--muted)">No notifications</div>'; } catch (e) {} }
+        async function markAllRead() { try { await api('/notifications/read-all', 'PUT'); loadNotifications(); } catch (e) {} }
+        async function loadUsers() { try { const u = await api('/users'); document.getElementById('usersList').innerHTML = `<table><thead><tr><th>ID</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>${u.map(x => `<tr><td>${x.id}</td><td>${x.username}</td><td>${x.email}</td><td><span class="badge ${x.role}">${x.role}</span></td><td><span class="badge ${x.status}">${x.status}</span></td></tr>`).join('')}</tbody></table>`; } catch (e) {} }
+        async function loadAdmin() { try { const s = await api('/admin/statistics'); document.getElementById('adminStats').innerHTML = `<div class="stat-card"><div class="label">Total Users</div><div class="value">${s.total_users}</div></div><div class="stat-card"><div class="label">Active Users</div><div class="value">${s.active_users}</div></div><div class="stat-card"><div class="label">Total Workspaces</div><div class="value">${s.total_workspaces}</div></div><div class="stat-card"><div class="label">Active Workspaces</div><div class="value">${s.active_workspaces}</div></div>`; document.getElementById('adminDetails').innerHTML = '<div style="padding:20px">Detailed admin stats will be formatted here.</div>'; } catch (e) {} }
+        async function loadProfile() { try { const p = await api('/profile'); document.getElementById('profileContent').innerHTML = `<div style="padding:20px"><p><strong>Username:</strong> ${p.username}</p><p><strong>Email:</strong> ${p.email}</p><p><strong>Role:</strong> <span class="badge ${p.role}">${p.role}</span></p></div>`; } catch (e) {} }
+        
+        if (token && currentUser) showApp();
+    </script>
+</body>
+</html>
