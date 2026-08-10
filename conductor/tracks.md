@@ -8,7 +8,7 @@ lastReconciled: 2026-08-10
 
 **Status is authoritative in each track's `metadata.json`.** This index summarizes the architectural roadmap of the Taawun Platform, reconciled on 2026-08-10.
 
-Total Tracks: 6 | 4 Completed · 0 InProgress · 2 Planned
+Total Tracks: 8 | 4 Completed · 0 InProgress · 4 Planned
 
 ---
 
@@ -23,12 +23,21 @@ Total Tracks: 6 | 4 Completed · 0 InProgress · 2 Planned
 
 ---
 
-## Program — Shura Governance & Community Marketplace (Wave 2)
+## Program — Security Hardening & Gap Remediation (Wave 2)
 
 | Wave | Track ID | Title | Status | Scope |
 |:---|:---|:---|:---|:---|
-| 2 | `shura_rbac_governance_20260810` | Shura Workspace Dynamics & Granular RBAC (Architect, Maintainer, Viewer) | **Planned** | `pkg/shura` |
-| 2 | `template_bazaar_marketplace_20260810` | The Bazaar — Community Template Directory & 1-Click Customization | **Planned** | `pkg/bazaar` |
+| 2 | `adversarial_security_hardening_20260810` | Adversarial Security & Infrastructure Hardening | **Planned** | `pkg/ethics`, `pkg/primitives`, `pkg/iac` |
+| 2 | `gap_analysis_remediation_20260810` | Platform Gap Analysis Remediation (DuckDB, Caddy, CRDTs) | **Planned** | `pkg/primitives`, `pkg/iac`, `pkg/shura` |
+
+---
+
+## Program — Shura Governance & Community Marketplace (Wave 3)
+
+| Wave | Track ID | Title | Status | Scope |
+|:---|:---|:---|:---|:---|
+| 3 | `shura_rbac_governance_20260810` | Shura Workspace Dynamics & Granular RBAC (Architect, Maintainer, Viewer) | **Planned** | `pkg/shura` |
+| 3 | `template_bazaar_marketplace_20260810` | The Bazaar — Community Template Directory & 1-Click Customization | **Planned** | `pkg/bazaar` |
 
 ---
 

@@ -1,0 +1,27 @@
+{
+  "id": "adversarial_security_hardening_20260810",
+  "trackId": "adversarial_security_hardening_20260810",
+  "title": "Adversarial Security & Infrastructure Hardening",
+  "description": "Hardens Taawun against ethics engine regex bypasses, unauthenticated P2P relay impersonation, Docker CLI privilege escalation, mixed-content CSP blocks, and WebSocket bandwidth exhaustion.",
+  "type": "security",
+  "status": "Planned",
+  "subproject": "taawun-go-core",
+  "phases": 5,
+  "tasks": 15,
+  "created": "2026-08-10",
+  "created_at": "2026-08-10T00:00:00.000Z",
+  "updated_at": "2026-08-10T00:00:00.000Z",
+  "depends_on": [
+    "go_iac_control_plane_20260810",
+    "mcp_vibecoding_engine_20260810",
+    "web_p2p_relay_and_ltap_20260810",
+    "taqwa_ethics_guardrails_20260810"
+  ],
+  "blocked_by": [],
+  "keyDecisions": [
+    "HMAC-SIGNED SIGNALING TOKENS. Web P2P relay requires cryptographic signed JWT/HMAC session tokens to prevent peer impersonation and cross-tenant eavesdropping.",
+    "OFFICIAL DOCKER GO SDK & CONTAINER ISOLATION. Migrate from exec.Command CLI to official Docker Go SDK with non-root user (1000:1000), read-only root filesystem, cap-drop=ALL, and explicit image whitelist.",
+    "AST SEMANTIC PARSING FOR TAQWA AUDIT. Replace string regex matching with AST symbolic parsing and LLM semantic auditing for code paths handling financial math and fees.",
+    "WSS SECURE WEBSOCKETS & 64KB RELAY CAP. Enforce wss:// TLS for browser sandbox compatibility and cap relay frames at 64KB to prevent bandwidth exhaustion."
+  ]
+}

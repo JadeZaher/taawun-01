@@ -1,0 +1,24 @@
+{
+  "id": "gap_analysis_remediation_20260810",
+  "trackId": "gap_analysis_remediation_20260810",
+  "title": "Platform Gap Analysis Remediation — DuckDB LTAP, Caddy Ingress, & CRDT State Engine",
+  "description": "Remediates architectural gaps by adding DuckDB analytical OLAP querying, Caddy automated TLS/subdomain routing, CRDT Yjs/Automerge sync protocol, Riba-free fee split engine, and hash-chained audit trails.",
+  "type": "feature",
+  "status": "Planned",
+  "subproject": "taawun-go-core",
+  "phases": 5,
+  "tasks": 16,
+  "created": "2026-08-10",
+  "created_at": "2026-08-10T00:00:00.000Z",
+  "updated_at": "2026-08-10T00:00:00.000Z",
+  "depends_on": [
+    "go_iac_control_plane_20260810",
+    "web_p2p_relay_and_ltap_20260810"
+  ],
+  "blocked_by": [],
+  "keyDecisions": [
+    "DUCKDB FOR ANALYTICAL OLAP AGGREGATION. Combine SQLite for transactional reads/writes with embedded DuckDB for cross-app analytics and Shura dashboard reporting.",
+    "CADDY REVERSE PROXY FOR AUTOMATED TLS. Integrate Caddy admin API to provision dynamic subdomains (*.taawun.community) and automatic Let's Encrypt SSL/TLS certificates.",
+    "CRDT COLLABORATION PROTOCOL. Extend Web P2P relay with Yjs/Automerge binary update format for zero-lock concurrent state sync."
+  ]
+}
