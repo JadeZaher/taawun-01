@@ -1,0 +1,49 @@
+{{define "content"}}
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h5 class="fw-bold mb-0">Workspaces</h5>
+        {{if .CanCreate}}<button id="newWorkspaceBtn" class="btn btn-dark btn-sm">New Workspace</button>{{end}}
+    </div>
+    <div id="workspacesList"><p class="text-muted small">Loading workspaces...</p></div>
+    <div class="modal fade" id="workspaceModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+        <form id="workspaceForm">
+            <div class="modal-header"><h6 class="modal-title fw-bold">Create Workspace</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label small">Name</label><input type="text" id="wsName" class="form-control" required></div>
+                <div class="mb-3"><label class="form-label small">Description</label><textarea id="wsDescription" class="form-control" rows="3"></textarea></div>
+                <div id="workspaceError" class="alert alert-danger py-2 d-none small"></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button><button class="btn btn-dark btn-sm">Create</button></div>
+        </form>
+    </div></div></div>
+</div>
+<script>
+async function loadWorkspaces() {
+    try {
+        const r = await api('/api/v1/workspaces');
+        if (!r.ok) return;
+        const ws = await r.json();
+        const el = document.getElementById('workspacesList');
+        if (!ws || ws.length === 0) { el.innerHTML = '<p class="text-muted small">No workspaces yet.</p>'; return; }
+        el.innerHTML = ws.map(w => `
+            <div class="card mb-2 p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div><h6 class="fw-bold mb-1">${w.name}</h6><p class="small text-muted mb-0">${w.description || 'No description'}</p></div>
+                    <div class="text-end"><span class="badge text-bg-light border me-2">${w.current_user_role}</span><a class="btn btn-outline-dark btn-sm" href="/workspaces/${w.id}">Open</a></div>
+                </div>
+            </div>`).join('');
+    } catch (e) { console.error(e); }
+}
+document.getElementById('newWorkspaceBtn')?.addEventListener('click', () => new bootstrap.Modal(document.getElementById('workspaceModal')).show());
+document.getElementById('workspaceForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = document.getElementById('workspaceError'); err.classList.add('d-none');
+    const r = await api('/api/v1/workspaces', { method: 'POST', body: { name: document.getElementById('wsName').value, description: document.getElementById('wsDescription').value } });
+    if (r.ok) { bootstrap.Modal.getInstance(document.getElementById('workspaceModal')).hide(); loadWorkspaces(); }
+    else { const d = await r.json(); err.textContent = d.error; err.classList.remove('d-none'); }
+});
+loadWorkspaces();
+const es = new EventSource('/_/sse');
+es.onmessage = () => loadWorkspaces();
+</script>
+{{end}}

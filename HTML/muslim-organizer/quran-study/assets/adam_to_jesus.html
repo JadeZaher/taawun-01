@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Divine Timeline</title>
+
+    <style>
+
+        :root {
+
+            --primary: #2c3e50;
+
+            --secondary: #3498db;
+
+            --accent: #e74c3c;
+
+            --light: #ecf0f1;
+
+            --dark: #2c3e50;
+
+            --success: #27ae60;
+
+            --warning: #f39c12;
+
+        }
+
+
+
+        body {
+
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+            line-height: 1.6;
+
+            color: #333;
+
+            background-color: #f5f5f5;
+
+            margin: 0;
+
+            padding: 0;
+
+        }
+
+
+
+        .container {
+
+            max-width: 1200px;
+
+            margin: 0 auto;
+
+            padding: 20px;
+
+        }
+
+
+
+        header {
+
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+
+            color: white;
+
+            text-align: center;
+
+            padding: 2rem 0;
+
+            margin-bottom: 2rem;
+
+            border-radius: 8px;
+
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+        }
+
+
+
+        h1 {
+
+            margin: 0;
+
+            font-size: 2.5rem;
+
+        }
+
+
+
+        .subtitle {
+
+            font-style: italic;
+
+            opacity: 0.9;
+
+        }
+
+
+
+        .timeline {
+
+            position: relative;
+
+            max-width: 1200px;
+
+            margin: 0 auto;
+
+        }
+
+
+
+        .timeline::after {
+
+            content: '';
+
+            position: absolute;
+
+            width: 6px;
+
+            background-color: var(--secondary);
+
+            top: 0;
+
+            bottom: 0;
+
+            left: 50%;
+
+            margin-left: -3px;
+
+            border-radius: 3px;
+
+        }
+
+
+
+        .event {
+
+            padding: 10px 40px;
+
+            position: relative;
+
+            background-color: inherit;
+
+            width: 50%;
+
+            margin-bottom: 30px;
+
+        }
+
+
+
+        .event::after {
+
+            content: '';
+
+            position: absolute;
+
+            width: 25px;
+
+            height: 25px;
+
+            right: -17px;
+
+            background-color: white;
+
+            border: 4px solid var(--accent);
+
+            top: 15px;
+
+            border-radius: 50%;
+
+            z-index: 1;
+
+        }
+
+
+
+        .left {
+
+            left: 0;
+
+        }
+
+
+
+        .right {
+
+            left: 50%;
+
+        }
+
+
+
+        .left::before {
+
+            content: " ";
+
+            height: 0;
+
+            position: absolute;
+
+            top: 22px;
+
+            width: 0;
+
+            z-index: 1;
+
+            right: 30px;
+
+            border: medium solid var(--light);
+
+            border-width: 10px 0 10px 10px;
+
+            border-color: transparent transparent transparent var(--light);
+
+        }
+
+
+
+        .right::before {
+
+            content: " ";
+
+            height: 0;
+
+            position: absolute;
+
+            top: 22px;
+
+            width: 0;
+
+            z-index: 1;
+
+            left: 30px;
+
+            border: medium solid var(--light);
+
+            border-width: 10px 10px 10px 0;
+
+            border-color: transparent var(--light) transparent transparent;
+
+        }
+
+
+
+        .right::after {
+
+            left: -16px;
+
+        }
+
+
+
+        .content {
+
+            padding: 20px 30px;
+
+            background-color: white;
+
+            position: relative;
+
+            border-radius: 6px;
+
+            box-shadow: 0 3px 5px rgba(0, 0, 0, 0.1);
+
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+        }
+
+
+
+        .content:hover {
+
+            transform: translateY(-5px);
+
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+
+        }
+
+
+
+        .year {
+
+            font-weight: bold;
+
+            color: var(--accent);
+
+            font-size: 1.2rem;
+
+            margin-bottom: 5px;
+
+        }
+
+
+
+        .creator {
+
+            color: var(--success);
+
+            font-weight: bold;
+
+        }
+
+
+
+        .famous-name {
+
+            color: var(--secondary);
+
+            font-weight: bold;
+
+        }
+
+
+
+        .false-god {
+
+            color: var(--warning);
+
+            font-weight: bold;
+
+        }
+
+
+
+        .footnotes {
+
+            background-color: var(--light);
+
+            padding: 20px;
+
+            border-radius: 8px;
+
+            margin-top: 40px;
+
+        }
+
+
+
+        .footnotes h2 {
+
+            color: var(--primary);
+
+            border-bottom: 2px solid var(--secondary);
+
+            padding-bottom: 10px;
+
+        }
+
+
+
+        .footnote-item {
+
+            margin-bottom: 15px;
+
+        }
+
+
+
+        .footnote-ref {
+
+            font-weight: bold;
+
+            color: var(--accent);
+
+        }
+
+
+
+        @media screen and (max-width: 768px) {
+
+            .timeline::after {
+
+                left: 31px;
+
+            }
+
+
+
+            .event {
+
+                width: 100%;
+
+                padding-left: 70px;
+
+                padding-right: 25px;
+
+            }
+
+
+
+            .event::before {
+
+                left: 60px;
+
+                border: medium solid white;
+
+                border-width: 10px 10px 10px 0;
+
+                border-color: transparent white transparent transparent;
+
+            }
+
+
+
+            .left::after, .right::after {
+
+                left: 15px;
+
+            }
+
+
+
+            .right {
+
+                left: 0%;
+
+            }
+
+        }
+
+
+
+        .quran-verse {
+
+            font-style: italic;
+
+            color: #555;
+
+            border-left: 3px solid var(--success);
+
+            padding-left: 10px;
+
+            margin: 10px 0;
+
+        }
+
+
+
+        .controls {
+
+            display: flex;
+
+            justify-content: center;
+
+            gap: 15px;
+
+            margin-bottom: 20px;
+
+            flex-wrap: wrap;
+
+        }
+
+
+
+        button {
+
+            padding: 8px 16px;
+
+            border: none;
+
+            border-radius: 4px;
+
+            background-color: var(--secondary);
+
+            color: white;
+
+            cursor: pointer;
+
+            transition: background-color 0.3s;
+
+        }
+
+
+
+        button:hover {
+
+            background-color: var(--primary);
+
+        }
+
+
+
+        .active {
+
+            background-color: var(--accent);
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div class="container">
+
+        <header>
+
+            <h1>Divine Timeline</h1>
+
+            <p class="subtitle">A historical account of monotheism and its challenges</p>
+
+        </header>
+
+
+
+        <div class="controls">
+
+            <button id="showAll">Show All</button>
+
+            <button id="showCreator">Show Creator Events</button>
+
+            <button id="showFalseGods">Show False Gods</button>
+
+            <button id="showQuran">Show Quran Verses</button>
+
+        </div>
+
+
+
+        <div class="timeline" id="timeline">
+
+            <!-- Timeline events will be inserted here by JavaScript -->
+
+        </div>
+
+
+
+        <div class="footnotes">
+
+            <h2>Footnotes and Islamic Sources</h2>
+
+            <div id="footnotes">
+
+                <!-- Footnotes will be inserted here by JavaScript -->
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <script>
+
+        // Timeline data
+
+        const timelineData = [
+
+            {
+
+                year: "Year 1",
+
+                creator: "Allah created Adam without a father or mother",
+
+                famousName: "Creation of Adam",
+
+                falseGod: "",
+
+                footnotes: [
+
+                    "Qur'an 3:59 – 'Indeed, the example of Jesus to Allah is like that of Adam. He created him from dust; then He said to him, 'Be,' and he was.'"
+
+                ]
+
+            },
+
+            {
+
+                year: "Year 1657",
+
+                creator: "Allah drowned those who did not follow Noah and worshipped Ishtar and Inanna",
+
+                famousName: "Noah and the Great Flood",
+
+                falseGod: "Ishtar/Inanna",
+
+                footnotes: [
+
+                    "Qur'an 71 – Entire chapter recounts Prophet Noah's efforts and the flood."
+
+                ]
+
+            },
+
+            {
+
+                year: "Year 2000",
+
+                creator: "Allah saved Prophet Abraham from the fire of Nimrod who claimed to be god",
+
+                famousName: "Abraham: A friend of Allah and father of prophets crucial to monotheism and the ancestor of Muhammad and Moses",
+
+                falseGod: "King Nimrod",
+
+                footnotes: [
+
+                    "Qur'an 21:69 – 'We said, 'O fire, be coolness and safety upon Abraham.''"
+
+                ]
+
+            },
+
+            {
+
+                year: "Year 2479",
+
+                creator: "Allah saved Prophet Moses and drowned Pharaoh who claimed to be god",
+
+                famousName: "The Exodus: Moses and Pharaoh's downfall",
+
+                falseGod: "Pharaoh Yahweh Shiva Vishnu Devi (various forms)",
+
+                footnotes: [
+
+                    "Qur'an 26:60-66 – Story of Moses, the sea parting, and the drowning of Pharaoh who claimed to be the grand god."
+
+                ]
+
+            },
+
+            {
+
+                year: "Year 3579",
+
+                creator: "Confucius focused on good conduct and management (he never claimed to be a god or son of god and was adopted by the Chinese government instead of the Indian Buddha or Christian trinity)",
+
+                famousName: "",
+
+                falseGod: "Zeus Athena",
+
+                footnotes: [
+
+                    "Historical – Confucius never claimed divinity; teachings adopted by dynasties over idol-based or imported religions."
+
+                ]
+
+            },
+
+            {
+
+                year: "Year 3592",
+
+                creator: "Allah sent Prophet Dhu Al-Kifl to the far east",
+
+                famousName: "Siddhartha Gautama (Buddha) and Dhu al-Kifl (a possible interpretation) were seen as corrupting monotheism replacing it with fairy tales and sexism",
+
+                falseGod: "",
+
+                footnotes: [
+
+                    "Qur'an 21:85 – Mentions Dhu al-Kifl; possible reference to a prophet sent to the East."
+
+                ]
+
+            },
+
+            {
+
+                year: "Year 4100",
+
+                creator: "Allah sent Prophet John the Baptist to children of Israel",
+
+                famousName: "John the Baptist an important figure in monotheism just before Jesus",
+
+                falseGod: "",
+
+                footnotes: [
+
+                    "Qur'an 19:7-15 – Prophet Yahya (John the Baptist) is honored as a prophet."
+
+                ]
+
+            },
+
+            {
+
+                year: "Year 4139",
+
+                creator: "Allah created Jesus from a virgin mother and raised him to heaven when he faced persecution",
+
+                famousName: "The life of Jesus and the four anonymous Gospel authors who portrayed him as the 'son of god'",
+
+                falseGod: "son of god, Jupiter, Venus",
+
+                footnotes: [
+
+                    "Qur'an 4:157-158 – Denies the divinity and crucifixion and asserts Jesus who was raised to heaven.",
+
+                    "Qur'an 5:17 Those who say that Allah is the Messiah, son of Mary are indeed those who disbelieved...",
+
+                    "Qur'an 5:73 Indeed those who say, 'Allah is the third of the Trinity' became unbelievers...",
+
+                    "Qur'an 5:116 And when Allah said, '(Prophet) Jesus, son of Mary, did you ever say to the people...'",
+
+                    "Qur'an 4:171 People of the Book, do not exaggerate your religion...",
+
+                    "Qur'an 4:157 and for their saying, 'We killed the Messiah, Jesus the son of Mary...'",
+
+                    "Qur'an 4:158 Rather, Allah raised him (Jesus) up to Him. Allah is Almighty, the Wise."
+
+                ]
+
+            },
+
+            {
+
+                year: "Year 4393",
+
+                creator: "Greek philosophers refused to follow Moses or Jesus rather idols who often rejected Moses influenced the corruption of Jesus' monotheism",
+
+                famousName: "Aristotle exemplified the push for abstract idols which were used by the Eastern Roman Emperor as a replacement for the true Bible of Jesus",
+
+                falseGod: "Abstract Greek idols",
+
+                footnotes: [
+
+                    "Historical – Influence of Platonic and Aristotelian thought the anonymous authored four bibles making Jesus similar to son of Planet sun in one single verse calling him son of god, and on early Christian theologians such as Origen, Augustine."
+
+                ]
+
+            },
+
+            {
+
+                year: "Year 4786",
+
+                creator: "Heraclius (Eastern Roman Emperor) received a letter from Prophet Muhammad and accepted him secretly halting the crusades and the promotion of Greek idols",
+
+                famousName: "",
+
+                falseGod: "",
+
+                footnotes: [
+
+                    "Hadith literature – Heraclius received a letter from Prophet Muhammad inviting him to Islam, which he started emperor investigation and favoured the Prophet Muhammad and never allowed his emperor army to support Roman associate Arabs who fought Muslims till all lost, he intentionally lost all his Middle East Empire except Alexandria which was left for Heraclius by the Prophetic Companion who opened Egypt"
+
+                ]
+
+            },
+
+            {
+
+                year: "Year 4803",
+
+                creator: "Allah Himself protected the Qur'an (there are more than 3 billion identical copies on Earth and archives containing 6,236 verses) and over 2 millions fully memorized by Prophet Muhammad freed people from idol worship dismantling the 365 idols in the Mecca Mosque kids and adult alike",
+
+                famousName: "",
+
+                falseGod: "",
+
+                footnotes: [
+
+                    "Qur'an 15:9 – 'Indeed, it is We who sent down the Qur'an and indeed, We will be its guardian.' Also, destruction of idols: Sahih al-Bukhari 4287."
+
+                ]
+
+            },
+
+            {
+
+                year: "Year 5674",
+
+                creator: "The western Crusades led to significant loss of life among Muslims till now in Gaza",
+
+                famousName: "The fall of the Ottoman Empire and the onset of the Crusades which resulted in the deaths of millions of Muslims",
+
+                falseGod: "",
+
+                footnotes: [
+
+                    "Historical – Crusades where Christian missionaries on front beginning 1095 CE; massive impact on Muslim lands from Morocco (French), Libya (Italy) to Egypt (England) Indonesia (Holland)"
+
+                ]
+
+            },
+
+            {
+
+                year: "Year 5777",
+
+                creator: "President Donald Trump is man of peace",
+
+                famousName: "On May 14 2025 President Trump intervened to stop the unconventional crusade led by the UK, US neoconservative and Israel forces killing millions in Libya, Iraq, lebanon, Yemen and Gaza",
+
+                falseGod: "",
+
+                footnotes: [
+
+                    "Modern man of peace political claim by Roland Trump though supporting Zionist Christian, Jews, USA NeoCon, and Israeli to kill Gaza (e.g., Abraham Accords, U.S. plans to kill Palestine"
+
+                ]
+
+            }
+
+        ];
+
+
+
+        // Function to create timeline events
+
+        function createTimeline() {
+
+            const timeline = document.getElementById('timeline');
+
+            const footnotesContainer = document.getElementById('footnotes');
+
+
+
+            // Clear existing content
+
+            timeline.innerHTML = '';
+
+            footnotesContainer.innerHTML = '';
+
+
+
+            // Create timeline events
+
+            timelineData.forEach((event, index) => {
+
+                const eventElement = document.createElement('div');
+
+                eventElement.className = `event ${index % 2 === 0 ? 'left' : 'right'}`;
+
+
+
+                let contentHTML = `
+
+                    <div class="content">
+                        <div class="year">${event.year}</div>
+
+                `;
+
+
+
+                if (event.creator) {
+
+                    contentHTML += `<p><span class="creator">Real Creator of the Universe:</span> ${event.creator}</p>`;
+
+                }
+
+
+
+                if (event.famousName) {
+
+                    contentHTML += `<p><span class="famous-name">The Famous Name or Event:</span> ${event.famousName}</p>`;
+
+                }
+
+
+
+                if (event.falseGod) {
+
+                    contentHTML += `<p><span class="false-god">False Physical or Abstract god/goddess:</span> ${event.falseGod}</p>`;
+
+                }
+
+
+
+                // Add footnotes indicator if there are any
+
+                if (event.footnotes && event.footnotes.length > 0) {
+
+                    const footnoteId = `footnote-${index}`;
+
+                    contentHTML += `<div class="quran-verse" id="${footnoteId}-preview">${event.footnotes[0]}</div>`;
+
+
+
+                    // Create full footnotes
+
+                    event.footnotes.forEach((note, noteIndex) => {
+
+                        const footnoteElement = document.createElement('div');
+
+                        footnoteElement.className = 'footnote-item';
+
+                        footnoteElement.innerHTML = `
+
+                            <span class="footnote-ref">${event.year.split(' ')[1]}-${noteIndex + 1}:</span> ${note}
+
+                        `;
+
+                        footnotesContainer.appendChild(footnoteElement);
+
+                    });
+
+                }
+
+
+
+                contentHTML += `</div>`;
+
+                eventElement.innerHTML = contentHTML;
+
+                timeline.appendChild(eventElement);
+
+            });
+
+        }
+
+
+
+        // Filter functions
+
+        function filterTimeline(filterType) {
+
+            const events = document.querySelectorAll('.event');
+
+
+
+            events.forEach(event => {
+
+                const content = event.querySelector('.content');
+
+                let showEvent = false;
+
+
+
+                switch(filterType) {
+
+                    case 'creator':
+
+                        showEvent = content.querySelector('.creator') !== null;
+
+                        break;
+
+                    case 'falseGods':
+
+                        showEvent = content.querySelector('.false-god') !== null;
+
+                        break;
+
+                    case 'quran':
+
+                        showEvent = content.querySelector('.quran-verse') !== null;
+
+                        break;
+
+                    case 'all':
+
+                        showEvent = true;
+
+                        break;
+
+                }
+
+
+
+                if (showEvent) {
+
+                    event.style.display = 'block';
+
+                } else {
+
+                    event.style.display = 'none';
+
+                }
+
+            });
+
+
+
+            // Update active button
+
+            document.querySelectorAll('.controls button').forEach(btn => {
+
+                btn.classList.remove('active');
+
+            });
+
+            document.getElementById(`show${filterType.charAt(0).toUpperCase() + filterType.slice(1)}`).classList.add('active');
+
+        }
+
+
+
+        // Initialize the page
+
+        document.addEventListener('DOMContentLoaded', () => {
+
+            createTimeline();
+
+
+
+            // Set up event listeners for filter buttons
+
+            document.getElementById('showAll').addEventListener('click', () => filterTimeline('all'));
+
+            document.getElementById('showCreator').addEventListener('click', () => filterTimeline('creator'));
+
+            document.getElementById('showFalseGods').addEventListener('click', () => filterTimeline('falseGods'));
+
+            document.getElementById('showQuran').addEventListener('click', () => filterTimeline('quran'));
+
+
+
+            // Show all by default
+
+            filterTimeline('all');
+
+        });
+
+    </script>
+       <div class="gtranslate_wrapper"></div>
+        <script> window.gtranslateSettings = {default_language:"ar",languages: ["ar","en","id","ru","ur","zh-CN","zh-TW","af","sq","am","hy","as","ay","az","bm","eu","be","bn","bh","bs","bg","ca","ceb","ny","co","hr","cs","da","dv","doi","nl","eo","et","ee","tl","fi","fr","fy","gl","ka","de","el","gn","gu","ht","ha","haw","he","hi","hmn","hu","is","ig","ilo","ga","it","ja","jv","kn","kk","km","rw","kok","ko","kri","ku","ckb","ky","lo","la","lv","ln","lt","lg","lb","mk","mai","mg","ms","ml","mt","mi","mr","mni","lus","mn","my","ne","no","or","om","ps","fa","pl","pt","pa","qu","ro","sm","sa","gd","ns","sr","st","sn","sd","si","sk","sl","so","es","su","sw","sv","tg","ta","tt","te","th","ti","ts","tr","tk","tw","uk","ug","uz","vi","cy","xh","yi","yo","zu"], wrapper_selector:".gtranslate_wrapper", switcher_horizontal_position:"left", switcher_vertical_position: "top", alt_flags: { en: "usa" }}; </script>
+        <script src="/float.js" defer="defer"></script> </b></div>
+    <b> </b>
+</body>
+
+</html>

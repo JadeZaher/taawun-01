@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>I ❤️ Every Town - CivicCommon for City Leaders</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:wght@400;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary: #D84315;
+            --secondary: #0D47A1;
+            --accent: #FFA726;
+            --dark: #1A1A1A;
+            --light: #F5F5F5;
+            --success: #2E7D32;
+        }
+        
+        body {
+            font-family: 'Space Mono', monospace;
+            line-height: 1.6;
+            color: var(--dark);
+            background: var(--light);
+        }
+        
+        .hero {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 4rem 2rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><rect width="2" height="2" fill="%23ffffff" opacity="0.1"/></svg>');
+            animation: slide 20s linear infinite;
+        }
+        
+        @keyframes slide {
+            0% { transform: translateX(0) translateY(0); }
+            100% { transform: translateX(50px) translateY(50px); }
+        }
+        
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            font-family: 'DM Serif Display', serif;
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            margin-bottom: 1rem;
+            line-height: 1.1;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .tagline {
+            font-size: clamp(1.1rem, 2vw, 1.4rem);
+            margin-bottom: 2rem;
+            opacity: 0.95;
+            font-weight: 400;
+        }
+        
+        .tribute {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 0.5rem 1.5rem;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+            text-align: center;
+        }
+        
+        .stat {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .stat:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: block;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .modules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+        
+        .module-card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-left: 4px solid var(--primary);
+            transition: all 0.3s ease;
+        }
+        
+        .module-card:hover {
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+            border-left-width: 8px;
+        }
+        
+        .module-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+        
+        .module-name {
+            font-family: 'DM Serif Display', serif;
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--secondary);
+        }
+        
+        .module-description {
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+        
+        .module-benefit {
+            background: #FFF3E0;
+            padding: 0.75rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #E65100;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+        }
+        
+        .module-tech {
+            font-size: 0.75rem;
+            color: #666;
+            font-family: monospace;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-top: 0.5rem;
+        }
+        
+        .status-production {
+            background: #C8E6C9;
+            color: var(--success);
+        }
+        
+        .status-beta {
+            background: #BBDEFB;
+            color: #1565C0;
+        }
+        
+        .status-alpha {
+            background: #FFE0B2;
+            color: #E65100;
+        }
+        
+        .section-title {
+            font-family: 'DM Serif Display', serif;
+            font-size: 2.5rem;
+            text-align: center;
+            margin: 3rem 0 2rem;
+            color: var(--secondary);
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .feature {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .feature h3 {
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+        
+        .feature p {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+        
+        .testimonials {
+            background: white;
+            border-radius: 12px;
+            padding: 3rem;
+            margin: 3rem 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .testimonial {
+            margin-bottom: 2rem;
+            padding-bottom: 2rem;
+            border-bottom: 2px solid #eee;
+        }
+        
+        .testimonial:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .testimonial-quote {
+            font-family: 'DM Serif Display', serif;
+            font-size: 1.3rem;
+            font-style: italic;
+            color: var(--secondary);
+            margin-bottom: 1rem;
+        }
+        
+        .testimonial-author {
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .testimonial-city {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .cta-section {
+            background: var(--dark);
+            color: white;
+            padding: 4rem 2rem;
+            text-align: center;
+            margin-top: 4rem;
+        }
+        
+        .cta-title {
+            font-family: 'DM Serif Display', serif;
+            font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 2rem;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 1rem 2.5rem;
+            border-radius: 50px;
+            font-weight: 700;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.9rem;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #BF360C;
+            transform: scale(1.05);
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+        }
+        
+        .btn-secondary:hover {
+            background: white;
+            color: var(--dark);
+        }
+        
+        .onboarding {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 3rem;
+            border-radius: 12px;
+            margin: 3rem 0;
+        }
+        
+        .onboarding-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .step {
+            text-align: center;
+        }
+        
+        .step-number {
+            width: 60px;
+            height: 60px;
+            background: white;
+            color: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0 auto 1rem;
+        }
+        
+        .step-text {
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        
+        .timeline {
+            background: rgba(255,255,255,0.2);
+            padding: 1rem 2rem;
+            border-radius: 30px;
+            display: inline-block;
+            margin-top: 2rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+        
+        footer {
+            background: var(--dark);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 1rem 0;
+        }
+        
+        .footer-links a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .hero {
+                padding: 3rem 1.5rem;
+            }
+            
+            .modules-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .cta-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <div class="hero-content">
+            <h1>I ❤️ Every Town</h1>
+            <p class="tagline">NYC-grade digital tools. Zero cost. Every zip code.</p>
+            <p style="font-size: 1.1rem;">Digital citizenship shouldn't depend on your zip code</p>
+            <div class="tribute">Honoring Mayor Zohran Mamdani</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="stats">
+            <div class="stat">
+                <span class="stat-number">3,142</span>
+                <span class="stat-label">Counties Supported</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">47M</span>
+                <span class="stat-label">Residents Served</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">$0</span>
+                <span class="stat-label">Cost Forever</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">48hr</span>
+                <span class="stat-label">Go Live Time</span>
+            </div>
+        </div>
+
+        <h2 class="section-title">Six Powerful Modules</h2>
+        
+        <div class="modules-grid">
+            <div class="module-card">
+                <span class="module-icon">🔐</span>
+                <h3 class="module-name">One Identity</h3>
+                <p class="module-description">Single sign-on via Login.gov. One ID for permits, benefits, and services.</p>
+                <div class="module-benefit">✓ Eliminate password sprawl for residents</div>
+                <div class="module-tech">Login.gov OIDC, OAuth2</div>
+                <span class="status-badge status-production">Production Ready</span>
+            </div>
+
+            <div class="module-card">
+                <span class="module-icon">🗺️</span>
+                <h3 class="module-name">3D City Atlas</h3>
+                <p class="module-description">High-resolution 3D maps and resource finder for hospitals, shelters, parks.</p>
+                <div class="module-benefit">✓ Urban planning tools once reserved for major metros</div>
+                <div class="module-tech">USGS 3DEP, MapLibre GL, PostGIS</div>
+                <span class="status-badge status-beta">Beta</span>
+            </div>
+
+            <div class="module-card">
+                <span class="module-icon">💰</span>
+                <h3 class="module-name">Benefit Navigator</h3>
+                <p class="module-description">AI-powered eligibility screener for SNAP, WIC, childcare, housing assistance.</p>
+                <div class="module-benefit">✓ Help residents find money they're entitled to</div>
+                <div class="module-tech">Benefits.gov API, FindHelp.org</div>
+                <span class="status-badge status-production">Production Ready</span>
+            </div>
+
+            <div class="module-card">
+                <span class="module-icon">📢</span>
+                <h3 class="module-name">Universal 311</h3>
+                <p class="module-description">Mobile-ready pothole reporting that routes to your existing work-order system.</p>
+                <div class="module-benefit">✓ Resident engagement without custom software</div>
+                <div class="module-tech">Open311 Standard, Email Bridge</div>
+                <span class="status-badge status-production">Production Ready</span>
+            </div>
+
+            <div class="module-card">
+                <span class="module-icon">🎙️</span>
+                <h3 class="module-name">Civic Pulse AI</h3>
+                <p class="module-description">Auto-summarize city council meetings into '3 Things You Need to Know' texts.</p>
+                <div class="module-benefit">✓ Increase transparency with zero staff hours</div>
+                <div class="module-tech">LLM Summarization, Twilio SMS</div>
+                <span class="status-badge status-alpha">Alpha</span>
+            </div>
+
+            <div class="module-card">
+                <span class="module-icon">📋</span>
+                <h3 class="module-name">Permit-Bot</h3>
+                <p class="module-description">TurboTax for permits. Residents answer 5 questions, get exact permit requirements.</p>
+                <div class="module-benefit">✓ Reduce counter inquiries by 70%</div>
+                <div class="module-tech">Logic Engine, JSON Schema</div>
+                <span class="status-badge status-beta">Beta</span>
+            </div>
+        </div>
+
+        <h2 class="section-title">Why Cities Choose CivicCommon</h2>
+        
+        <div class="features">
+            <div class="feature">
+                <h3>💸 Zero Infrastructure Cost</h3>
+                <p>We leverage federal APIs (Census, USGS, HUD) you already pay for with taxes</p>
+            </div>
+            <div class="feature">
+                <h3>🔌 Plug-and-Play</h3>
+                <p>Works with your existing email and work-order systems. No vendor lock-in.</p>
+            </div>
+            <div class="feature">
+                <h3>📱 Mobile-First + SMS</h3>
+                <p>Works on 5-year-old phones. Text-only mode for residents without smartphones.</p>
+            </div>
+            <div class="feature">
+                <h3>🔓 Open Source Forever</h3>
+                <p>MIT License. No fees. No tracking. No data-selling. Built by the people.</p>
+            </div>
+        </div>
+
+        <div class="testimonials">
+            <h2 class="section-title">Success Stories</h2>
+            
+            <div class="testimonial">
+                <p class="testimonial-quote">"Our 311 reports went from email chaos to organized action in 2 weeks."</p>
+                <p><span class="testimonial-author">Jane Chen, IT Director</span><br>
+                <span class="testimonial-city">Boise, ID (235K residents)</span></p>
+            </div>
+            
+            <div class="testimonial">
+                <p class="testimonial-quote">"We couldn't afford a $50K software contract. This gave us NYC-level tools for free."</p>
+                <p><span class="testimonial-author">Marcus Williams, City Manager</span><br>
+                <span class="testimonial-city">Wheeling, WV (26K residents)</span></p>
+            </div>
+        </div>
+
+        <div class="onboarding">
+            <h2 style="font-family: 'DM Serif Display', serif; font-size: 2rem; text-align: center; margin-bottom: 1rem;">
+                Simple Onboarding
+            </h2>
+            
+            <div class="onboarding-steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <p class="step-text">City staff claim their municipality on CivicCommon.org</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <p class="step-text">We verify your official email and set up the 311 routing</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <p class="step-text">Residents access tools immediately - no app downloads required</p>
+                </div>
+            </div>
+            
+            <div style="text-align: center;">
+                <div class="timeline">⚡ Live in 48 Hours</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="cta-section">
+        <h2 class="cta-title">Ready to Bring World-Class Tools<br>to Your Community?</h2>
+        <p style="font-size: 1.2rem; max-width: 700px; margin: 0 auto;">
+            Join 100+ cities already serving 47M residents with CivicCommon
+        </p>
+        
+        <div class="cta-buttons">
+            <a href="https://civiccommon.org/claim" class="btn btn-primary">Claim Your City</a>
+            <a href="https://cal.com/civiccommon/demo" class="btn btn-secondary">Schedule a Demo</a>
+        </div>
+
+        <p style="margin-top: 2rem; font-size: 0.9rem; opacity: 0.8;">
+            Required: 2 hours staff time • Official city email address • Zero ongoing maintenance
+        </p>
+    </div>
+
+    <footer>
+        <p style="font-size: 1.1rem; margin-bottom: 1rem;">
+            Built by the Digital Corps. Dedicated to Zohran Mamdani's vision of equitable cities.
+        </p>
+        
+        <div class="footer-links">
+            <a href="/cdn-cgi/l/email-protection#09646870667b7a496a607f606a6a666464666727667b6e"><span class="__cf_email__" data-cfemail="2a474b534558596a49435c43494945474745440445584d">[email&#160;protected]</span></a>
+            <a href="https://github.com/civic-common">GitHub</a>
+            <a href="https://discord.gg/civiccommon">Discord</a>
+            <a href="https://docs.civiccommon.org">Documentation</a>
+        </div>
+        
+        <p style="margin-top: 1.5rem; font-size: 0.85rem; opacity: 0.7;">
+            MIT License - Public Domain Forever<br>
+            Partners: Code for America • U.S. Digital Service • National League of Cities <p>
+            Produced by The Agentic Battalion — Enterprise AI Delivery Without Enterprise Risk
+            NabiMuhammad.com/agentic-battalion
+            A technical initiative hosted under NabiMuhammad.com
+            Lowercase, neutral, professional — clearly

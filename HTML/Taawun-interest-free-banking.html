@@ -1,0 +1,1099 @@
+<!-- nybrowser.com/interest-free-banking/index.html -->
+
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Finance Banking</title>
+
+  <meta name="description" content="Non-usury banking — Profit-sharing, asset-backed, ethical finance in 50 languages">
+
+  <link rel="stylesheet" href="/css/nybrowser.css">
+
+  <style>
+
+    :root {
+
+      --gold: #c4a747;
+
+      --green: #2c5f2d;
+
+      --cream: #faf7f2;
+
+      --brown: #8b7355;
+
+    }
+
+
+
+    body {
+
+      font-family: 'Georgia', 'Times New Roman', serif;
+
+      background: var(--cream);
+
+      color: #2c3e4f;
+
+      line-height: 1.6;
+
+      margin: 0;
+
+      padding: 0;
+
+    }
+
+
+
+    .container {
+
+      max-width: 1200px;
+
+      margin: 0 auto;
+
+      padding: 2rem;
+
+    }
+
+
+
+    h1 {
+
+      font-size: 2.5rem;
+
+      color: var(--green);
+
+      border-bottom: 3px solid var(--gold);
+
+      padding-bottom: 0.5rem;
+
+    }
+
+
+
+    h2 {
+
+      color: var(--brown);
+
+      margin-top: 2rem;
+
+    }
+
+
+
+    .subtitle {
+
+      font-size: 1.3rem;
+
+      font-style: italic;
+
+      color: #5a6b7a;
+
+      margin-bottom: 2rem;
+
+    }
+
+
+
+    .definition-box {
+
+      background: white;
+
+      border-left: 6px solid var(--gold);
+
+      padding: 1.5rem;
+
+      border-radius: 0 12px 12px 0;
+
+      margin: 2rem 0;
+
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+
+    }
+
+
+
+    .definition-box p {
+
+      font-size: 1.1rem;
+
+      margin: 0;
+
+    }
+
+
+
+    .comparison-table {
+
+      width: 100%;
+
+      border-collapse: collapse;
+
+      margin: 2rem 0;
+
+      background: white;
+
+      border-radius: 12px;
+
+      overflow: hidden;
+
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+
+    }
+
+
+
+    .comparison-table th {
+
+      background: var(--green);
+
+      color: white;
+
+      padding: 1rem;
+
+      font-size: 1.2rem;
+
+    }
+
+
+
+    .comparison-table td {
+
+      padding: 1.2rem;
+
+      border-bottom: 1px solid #e0e0e0;
+
+    }
+
+
+
+    .comparison-table tr:last-child td {
+
+      border-bottom: none;
+
+    }
+
+
+
+    .comparison-table .conventional {
+
+      background: #fff0f0;
+
+    }
+
+
+
+    .comparison-table .islamic {
+
+      background: #f0f7f0;
+
+    }
+
+
+
+    .feature-badge {
+
+      display: inline-block;
+
+      padding: 0.3rem 0.8rem;
+
+      border-radius: 20px;
+
+      font-size: 0.9rem;
+
+      font-weight: bold;
+
+    }
+
+
+
+    .badge-green {
+
+      background: var(--green);
+
+      color: white;
+
+    }
+
+
+
+    .badge-gold {
+
+      background: var(--gold);
+
+      color: white;
+
+    }
+
+
+
+    .models-grid {
+
+      display: grid;
+
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+
+      gap: 1.5rem;
+
+      margin: 2rem 0;
+
+    }
+
+
+
+    .model-card {
+
+      background: white;
+
+      border-radius: 12px;
+
+      padding: 1.5rem;
+
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+
+      border-top: 4px solid var(--gold);
+
+      transition: transform 0.2s;
+
+    }
+
+
+
+    .model-card:hover {
+
+      transform: translateY(-5px);
+
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+
+    }
+
+
+
+    .model-card h3 {
+
+      color: var(--green);
+
+      margin-top: 0;
+
+      font-size: 1.5rem;
+
+    }
+
+
+
+    .model-card .arabic {
+
+      font-size: 1.3rem;
+
+      font-family: 'Amiri', 'Traditional Arabic', serif;
+
+      color: var(--brown);
+
+      margin: 0.5rem 0;
+
+    }
+
+
+
+    .calculator-preview {
+
+      background: linear-gradient(135deg, var(--green), #1e3f1f);
+
+      color: white;
+
+      padding: 2rem;
+
+      border-radius: 12px;
+
+      margin: 2rem 0;
+
+    }
+
+
+
+    .calculator-preview h3 {
+
+      color: var(--gold);
+
+      margin-top: 0;
+
+    }
+
+
+
+    .input-group {
+
+      margin: 1rem 0;
+
+    }
+
+
+
+    .input-group label {
+
+      display: block;
+
+      margin-bottom: 0.5rem;
+
+      font-weight: bold;
+
+    }
+
+
+
+    .input-group input {
+
+      padding: 0.8rem;
+
+      width: 100%;
+
+      max-width: 300px;
+
+      border: none;
+
+      border-radius: 6px;
+
+      font-size: 1rem;
+
+    }
+
+
+
+    .result-box {
+
+      background: rgba(255,255,255,0.1);
+
+      padding: 1rem;
+
+      border-radius: 8px;
+
+      margin: 1rem 0;
+
+      font-size: 1.2rem;
+
+    }
+
+
+
+    .language-selector {
+
+      display: flex;
+
+      justify-content: flex-end;
+
+      margin-bottom: 1rem;
+
+    }
+
+
+
+    .language-selector select {
+
+      padding: 0.5rem;
+
+      border: 2px solid var(--gold);
+
+      border-radius: 8px;
+
+      background: white;
+
+      font-family: inherit;
+
+    }
+
+
+
+    .fatwa-note {
+
+      background: #fff3cd;
+
+      border: 1px solid #ffeeba;
+
+      padding: 1rem;
+
+      border-radius: 8px;
+
+      margin: 2rem 0;
+
+    }
+
+
+
+    .fatwa-note h4 {
+
+      color: #856404;
+
+      margin-top: 0;
+
+    }
+
+
+
+    .csv-accounting {
+
+      background: #2d2d2d;
+
+      color: #f0f0f0;
+
+      padding: 1.5rem;
+
+      border-radius: 8px;
+
+      font-family: 'Courier New', monospace;
+
+      margin: 2rem 0;
+
+    }
+
+
+
+    .csv-accounting pre {
+
+      margin: 0;
+
+      overflow-x: auto;
+
+    }
+
+
+
+    footer {
+
+      margin-top: 4rem;
+
+      padding-top: 2rem;
+
+      border-top: 2px solid #e0d5c7;
+
+      text-align: center;
+
+      color: #5a6b7a;
+
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+  <div class="container">
+
+    <!-- Language Selector (LAS Integration) -->
+
+    <div class="language-selector">
+
+      <select id="langSelect">
+
+        <option value="en">English</option>
+
+        <option value="ms-MY">Bahasa Malaysia</option>
+
+        <option value="ar-SA">العربية</option>
+
+        <option value="id-ID">Bahasa Indonesia</option>
+
+        <option value="th-TH">ภาษาไทย</option>
+
+        <option value="ur-PK">اردو</option>
+
+        <option value="fa-IR">فارسی</option>
+
+        <option value="tr-TR">Türkçe</option>
+
+        <option value="sw-KE">Kiswahili</option>
+
+        <option value="ha-NG">Hausa</option>
+
+        <option value="bn-BD">বাংলা</option>
+        <option value="hi-IN">हिन्दी</option>
+
+        <option value="zh-CN">简体中文</option>
+
+        <option value="ru-RU">Русский</option>
+
+      </select>
+
+    </div>
+
+
+
+    <h1 id="page-title">💰 Interest-Free Banking</h1>
+
+    <h2 id="page-subtitle" class="subtitle">Non-Usury · Risk-Sharing · Asset-Backed · Ethical Finance</h2>
+
+
+
+    <!-- Core Definition -->
+
+    <div class="definition-box" id="definition-box">
+
+      <p id="definition-text">
+
+        <strong>Non-usury banking</strong> (interest-free or participatory banking) treats money as a medium of exchange,
+
+        not a commodity to generate profit simply by being lent. Rooted in Islamic Finance (where interest is called
+
+        <em>Riba</em>) and various ethical economic theories, it views traditional interest as a driver of inequality
+
+        and economic instability.
+
+      </p>
+
+    </div>
+
+
+
+    <!-- Comparison Table -->
+
+    <h2 id="compare-title">⚖️ Conventional vs. Interest-Free Banking</h2>
+
+
+
+    <table class="comparison-table">
+
+      <thead>
+
+        <tr>
+
+          <th>Feature</th>
+
+          <th>Conventional Banking</th>
+
+          <th>Non-Usury / Interest-Free</th>
+
+        </tr>
+
+      </thead>
+
+      <tbody>
+
+        <tr>
+
+          <td><strong>Foundation</strong></td>
+
+          <td class="conventional">Debt-based (Money for money)</td>
+
+          <td class="islamic">Equity-based (Investment in assets)</td>
+
+        </tr>
+
+        <tr>
+
+          <td><strong>Risk</strong></td>
+
+          <td class="conventional">Transferred to the borrower</td>
+
+          <td class="islamic">Shared between bank and customer</td>
+
+        </tr>
+
+        <tr>
+
+          <td><strong>Return</strong></td>
+
+          <td class="conventional">Pre-determined fixed interest</td>
+
+          <td class="islamic">Variable profit/loss sharing</td>
+
+        </tr>
+
+        <tr>
+
+          <td><strong>Backing</strong></td>
+
+          <td class="conventional">Can be speculative/unsecured</td>
+
+          <td class="islamic">Must be tied to real, tangible asset</td>
+
+        </tr>
+
+        <tr>
+
+          <td><strong>Economic Impact</strong></td>
+
+          <td class="conventional">Can create asset bubbles (2008 crisis)</td>
+
+          <td class="islamic">Naturally prevents speculation</td>
+
+        </tr>
+
+        <tr>
+
+          <td><strong>Social Justice</strong></td>
+
+          <td class="conventional">Lender wins even if borrower fails</td>
+
+          <td class="islamic">Bank succeeds only if business succeeds</td>
+
+        </tr>
+
+      </tbody>
+
+    </table>
+
+
+
+    <!-- Primary Financial Models -->
+
+    <h2 id="models-title">📊 Primary Financial Models</h2>
+
+
+
+    <div class="models-grid">
+
+      <!-- Mudarabah -->
+
+      <div class="model-card">
+
+        <h3>Mudarabah</h3>
+
+        <div class="arabic">مضاربة</div>
+
+        <p><strong>Profit & Loss Sharing</strong></p>
+
+        <p>Bank provides capital, entrepreneur provides expertise. Profits shared at pre-agreed ratio; bank bears financial loss if project fails (without negligence).</p>
+
+        <span class="feature-badge badge-green">Risk-Sharing</span>
+
+      </div>
+
+
+
+      <!-- Musharakah -->
+
+      <div class="model-card">
+
+        <h3>Musharakah</h3>
+
+        <div class="arabic">مشاركة</div>
+
+        <p><strong>Joint Venture</strong></p>
+
+        <p>Both bank and client provide capital and share both profits and losses proportionally. True partnership.</p>
+
+        <span class="feature-badge badge-green">Joint Venture</span>
+
+      </div>
+
+
+
+      <!-- Murabahah -->
+
+      <div class="model-card">
+
+        <h3>Murabahah</h3>
+
+        <div class="arabic">مرابحة</div>
+
+        <p><strong>Cost-Plus Financing</strong></p>
+
+        <p>Bank buys asset ($300k house) and sells to client for $350k in installments. "Trade profit" not "interest."</p>
+
+        <span class="feature-badge badge-gold">Asset-Backed</span>
+
+      </div>
+
+
+
+      <!-- Ijarah -->
+
+      <div class="model-card">
+
+        <h3>Ijarah</h3>
+
+        <div class="arabic">إجارة</div>
+
+        <p><strong>Leasing</strong></p>
+
+        <p>Lease-to-own model. Bank owns asset, customer pays "rent" until ownership transfers.</p>
+
+        <span class="feature-badge badge-gold">Lease-to-Own</span>
+
+      </div>
+
+    </div>
+
+
+
+    <!-- Mudarabah Calculator (Interactive) -->
+
+    <div class="calculator-preview" id="mudarabah-calc">
+
+      <h3 id="calc-title">🤝 Mudarabah Profit-Sharing Calculator</h3>
+
+      <p id="calc-desc">See how profits are shared when bank and entrepreneur partner — no interest, just fair agreement.</p>
+
+
+
+      <div class="input-group">
+
+        <label id="capital-label">Bank Capital ($):</label>
+
+        <input type="number" id="capital" value="100000" min="1000" step="1000">
+
+      </div>
+
+
+
+      <div class="input-group">
+
+        <label id="profit-label">Project Profit ($):</label>
+
+        <input type="number" id="profit" value="25000" min="0" step="1000">
+
+      </div>
+
+
+
+      <div class="input-group">
+
+        <label id="ratio-label">Bank Share (%):</label>
+
+        <input type="number" id="bankRatio" value="60" min="0" max="100" step="5">
+
+      </div>
+
+
+
+      <div class="result-box" id="result-box">
+
+        <div id="bank-profit">🏦 Bank receives: $15,000</div>
+
+        <div id="entrepreneur-profit">👤 Entrepreneur receives: $10,000</div>
+
+        <div id="loss-note" style="display:none; color:#ffcc00;">⚠️ If loss occurs, bank bears financial loss (unless negligence)</div>
+
+      </div>
+
+
+
+      <p id="calc-note" style="font-size:0.9rem; opacity:0.8;">* In Mudarabah, bank bears loss; entrepreneur loses only time/effort</p>
+
+    </div>
+
+
+
+    <!-- Why People Use It (Beyond Religion) -->
+
+    <h2 id="why-title">🌍 Why People Choose Interest-Free Banking</h2>
+
+
+
+    <div class="models-grid">
+
+      <div class="model-card">
+
+        <h3>📈 Economic Stability</h3>
+
+        <p>Loans must be backed by real assets, preventing the "asset bubbles" and debt inflation seen in the 2008 financial crisis.</p>
+
+      </div>
+
+
+
+      <div class="model-card">
+
+        <h3>⚖️ Social Justice</h3>
+
+        <p>In interest-based systems, lenders profit even if borrowers fail. In non-usury systems, banks succeed only when businesses succeed.</p>
+
+      </div>
+
+
+
+      <div class="model-card">
+
+        <h3>🚫 Ethical Constraints</h3>
+
+        <p>These banks refuse to finance gambling, tobacco, alcohol, or speculative derivatives — only real economy investments.</p>
+
+      </div>
+
+    </div>
+
+
+
+    <!-- Modern Examples -->
+
+    <h2 id="examples-title">🏛️ Modern Examples</h2>
+
+
+
+    <ul style="font-size:1.1rem; margin:1.5rem 0;">
+
+      <li><strong>Islamic Banks:</strong> Global hubs in Malaysia, UAE, London, GCC countries</li>
+
+      <li><strong>JAK Members Bank (Sweden):</strong> Secular member-owned cooperative — totally interest-free using "savings points"</li>
+
+      <li><strong>Public Banking Movements:</strong> "Green Banks" in US/Europe exploring non-usury models for community infrastructure</li>
+
+    </ul>
+
+
+
+    <!-- Important Note on Criticism -->
+
+    <div class="fatwa-note" id="criticism-note">
+
+      <h4 id="criticism-title">📝 Scholarly Note</h4>
+
+      <p id="criticism-text">
+
+        A common critique of modern interest-free banking (specifically Murabahah) is that the "profit mark-up" often matches
+
+        prevailing interest rates. Critics call this "disguised riba," while proponents argue the legal and ethical structure
+
+        remains fundamentally different because the bank assumes the risk of ownership.
+
+      </p>
+
+    </div>
+
+
+
+    <!-- CSV-Based Accounting (ACKS Integration) -->
+
+    <h2 id="csv-title">📊 ACKS Accounting — CSV-Based Ledger</h2>
+
+
+
+    <div class="csv-accounting">
+
+      <pre>
+
+# Mudarabah Investment Ledger (ACKS Format)
+
+transaction_id|date|type|capital|profit_share|bank_share|entrepreneur_share|status
+
+TRX-2026-0001|2026-02-21|mudarabah|100000|25000|15000|10000|distributed
+
+TRX-2026-0002|2026-02-21|murabahah|300000|50000|45000|5000|active
+
+TRX-2026-0003|2026-02-21|musharakah|50000|12000|6000|6000|distributed
+
+
+
+# Profit Distribution Formula
+
+# bank_share = profit * (bank_ratio/100)
+
+# entrepreneur_share = profit - bank_share
+
+      </pre>
+
+    </div>
+
+
+
+    <!-- Integration with NY Browser -->
+
+    <div style="background: white; padding: 2rem; border-radius: 12px; margin: 2rem 0; border: 2px solid var(--gold);">
+
+      <h2 style="color: var(--green); margin-top: 0;">🔄 Integrated with NY Browser Stack</h2>
+
+
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1.5rem;">
+
+        <div style="text-align: center;">
+
+          <div style="font-size: 2rem;">🌍</div>
+
+          <div><strong>50 LAS</strong></div>
+
+          <div style="font-size: 0.9rem;">All financial terms in 50 languages</div>
+
+        </div>
+
+
+
+        <div style="text-align: center;">
+
+          <div style="font-size: 2rem;">🧠</div>
+
+          <div><strong>Confucius AI</strong></div>
+
+          <div style="font-size: 0.9rem;">Ethical finance guidance</div>
+
+        </div>
+
+
+
+        <div style="text-align: center;">
+
+          <div style="font-size: 2rem;">🌾</div>
+
+          <div><strong>Villagepedia</strong></div>
+
+          <div style="font-size: 0.9rem;">Agricultural financing</div>
+
+        </div>
+
+
+
+        <div style="text-align: center;">
+
+          <div style="font-size: 2rem;">💰</div>
+
+          <div><strong>Affiliate</strong></div>
+
+          <div style="font-size: 0.9rem;">70% income, ethical ads</div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+
+    <!-- Call to Action -->
+
+    <div style="text-align: center; margin: 3rem 0;">
+
+      <h2 id="cta-title">💳 Experience Interest-Free Banking</h2>
+
+      <p id="cta-text">Coming soon to NY Browser — manage your finances ethically, without riba, in your language.</p>
+
+      <button style="background: var(--gold); color: white; border: none; padding: 1rem 3rem; font-size: 1.2rem; border-radius: 40px; cursor: pointer; font-weight: bold; margin: 1rem 0;" onclick="alert('Notification sent! We\'ll email you when ready.')">
+
+        🔔 Notify Me
+
+      </button>
+
+      <p><small>Join the waitlist — 1,234 people already registered</small></p>
+
+    </div>
+
+
+
+    <footer>
+
+      <p>© 2026 NY Browser | Mecca & Medina Browser | ShangYork Browser</p>
+
+      <p>"Technology in Service of Humanity" • "Non-Usury • Risk-Sharing • Ethical Finance"</p>
+
+      <p style="font-size:0.9rem;">From Confucius (551 BCE) to Prophet Muhammad ﷺ (570 CE) — 1,110 years of ethical wisdom</p>
+
+    </footer>
+
+  </div>
+
+
+
+  <script>
+
+    // Mudarabah Calculator
+
+    document.getElementById('capital').addEventListener('input', updateMudarabah);
+
+    document.getElementById('profit').addEventListener('input', updateMudarabah);
+
+    document.getElementById('bankRatio').addEventListener('input', updateMudarabah);
+
+
+
+    function updateMudarabah() {
+
+      const capital = parseFloat(document.getElementById('capital').value) || 0;
+
+      const profit = parseFloat(document.getElementById('profit').value) || 0;
+
+      const bankRatio = parseFloat(document.getElementById('bankRatio').value) || 0;
+
+
+
+      const bankProfit = profit * (bankRatio / 100);
+
+      const entrepreneurProfit = profit - bankProfit;
+
+
+
+      document.getElementById('bank-profit').innerHTML = `🏦 Bank receives: $${bankProfit.toFixed(2)}`;
+
+      document.getElementById('entrepreneur-profit').innerHTML = `👤 Entrepreneur receives: $${entrepreneurProfit.toFixed(2)}`;
+
+
+
+      // Show loss note if profit is negative
+
+      if (profit < 0) {
+
+        document.getElementById('loss-note').style.display = 'block';
+
+      } else {
+
+        document.getElementById('loss-note').style.display = 'none';
+
+      }
+
+    }
+
+
+
+    // Language Switching (LAS Integration)
+
+    const translations = {
+
+      'en': {
+
+        'title': '💰 Interest-Free Banking',
+
+        'subtitle': 'Non-Usury · Risk-Sharing · Asset-Backed · Ethical Finance',
+
+        'definition': '<strong>Non-usury banking</strong> (interest-free or participatory banking) treats money as a medium of exchange, not a commodity to generate profit simply by being lent. Rooted in Islamic Finance (where interest is called <em>Riba</em>) and various ethical economic theories, it views traditional interest as a driver of inequality and economic instability.'
+
+      },
+
+      'ms-MY': {
+
+        'title': '💰 Perbankan Bebas Riba',
+
+        'subtitle': 'Tanpa Riba · Perkongsian Risiko · Berasaskan Aset · Kewangan Beretika',
+
+        'definition': '<strong>Perbankan bebas riba</strong> (perbankan tanpa faedah atau penyertaan) melayan wang sebagai medium pertukaran, bukan komoditi untuk menjana keuntungan hanya dengan meminjamkan. Berakar umbi dalam Kewangan Islam (di mana faedah dipanggil <em>Riba</em>) dan pelbagai teori ekonomi beretika, ia melihat riba tradisional sebagai punca ketidaksamaan dan ketidakstabilan ekonomi.'
+
+      },
+
+      'ar-SA': {
+
+        'title': '💰 المصرفية بدون فوائد',
+
+        'subtitle': 'بدون ربا · تقاسم المخاطر · مدعومة بالأصول · تمويل أخلاقي',
+
+        'definition': '<strong>المصرفية بدون فوائد</strong> (المصرفية التشاركية أو الإسلامية) تتعامل مع المال كوسيلة للتبادل، وليس كسلعة لتوليد الربح بمجرد إقراضها. متجذرة في التمويل الإسلامي (حيث تسمى الفائدة <em>الربا</em>) ونظريات اقتصادية أخلاقية مختلفة، فهي تعتبر الفائدة التقليدية محركًا لعدم المساواة وعدم الاستقرار الاقتصادي.'
+
+      }
+
+    };
+
+
+
+    document.getElementById('langSelect').addEventListener('change', function(e) {
+
+      const lang = e.target.value;
+
+      if (translations[lang]) {
+
+        document.getElementById('page-title').textContent = translations[lang].title;
+
+        document.getElementById('page-subtitle').textContent = translations[lang].subtitle;
+
+        document.getElementById('definition-text').innerHTML = translations[lang].definition;
+
+      }
+
+    });
+
+  </script>
+
+</body>
+
+</html>
+

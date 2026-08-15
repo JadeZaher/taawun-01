@@ -1,0 +1,76 @@
+{{define "content"}}
+<div class="container py-5">
+    <a href="/workspaces" class="small text-muted">Back to workspaces</a>
+    <div class="row g-4 mt-1">
+        <div class="col-md-6">
+            <div class="card p-4">
+                <h5 class="fw-bold mb-3">Workspace Settings</h5>
+                <form id="editForm">
+                    <div class="mb-3"><label class="form-label small">Name</label><input type="text" id="editName" class="form-control" {{if not .CanEdit}}disabled{{end}}></div>
+                    <div class="mb-3"><label class="form-label small">Description</label><textarea id="editDesc" class="form-control" rows="3" {{if not .CanEdit}}disabled{{end}}></textarea></div>
+                    {{if .CanEdit}}<button class="btn btn-dark btn-sm">Save</button>{{end}}
+                </form>
+                {{if .CanManage}}<hr><button id="deleteBtn" class="btn btn-outline-danger btn-sm">Delete Workspace</button>{{end}}
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card p-4">
+                <h6 class="fw-bold mb-3">Members</h6>
+                <div id="membersList" class="mb-3"></div>
+                {{if .CanManage}}
+                <form id="addMemberForm" class="row g-2">
+                    <div class="col"><input type="email" id="memberEmail" class="form-control form-control-sm" placeholder="member email (must be registered)" required></div>
+                    <div class="col-auto"><select id="memberRole" class="form-select form-select-sm"><option>maintainer</option><option>viewer</option><option>architect</option></select></div>
+                    <div class="col-auto"><button class="btn btn-dark btn-sm">Add</button></div>
+                </form>
+                {{end}}
+                <div id="memberMsg" class="small mt-2"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+const wsID = "{{.WorkspaceID}}";
+const canManage = {{.CanManage}};
+async function loadWorkspace() {
+    const r = await api(`/api/v1/workspaces/${wsID}`);
+    if (r.ok) { const w = await r.json(); document.getElementById('editName').value = w.name; document.getElementById('editDesc').value = w.description || ''; }
+}
+async function loadMembers() {
+    const r = await api(`/api/v1/workspaces/${wsID}/members`);
+    if (!r.ok) return;
+    const members = await r.json();
+    document.getElementById('membersList').innerHTML = (members || []).map(m => `
+        <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+            <div><span class="small fw-bold">${m.name}</span> <span class="small text-muted">${m.email}</span></div>
+            <div><span class="badge text-bg-light border me-2">${m.role}</span>${canManage ? `<button class="btn btn-outline-danger btn-sm" onclick="removeMember('${m.user_id}')">Remove</button>` : ''}</div>
+        </div>`).join('');
+}
+document.getElementById('editForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await api(`/api/v1/workspaces/${wsID}`, { method: 'PUT', body: { name: document.getElementById('editName').value, description: document.getElementById('editDesc').value } });
+    loadWorkspace();
+});
+document.getElementById('deleteBtn')?.addEventListener('click', async () => {
+    if (!confirm('Delete this workspace?')) return;
+    const r = await api(`/api/v1/workspaces/${wsID}`, { method: 'DELETE' });
+    if (r.ok) window.location.href = '/workspaces';
+});
+document.getElementById('addMemberForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById('memberMsg');
+    const r = await api(`/api/v1/workspaces/${wsID}/members`, { method: 'POST', body: { email: document.getElementById('memberEmail').value, role: document.getElementById('memberRole').value } });
+    const d = await r.json();
+    msg.textContent = d.message || d.error;
+    if (r.ok) { loadMembers(); e.target.reset(); }
+});
+async function removeMember(uid) {
+    if (!confirm('Remove this member?')) return;
+    await api(`/api/v1/workspaces/${wsID}/members/${uid}`, { method: 'DELETE' });
+    loadMembers();
+}
+loadWorkspace(); loadMembers();
+const es = new EventSource('/_/sse');
+es.onmessage = () => { loadMembers(); loadWorkspace(); };
+</script>
+{{end}}

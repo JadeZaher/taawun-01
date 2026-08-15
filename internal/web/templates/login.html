@@ -1,0 +1,29 @@
+{{define "content"}}
+<div class="container py-5">
+    <div class="row justify-content-center"><div class="col-md-5">
+        <div class="card p-4">
+            <h5 class="fw-bold mb-4">Login</h5>
+            <form id="loginForm">
+                <div class="mb-3"><label class="form-label small">Email</label><input type="email" id="email" class="form-control" required></div>
+                <div class="mb-3"><label class="form-label small">Password</label><input type="password" id="password" class="form-control" required></div>
+                <div id="loginError" class="alert alert-danger py-2 d-none small"></div>
+                <button class="btn btn-dark w-100">Login</button>
+                <p class="small text-muted mt-3 mb-0">No account? <a href="/register">Register</a></p>
+            </form>
+        </div>
+    </div></div>
+</div>
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = document.getElementById('loginError');
+    err.classList.add('d-none');
+    try {
+        const response = await api('/api/v1/auth/login', { method: 'POST', body: { email: document.getElementById('email').value, password: document.getElementById('password').value } });
+        const result = await response.json();
+        if (response.ok) { window.location.href = '/dashboard'; }
+        else { err.textContent = result.error || 'Login failed'; err.classList.remove('d-none'); }
+    } catch { err.textContent = 'Network error. Please try again.'; err.classList.remove('d-none'); }
+});
+</script>
+{{end}}

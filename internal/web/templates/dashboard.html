@@ -1,0 +1,24 @@
+{{define "content"}}
+<div class="container py-5">
+    <h5 class="fw-bold mb-4">Dashboard</h5>
+    <p class="text-muted small">Welcome back, {{.UserName}}</p>
+    <div class="row g-3">
+        <div class="col-md-4"><div class="card p-4"><h6 class="text-muted small mb-1">Workspaces</h6><div id="workspaceCount" class="fs-4 fw-bold">0</div></div></div>
+        <div class="col-md-4"><div class="card p-4"><h6 class="text-muted small mb-1">Platform role</h6><div class="fs-6 fw-bold">{{.UserRole}}</div></div></div>
+        <div class="col-md-4"><div class="card p-4"><h6 class="text-muted small mb-1">Status</h6><div id="sseStatus" class="fs-6">Connected</div></div></div>
+    </div>
+    <div class="mt-4"><a href="/workspaces" class="btn btn-dark">Manage Workspaces</a></div>
+</div>
+<script>
+async function loadWorkspaceCount() {
+    try {
+        const r = await api('/api/v1/workspaces');
+        if (r.ok) { const ws = await r.json(); document.getElementById('workspaceCount').textContent = (ws || []).length; }
+    } catch (e) { console.error(e); }
+}
+loadWorkspaceCount();
+const es = new EventSource('/_/sse');
+es.onmessage = (ev) => { const d = JSON.parse(ev.data); const s = d.signals?.[0]; if (s?.name === 'workspace_event') loadWorkspaceCount(); };
+es.onerror = () => { document.getElementById('sseStatus').textContent = 'Reconnecting...'; };
+</script>
+{{end}}

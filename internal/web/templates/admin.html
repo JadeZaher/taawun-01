@@ -1,0 +1,32 @@
+{{define "content"}}
+<div class="container py-5">
+    <h5 class="fw-bold mb-4">Admin Panel - User Management</h5>
+    <div id="usersList"><p class="text-muted small">Loading users...</p></div>
+</div>
+<script>
+async function loadUsers() {
+    const r = await api('/api/v1/admin/users');
+    if (!r.ok) return;
+    const users = await r.json();
+    document.getElementById('usersList').innerHTML = `
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead>
+            <tbody>${(users || []).map(u => `
+                <tr>
+                    <td class="small fw-bold">${u.name}</td>
+                    <td class="small">${u.email}</td>
+                    <td><select class="form-select form-select-sm w-auto" onchange="setRole('${u.id}', this.value)">
+                        ${['admin','architect','maintainer','viewer'].map(r => `<option ${r===u.role?'selected':''}>${r}</option>`).join('')}
+                    </select></td>
+                    <td class="small text-muted">${new Date(u.created_at).toLocaleDateString()}</td>
+                </tr>`).join('')}
+            </tbody>
+        </table>`;
+}
+async function setRole(id, role) {
+    const r = await api(`/api/v1/admin/users/${id}/role`, { method: 'PUT', body: { role } });
+    if (!r.ok) { const d = await r.json(); alert(d.error); loadUsers(); }
+}
+loadUsers();
+</script>
+{{end}}
