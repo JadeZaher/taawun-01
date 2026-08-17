@@ -1,52 +1,59 @@
-# Product Guide: Taawun Platform
+# Product Guide: Taawun Platform Blueprint v0.2
 
 > *"And cooperate in righteousness and piety"* — Surah Al-Ma'idah 5:2
 
-## Vision
-Taawun is a multi-tenant Infrastructure-as-Code (IaC) control plane, Model Context Protocol (MCP) vibecoding engine, and local-first application ecosystem designed to remove technical barriers for community organizations, non-profits, student groups, and ethical entrepreneurs. It bridges AI-assisted natural language software generation ("vibecoding") with rigorous Islamic ethics, data sovereignty (Amanah), and peer-to-peer data ownership.
+## Vision & One-Paragraph Thesis
+Taawun lets communities — mosques, charities, student associations, Muslim founders — describe an application in natural language and get a working, deployable product. Unlike Lovable and its peers, generated apps are not React SPAs tethered to a centralized backend. Each app is a **static microfrontend** composed over a shared primitive layer (Appwrite-style ergonomics, but Taawun-hosted only where essential), with **local-first data owned by the community itself**, synchronized peer-to-peer via RxDB over WebRTC. Anything touching money runs on **AZOA**, a federated financial orchestration engine (first node self-hosted by us). Compliance with Islamic jurisprudence is a scholar-authored guardrail corpus enforced through RAG at generation time, review time, and runtime.
 
 ---
 
-## Target Users & Constituencies
+## The Core Architectural Stance (Amanah & Zero Data Custody)
+**Taawun does not hold your data. It holds your identity and your highway.**
 
-| User Segment | Description | Primary Use Case | Priority |
-|:---|:---|:---|:---|
-| **Community Architects** | Technical volunteers, developers, and platform builders | Vibecoding templates, managing cloud manifests & infrastructure specs | Core (Active) |
-| **Organization Maintainers** | Mosque administrators, non-profit directors, team leads | Customizing deployed app content, donation thresholds, and volunteer rosters | Core (Active) |
-| **Community Members & Viewers** | General public, congregants, volunteers, donors | End-user interaction with deployed apps (Standup trackers, Zakat calculators, Halal directories) | Core (Active) |
-| **Ethical Entrepreneurs** | Creators of Halal applications & tools | Publishing templates to The Bazaar, earning Riba-free commissions | Core (Active) |
+Deploying an app in Taawun v1 means publishing a static microfrontend bundle. The app's data lives on the devices of the community using it, replicated locally-first through RxDB and synchronized peer-to-peer over WebRTC. What Taawun hosts centrally is minimal: an SSO-style identity service that works across every deployed app, and a relay layer (signaling, STUN/TURN, and optional encrypted sync super-peer relays) that makes the P2P mesh performant and resilient when peers are offline or behind NATs. The relays move encrypted bytes; they do not become a database.
 
----
+This stance is the direct technical implementation of **amanah**: user data as a sacred trust.
 
-## Problems Solved
-
-1. **The Sandbox Paradox ("A Million Apps, Nowhere to Live")**: AI code generators produce transient browser artifacts isolated from real data. Taawun provides **Local-First Web P2P networks** (`ch01-a-million-apps.md`) with relay fallbacks, giving generated tools a permanent home without wasteful cloud tenant bloat.
-2. **Contractual Uncertainty (Gharar)**: Buying unpredictable AI-generated tools with hidden uptime or resource limits violates Islamic jurisprudence. Taawun mandates zero-cost live staging previews with explicit SLA and capacity specs before payment checkout.
-3. **Interest & Exploitative Billing (Riba)**: Traditional cloud PaaS platforms enforce interest-bearing late penalties. Taawun enforces flat infrastructure pricing and Riba-free fee structures.
-4. **Data Bleed & Privacy (Amanah)**: Donor lists and mosque records are a sacred trust. Taawun enforces cryptographic tenant isolation and peer-to-peer data storage where client devices own their records.
-5. **Content Guardrails**: Automated Haram-check AST & prompt scanners prevent the generation or hosting of non-compliant platforms (Riba loan calculators, gambling, prohibited content).
+### The State Split: Convergent vs. Transactional
+1. **Convergent State**: Content, schedules, member lists, page copy, UI themes. Lives in CRDT-backed RxDB collections. Conflicts merge automatically; offline edits are first-class; eventual consistency applies.
+2. **Transactional State**: Balances, payments, escrows, splits, pledges. Must NEVER live in a CRDT. Money requires exactly-once semantics, fail-closed behavior, and real-world reconciliation. Delegated to **AZOA quest graphs**.
 
 ---
 
-## Core Features & System Boundaries
+## 5 System Layers
 
-### Implemented
-- **Go IaC Control Plane (`pkg/iac`)**: Docker Engine API provider for automated container provisioning & manifest generation.
-- **Embedded Go MCP Engine (`pkg/mcp`)**: JSON-RPC 2.0 interface connecting LLM vibecoding agents directly to local and sandboxed environments.
-- **Local-First Web P2P & LTAP Storage (`pkg/primitives`)**: WebRTC signaling + WebSocket relay hub for browser artifacts, paired with isolated SQLite analytical/transactional storage.
-- **Taqwa Ethics & Anti-Gharar Engine (`pkg/ethics`)**: Automated AST/prompt scanner for Islamic compliance and pre-payment staging preview validation.
-- **Platform Specification API (`/api/conductor/spec`)**: OpenAPI-compliant specification metadata endpoint.
-
-### Planned (Wave 2)
-- **The Shura Workspace & Granular RBAC (`pkg/shura`)**: Formalized role-based access for `Architect`, `Maintainer`, and `Viewer`.
-- **The Bazaar Marketplace**: Public showcase directory of vetted app templates with 1-click test drives.
-- **Multi-Cloud IaC Extensions**: Hetzner Cloud, Fly.io, and Caddy automated TLS/domain routing.
+1. **Layer 1 — The Vibecoding Engine**: LLM orchestrated through MCP against a sandboxed build environment. Generates microfrontend bundles composing Taawun primitive widgets. Augmented by Compliance RAG.
+2. **Layer 2 — Shared Primitives**: Taawun SSO (cross-app identity), Relay infrastructure (WebRTC signaling, TURN, encrypted sync super-peers), static bundle hosting, and notification fan-out.
+3. **Layer 3 — The App Runtime**: In-browser microfrontend shell, RxDB WebRTC replication plugin, IndexedDB persistence, and Taawun SDK.
+4. **Layer 4 — Financial Orchestration (AZOA)**: Powers platform marketplace (escrow quests, creator revenue splits) and app-level financial primitives (Zakat calculator, donation drives, Qard Hasan trackers, volunteer stipends) using AZOA STAR primitives.
+5. **Layer 5 — Compliance Infrastructure**: Scholar-authored RAG corpus enforcing fiqh guardrails at generation, publish (fiqh-linting), and runtime.
 
 ---
 
-## Success Metrics
+## Target Users & Roles (Signed Capability RBAC)
 
-1. **Vibecoding Execution Latency**: Under 2 seconds from prompt submission to staged container preview.
-2. **Ethics Compliance Pass Rate**: 100% automated blockage of Riba, gambling, or non-compliant domain models.
-3. **P2P Relay Connection Success**: 99.5% WebRTC/WebSocket connection success for sandboxed browser artifacts.
-4. **Infrastructure Cost Efficiency**: Zero un-refrigerated empty tenant databases through local-first P2P data sync.
+| Role / Segment | Responsibilities | Capability Tokens Issued |
+|:---|:---|:---|
+| **Architect** | Vibecodes new apps/templates, manages workspace AZOA relationships & billing | Full CRDT write + AZOA quest execution & template publish |
+| **Maintainer** | Edits convergent state (donation page copy, event schedules) | Write access to convergent CRDT collections |
+| **Viewer** | End-user, congregant, donor | Read-only access & public app interaction |
+
+---
+
+## Marketplace & Anti-Gharar Deployment Lifecycle
+- **Live Staging Preview**: Primary mitigation of *gharar*. Buyers test live staging preview before payment.
+- **AZOA Escrow Quests**: Escrow settles to creator and platform only after buyer confirmation. Failed or ambiguous deployments fail closed and refund.
+- **Riba-Free Flat Pricing**: Flat fees for static bundle hosting, SSO seats, relay bandwidth tier, and AZOA capacity. No interest-bearing late penalties.
+
+---
+
+## Design System (Blueprint v0.2 & AZOA Style Reference)
+- **Typography**: `Fraunces` (Serif titles & Arabic callouts), `IBM Plex Sans` (Body), `IBM Plex Mono` (Code & Eyebrows).
+- **Color Palette**:
+  - Ink Backgrounds: `#11161a` (base), `#171e24` (containers)
+  - Parchment Text: `#eee7d8` (dim: `#c9c0ac`)
+  - Emerald Accents: `#3c7263` / `#57a68e`
+  - Gold Highlights: `#c7a24a`
+  - Terracotta/Rust Accent (AZOA): `#c8501e`
+- **Pattern**: Geometric Girih star SVG background (`.girih-bg`).
+

@@ -1,34 +1,43 @@
-# Tech Stack Specification: Taawun Platform
+# Tech Stack Specification: Taawun Platform Blueprint v0.2
 
 ## Architecture Overview
 
-Taawun is structured as a modular **Go Control Plane & Infrastructure Engine** running an embedded Model Context Protocol (MCP) server, Web P2P signaling relay, Appwrite-inspired primitives, and Taqwa ethics scanner, paired with an embedded frontend GUI.
+Taawun is structured as a 5-layer local-first vibecoding ecosystem with zero readable community data custody. The platform comprises a Go Control Plane, MCP Vibecoding Engine, RxDB WebRTC P2P Sync Relay Layer, AZOA Financial Orchestration Engine, and Scholar-authored Compliance RAG.
 
 ---
 
-## Core Components & Technology Stack
+## 5-Layer Technology Stack
 
-| Layer / Subsystem | Technology | Version | Purpose & Rationale |
+| Layer | Technology | Key Components | Purpose & Rationale |
 |:---|:---|:---|:---|
-| **Core Language** | Go | 1.21+ | High concurrency, low latency, memory safety, binary embeddability |
-| **HTTP Router** | Gorilla Mux | 1.8.1 | High-performance RESTful routing and subrouter middleware |
-| **CORS Handler** | Gorilla Handlers | 1.5.2 | Cross-Origin Resource Sharing for browser sandbox integration |
-| **WebSocket Engine** | Gorilla Websocket | 1.5.3 | Real-time Web P2P signaling and WebSocket fallback stream relay |
-| **Container Engine** | Docker Engine API | v25+ | Sandboxed app compilation, staging previews, and VPS deployments |
-| **Embedded Storage** | SQLite3 (go-sqlite3) | 1.14.x | CGO-compiled LTAP (Hybrid Transactional/Analytical) storage |
-| **Security & Auth** | golang-jwt / bcrypt | v5 / v0.54 | Token verification, password hashing, and API key management |
-| **Agent Interface** | MCP JSON-RPC 2.0 | 2024-11-05 | Standardized AI agent tooling for local and cloud execution |
-| **Web UI** | Embedded Go FS (`web.FS`) | HTML5/JS | Geometric Swiss-style UI embedded directly inside compiled binary |
+| **Layer 1: Vibecoding Engine** | Go 1.21+, MCP JSON-RPC 2.0, LLM Sandboxes | `pkg/mcp`, `pkg/iac` | Generates static microfrontend bundles with embedded Compliance RAG |
+| **Layer 2: Shared Primitives** | Taawun SSO, WebRTC Signaling, STUN/TURN | `pkg/primitives` | Cross-app identity, WebRTC signaling & encrypted sync super-peers |
+| **Layer 3: App Runtime** | RxDB, WebRTC Replication, IndexedDB, Taawun SDK | In-Browser JS Runtime | Local-first convergent state replication; offline-first default |
+| **Layer 4: Financial Engine** | AZOA Quest Graphs, STAR Primitives | `pkg/financial` | Fail-closed, exactly-once settlement for escrows, Zakat, Qard Hasan |
+| **Layer 5: Compliance** | Scholar-Authored RAG Corpus, Fiqh-Linter | `pkg/ethics` | Generation, publish (Bazaar), and runtime fiqh compliance audit |
 
 ---
 
-## Infrastructure & Deployment Drivers
+## Security & RBAC Capabilities
 
-| Environment | Driver / Provider | Details |
+| Role | Capabilities | Verification |
 |:---|:---|:---|
-| **Local Staging Sandbox** | Docker API Driver (`pkg/iac`) | Spawns isolated container sandboxes with explicit RAM/CPU limits |
-| **Peer-to-Peer Artifacts** | Web P2P Relay (`pkg/primitives`) | WebRTC signaling + WebSocket fallback relay for browser tools |
-| **Cloud VPS (Planned)** | Hetzner / Fly.io / Caddy | Automated TLS certification, domain routing, and flat-rate hosting |
+| **Architect** | Full CRDT write, AZOA quest trigger, template publish | Signed JWT Capability Token (`pkg/shura`) |
+| **Maintainer** | Write access to convergent state collections (events, copy) | Signed JWT Capability Token (`pkg/shura`) |
+| **Viewer** | Read-only interaction & public features | Public / Anonymous Session |
+
+---
+
+## Design System Specs (Blueprint v0.2 & AZOA Reference)
+
+- **Typography**: `Fraunces` (Serif titles & Arabic callouts), `IBM Plex Sans` (Body), `IBM Plex Mono` (Code & Eyebrows).
+- **Color Palette**:
+  - Ink Backgrounds: `#11161a` (base), `#171e24` (containers)
+  - Parchment Text: `#eee7d8` (dim: `#c9c0ac`)
+  - Emerald Accents: `#3c7263` / `#57a68e`
+  - Gold Highlights: `#c7a24a`
+  - Terracotta Accent: `#c8501e`
+- **Pattern**: Geometric Girih star SVG background (`.girih-bg`).
 
 ---
 
@@ -36,6 +45,7 @@ Taawun is structured as a modular **Go Control Plane & Infrastructure Engine** r
 
 | Test Category | Tool | Scope |
 |:---|:---|:---|
-| **Unit & Integration Tests** | Go `testing` package | `pkg/conductor`, `pkg/ethics`, `pkg/mcp`, `pkg/primitives`, `pkg/iac` |
-| **Taqwa Audit Benchmarks** | Go test suites | Validating Riba detection regex and AST pattern matchers |
-| **MCP Tool Tracing** | `httptest` recorder | JSON-RPC 2.0 request/response verification |
+| **Unit & Integration Tests** | Go `testing` package | `pkg/conductor`, `pkg/ethics`, `pkg/mcp`, `pkg/primitives`, `pkg/financial`, `pkg/shura` |
+| **Taqwa Audit Benchmarks** | Go test suites | Validating Riba detection, Fiqh-linting, and Anti-Gharar staging previews |
+| **AZOA Quest Tests** | Go `testing` | Validating fail-closed escrow settlement and zero-interest Zakat quests |
+
