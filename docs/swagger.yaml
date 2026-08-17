@@ -1,0 +1,352 @@
+openapi: 3.0.3
+info:
+  title: Taawun API
+  description: Collaborative workspace management platform API (v2.1 RBAC)
+  version: 2.1.0
+servers:
+  - url: http://localhost:8080
+    description: Development server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/v1/auth/register:
+    post:
+      summary: Register new user (sets token & csrf cookies)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400': { description: Bad Request }
+        '409': { description: User already exists }
+
+  /api/v1/auth/login:
+    post:
+      summary: Login user (sets token & csrf cookies)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401': { description: Invalid credentials }
+
+  /api/v1/auth/logout:
+    post:
+      summary: Logout (blacklists token, clears cookies)
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200': { description: Logged out successfully }
+
+  /api/v1/profile:
+    get:
+      summary: Get current user profile
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /api/v1/workspaces:
+    get:
+      summary: List user's workspaces
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of workspaces
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Workspace'
+    post:
+      summary: Create workspace (Admin/Architect only)
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceRequest'
+      responses:
+        '201': { description: Workspace created }
+        '403': { description: Forbidden (Insufficient role) }
+
+  /api/v1/workspaces/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Get workspace details
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200': { description: Workspace details }
+    put:
+      summary: Update workspace (Maintainer+ required)
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceRequest'
+      responses:
+        '200': { description: Workspace updated }
+        '403': { description: Forbidden }
+    delete:
+      summary: Delete workspace (Architect+ required)
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200': { description: Workspace deleted }
+        '403': { description: Forbidden }
+
+  /api/v1/workspaces/{id}/members:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: List workspace members
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkspaceMember'
+    post:
+      summary: Add member (Architect+ required)
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemberRequest'
+      responses:
+        '201': { description: Member added }
+        '403': { description: Forbidden }
+
+  /api/v1/workspaces/{id}/members/{userID}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: userID
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      summary: Remove member (Architect+ required)
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200': { description: Member removed }
+
+  /api/v1/admin/users:
+    get:
+      summary: List all users (Admin only)
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200': { description: List of all users }
+
+  /api/v1/admin/users/{id}/role:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      summary: Update user platform role (Admin only)
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleUpdateRequest'
+      responses:
+        '200': { description: Role updated }
+
+  /_/sse:
+    get:
+      summary: Server-Sent Events stream
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+
+components:
+  parameters:
+    CsrfHeader:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      description: Must match the csrf_token cookie
+      schema: { type: string }
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string }
+        name: { type: string }
+        role: { type: string, enum: [admin, architect, maintainer, viewer] }
+        created_at: { type: string }
+
+    Workspace:
+      type: object
+      properties:
+        id: { type: string }
+        owner_id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        current_user_role: { type: string, enum: [architect, maintainer, viewer, admin] }
+        created_at: { type: string }
+        updated_at: { type: string }
+
+    WorkspaceMember:
+      type: object
+      properties:
+        user_id: { type: string }
+        email: { type: string }
+        name: { type: string }
+        role: { type: string }
+        created_at: { type: string }
+
+    RegisterRequest:
+      type: object
+      required: [email, password, name]
+      properties:
+        email: { type: string }
+        password: { type: string }
+        name: { type: string }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+
+    LoginResponse:
+      type: object
+      properties:
+        token: { type: string }
+        user: { $ref: '#/components/schemas/User' }
+
+    WorkspaceRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string }
+
+    MemberRequest:
+      type: object
+      required: [email, role]
+      properties:
+        email: { type: string }
+        role: { type: string, enum: [architect, maintainer, viewer] }
+
+    RoleUpdateRequest:
+      type: object
+      required: [role]
+      properties:
+        role: { type: string, enum: [admin, architect, maintainer, viewer] }
+
+    HealthResponse:
+      type: object
+      properties:
+        status: { type: string, example: healthy }
+        service: { type: string, example: taawun }
+        version: { type: string, example: 2.1.0 }

@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  taawun:
+    build: .
+    container_name: taawun-app
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - PORT=8080
+      - DB_PATH=/app/data/taawun.db
+      - COOKIE_SECURE=false
+    volumes:
+      - ./data:/app/data
+      - ./internal/web:/app/internal/web
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentic Architect | Legacy Modernization</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700;900&family=Archivo+Black&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --secondary: #8b5cf6;
+            --accent: #ec4899;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --bg: #ffffff;
+            --bg-alt: #f8fafc;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Geometric background */
+        .geometric-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.03;
+            background-image: 
+                repeating-linear-gradient(45deg, transparent, transparent 50px, var(--primary) 50px, var(--primary) 51px),
+                repeating-linear-gradient(-45deg, transparent, transparent 50px, var(--secondary) 50px, var(--secondary) 51px);
+        }
+
+        .container {
+            position: relative;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            z-index: 1;
+        }
+
+        /* Header */
+        header {
+            padding: 2rem 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 3px solid var(--primary);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        nav {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        nav a {
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s;
+        }
+
+        nav a:hover {
+            color: var(--primary);
+        }
+
+        .cta-btn {
+            background: var(--primary);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 0;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        }
+
+        .cta-btn:hover {
+            background: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+        }
+
+        /* Hero */
+        .hero {
+            padding: 8rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 80%;
+            height: 150%;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(236, 72, 153, 0.05));
+            transform: rotate(-15deg);
+            z-index: -1;
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .hero-content h1 {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: clamp(2.5rem, 7vw, 5rem);
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.03em;
+        }
+
+        .highlight {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-content p {
+            font-size: 1.3rem;
+            color: var(--text-light);
+            margin-bottom: 2rem;
+            font-weight: 300;
+        }
+
+        .hero-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .stat-box {
+            background: white;
+            padding: 1.5rem;
+            border-left: 4px solid var(--primary);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-number {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        .hero-visual {
+            position: relative;
+        }
+
+        .architecture-diagram {
+            background: white;
+            padding: 3rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            border: 3px solid var(--primary);
+        }
+
+        .diagram-title {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+            color: var(--primary);
+        }
+
+        .flow-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .flow-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .flow-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 900;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .flow-text {
+            flex: 1;
+            font-size: 0.95rem;
+            color: var(--text);
+        }
+
+        .flow-arrow {
+            text-align: center;
+            color: var(--primary);
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 8rem 0;
+            background: var(--bg-alt);
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 5rem;
+        }
+
+        .section-header h2 {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .section-header p {
+            font-size: 1.2rem;
+            color: var(--text-light);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 3rem;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 3rem;
+            border-top: 5px solid var(--primary);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 5px;
+            background: var(--accent);
+            transition: width 0.3s;
+        }
+
+        .feature-card:hover::before {
+            width: 100%;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+        }
+
+        .feature-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .feature-title {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-desc {
+            color: var(--text-light);
+            line-height: 1.7;
+        }
+
+        /* Process Timeline */
+        .process {
+            padding: 8rem 0;
+            position: relative;
+        }
+
+        .timeline {
+            position: relative;
+            max-width: 1000px;
+            margin: 5rem auto;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(180deg, var(--primary), var(--accent));
+        }
+
+        .timeline-item {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            margin-bottom: 4rem;
+            position: relative;
+        }
+
+        .timeline-item:nth-child(even) .timeline-content {
+            grid-column: 2;
+        }
+
+        .timeline-item:nth-child(even) .timeline-number {
+            grid-column: 1;
+            grid-row: 1;
+            text-align: right;
+        }
+
+        .timeline-content {
+            background: white;
+            padding: 2rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+            border-left: 5px solid var(--primary);
+        }
+
+        .timeline-title {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .timeline-duration {
+            color: var(--accent);
+            font-weight: 700;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .timeline-desc {
+            color: var(--text-light);
+            margin-bottom: 1rem;
+        }
+
+        .timeline-deliverables {
+            list-style: none;
+            margin-top: 1rem;
+        }
+
+        .timeline-deliverables li {
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+            color: var(--text);
+            font-size: 0.95rem;
+        }
+
+        .timeline-deliverables li::before {
+            content: '▸';
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .timeline-number {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 4rem;
+            color: transparent;
+            -webkit-text-stroke: 2px var(--primary);
+        }
+
+        /* Case Study */
+        .case-study {
+            padding: 8rem 0;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: white;
+        }
+
+        .case-study-content {
+            max-width: 900px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .case-study h2 {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: clamp(2rem, 5vw, 3rem);
+            margin-bottom: 2rem;
+        }
+
+        .case-quote {
+            font-size: 1.5rem;
+            font-style: italic;
+            margin: 3rem 0;
+            line-height: 1.6;
+            font-weight: 300;
+        }
+
+        .case-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .result-item {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .result-number {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Pricing */
+        .pricing {
+            padding: 8rem 0;
+            background: var(--bg-alt);
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 4rem;
+        }
+
+        .price-card {
+            background: white;
+            padding: 3rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s;
+            border-top: 5px solid var(--border);
+        }
+
+        .price-card.featured {
+            border-top-color: var(--primary);
+            transform: scale(1.05);
+            box-shadow: 0 20px 60px rgba(99, 102, 241, 0.2);
+        }
+
+        .price-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .price-name {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .price-amount {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 3rem;
+            color: var(--primary);
+            margin: 1rem 0;
+        }
+
+        .price-desc {
+            color: var(--text-light);
+            margin-bottom: 2rem;
+            padding-bottom: 2rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .price-features {
+            list-style: none;
+            margin-bottom: 2rem;
+        }
+
+        .price-features li {
+            padding: 0.75rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+            color: var(--text);
+        }
+
+        .price-features li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        /* CTA Section */
+        .cta-section {
+            padding: 8rem 0;
+            text-align: center;
+            background: var(--text);
+            color: white;
+        }
+
+        .cta-section h2 {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            margin-bottom: 2rem;
+        }
+
+        .cta-section p {
+            font-size: 1.3rem;
+            margin-bottom: 3rem;
+            opacity: 0.9;
+        }
+
+        .cta-large {
+            background: var(--accent);
+            color: white;
+            padding: 1.5rem 3rem;
+            border: none;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
+        }
+
+        .cta-large:hover {
+            background: var(--primary);
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(236, 72, 153, 0.4);
+        }
+
+        /* Footer */
+        footer {
+            padding: 4rem 0 2rem;
+            background: var(--bg-alt);
+            text-align: center;
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .footer-links a {
+            color: var(--text-light);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .footer-links a:hover {
+            color: var(--primary);
+        }
+
+        @media (max-width: 968px) {
+            .hero-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .timeline::before {
+                left: 30px;
+            }
+
+            .timeline-item {
+                grid-template-columns: 1fr;
+                padding-left: 80px;
+            }
+
+            .timeline-item:nth-child(even) .timeline-content {
+                grid-column: 1;
+            }
+
+            .timeline-number {
+                position: absolute;
+                left: 0;
+                text-align: left !important;
+                font-size: 3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="geometric-bg"></div>
+
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">AGENTIC ARCHITECT</div>
+                <nav>
+                    <a href="#features">Features</a>
+                    <a href="#process">Process</a>
+                    <a href="#pricing">Pricing</a>
+                    <button class="cta-btn" onclick="scrollTo('cta')">Schedule Assessment</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="container">
+                <div class="hero-grid">
+                    <div class="hero-content">
+                        <h1>From <span class="highlight">Legacy Monolith</span> to Modern Microservices in 90 Days</h1>
+                        <p>AI agent that crawls 20-year-old COBOL and Java repos, builds autonomous migration maps, and suggests which parts can be replaced by modern GitHub Actions or serverless functions.</p>
+                        <button class="cta-btn" style="font-size: 1.1rem; padding: 1rem 2rem;">Start Free Assessment</button>
+
+                        <div class="hero-stats">
+                            <div class="stat-box">
+                                <div class="stat-number">10x</div>
+                                <div class="stat-label">Faster than manual migration</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number">60%</div>
+                                <div class="stat-label">Reduction in technical debt</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number">3mo</div>
+                                <div class="stat-label">Average completion vs 18+ manual</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number">$4.2M</div>
+                                <div class="stat-label">Average cost savings</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="hero-visual">
+                        <div class="architecture-diagram">
+                            <div class="diagram-title">AUTONOMOUS MIGRATION FLOW</div>
+                            <div class="flow-container">
+                                <div class="flow-item">
+                                    <div class="flow-icon">1</div>
+                                    <div class="flow-text"><strong>Scan</strong><br>Legacy codebase analysis</div>
+                                </div>
+                                <div class="flow-arrow">↓</div>
+                                <div class="flow-item">
+                                    <div class="flow-icon">2</div>
+                                    <div class="flow-text"><strong>Map</strong><br>Service boundaries identified</div>
+                                </div>
+                                <div class="flow-arrow">↓</div>
+                                <div class="flow-item">
+                                    <div class="flow-icon">3</div>
+                                    <div class="flow-text"><strong>Translate</strong><br>Modern code generated</div>
+                                </div>
+                                <div class="flow-arrow">↓</div>
+                                <div class="flow-item">
+                                    <div class="flow-icon">4</div>
+                                    <div class="flow-text"><strong>Deploy</strong><br>GitHub Actions + Cloud</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="features" id="features">
+            <div class="container">
+                <div class="section-header">
+                    <h2>The Migration Fear Problem</h2>
+                    <p>The #1 reason enterprises don't modernize—legacy migration is too risky, too expensive, and takes too long</p>
+                </div>
+
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🔍</div>
+                        <h3 class="feature-title">Autonomous Code Discovery</h3>
+                        <p class="feature-desc">Agent scans your entire legacy codebase, identifies dependencies, data flows, and business logic patterns. Complete dependency graphs and risk assessments in days, not months.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🏗️</div>
+                        <h3 class="feature-title">Architecture Decomposition</h3>
+                        <p class="feature-desc">AI generates microservice boundaries based on domain-driven design principles and your business context. API contracts, database decomposition, and migration sequence—all automated.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3 class="feature-title">Automated Translation</h3>
+                        <p class="feature-desc">Agent generates modern equivalents (Python/Node.js/Go) with 1:1 functional parity to legacy code. 90% test coverage included. No manual rewriting required.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🚀</div>
+                        <h3 class="feature-title">GitHub Actions Integration</h3>
+                        <p class="feature-desc">Replace legacy batch jobs with modern CI/CD pipelines. Serverless functions, monitoring, alerting—all pre-configured and production-ready.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🛡️</div>
+                        <h3 class="feature-title">Zero-Downtime Validation</h3>
+                        <p class="feature-desc">Shadow deployment, parallel runs, A/B testing. Validate new systems alongside legacy before cutover. Automated rollback if issues detected.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">📚</div>
+                        <h3 class="feature-title">Knowledge Preservation</h3>
+                        <p class="feature-desc">100% of business logic automatically documented. No more "tribal knowledge" locked in retired developers' heads. Complete transfer to modern team.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="process" id="process">
+            <div class="container">
+                <div class="section-header">
+                    <h2>The 90-Day Migration Process</h2>
+                    <p>Five phases from legacy nightmare to modern microservices</p>
+                </div>
+
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-number">01</div>
+                        <div class="timeline-content">
+                            <h3 class="timeline-title">Autonomous Code Discovery</h3>
+                            <div class="timeline-duration">Week 1-2</div>
+                            <p class="timeline-desc">Agent scans your entire legacy codebase, identifies dependencies, data flows, and business logic patterns</p>
+                            <ul class="timeline-deliverables">
+                                <li>Complete dependency graph</li>
+                                <li>Business logic inventory</li>
+                                <li>Critical path identification</li>
+                                <li>Risk assessment matrix</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-number">02</div>
+                        <div class="timeline-content">
+                            <h3 class="timeline-title">Architecture Decomposition</h3>
+                            <div class="timeline-duration">Week 3-4</div>
+                            <p class="timeline-desc">AI generates microservice boundaries based on domain-driven design principles and your business context</p>
+                            <ul class="timeline-deliverables">
+                                <li>Microservice architecture diagram</li>
+                                <li>API contract specifications</li>
+                                <li>Database decomposition strategy</li>
+                                <li>Migration sequence roadmap</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-number">03</div>
+                        <div class="timeline-content">
+                            <h3 class="timeline-title">Automated Code Translation</h3>
+                            <div class="timeline-duration">Week 5-8</div>
+                            <p class="timeline-desc">Agent generates modern equivalents with 1:1 functional parity to legacy code</p>
+                            <ul class="timeline-deliverables">
+                                <li>Translated service code</li>
+                                <li>Unit test suites (90% coverage)</li>
+                                <li>Integration test scenarios</li>
+                                <li>Performance benchmarks</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-number">04</div>
+                        <div class="timeline-content">
+                            <h3 class="timeline-title">GitHub Actions Integration</h3>
+                            <div class="timeline-duration">Week 9-10</div>
+                            <p class="timeline-desc">Replace legacy batch jobs with modern CI/CD pipelines and serverless functions</p>
+                            <ul class="timeline-deliverables">
+                                <li>GitHub Actions workflows</li>
+                                <li>AWS Lambda/Azure Functions</li>
+                                <li>Monitoring & alerting setup</li>
+                                <li>Rollback procedures</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-number">05</div>
+                        <div class="timeline-content">
+                            <h3 class="timeline-title">Validation & Deployment</h3>
+                            <div class="timeline-duration">Week 11-12</div>
+                            <p class="timeline-desc">Parallel run validation, gradual traffic shifting, and full cutover</p>
+                            <ul class="timeline-deliverables">
+                                <li>Shadow deployment results</li>
+                                <li>A/B testing data</li>
+                                <li>Production cutover plan</li>
+                                <li>Knowledge transfer documentation</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="case-study">
+            <div class="container">
+                <div class="case-study-content">
+                    <h2>Fortune 500 Bank Success Story</h2>
+                    <p class="case-quote">"The Agentic Architect didn't just migrate our code—it gave us a strategic roadmap we could execute with confidence. What we estimated at 18-24 months was completed in 5 months with zero downtime."</p>
+                    <p style="font-weight: 700; font-size: 1.1rem;">— CTO, Regional Bank</p>
+
+                    <div class="case-results">
+                        <div class="result-item">
+                            <div class="result-number">2.5M</div>
+                            <p>Lines of COBOL migrated</p>
+                        </div>
+                        <div class="result-item">
+                            <div class="result-number">5mo</div>
+                            <p>Completion time (vs 18+ manual)</p>
+                        </div>
+                        <div class="result-item">
+                            <div class="result-number">$4.2M</div>
+                            <p>Development cost savings</p>
+                        </div>
+                        <div class="result-item">
+                            <div class="result-number">60%</div>
+                            <p>Technical debt reduction</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="pricing" id="pricing">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Transparent Pricing</h2>
+                    <p>Choose the engagement model that fits your timeline and budget</p>
+                </div>
+
+                <div class="pricing-grid">
+                    <div class="price-card">
+                        <div class="price-name">Assessment</div>
+                        <div class="price-amount">$5,000</div>
+                        <div class="price-desc">One-time codebase analysis and migration roadmap</div>
+                        <ul class="price-features">
+                            <li>Complete legacy system scan</li>
+                            <li>Migration complexity report</li>
+                            <li>Architecture recommendations</li>
+                            <li>Effort & cost estimation</li>
+                            <li>Risk assessment</li>
+                        </ul>
+                        <button class="cta-btn" style="width: 100%;">Get Assessment</button>
+                    </div>
+
+                    <div class="price-card featured">
+                        <div class="price-name">Professional</div>
+                        <div class="price-amount">$12K<span style="font-size: 1rem; color: var(--text-light);">/mo</span></div>
+                        <div class="price-desc">Active migration engagement with dedicated support</div>
+                        <ul class="price-features">
+                            <li>Everything in Assessment</li>
+                            <li>Automated code translation</li>
+                            <li>Migration project management</li>
+                            <li>Weekly stakeholder reports</li>
+                            <li>Dedicated migration engineer</li>
+                            <li>6-month engagement minimum</li>
+                        </ul>
+                        <button class="cta-btn" style="width: 100%; background: var(--accent);">Start Migration</button>
+                    </div>
+
+                    <div class="price-card">
+                        <div class="price-name">Enterprise</div>
+                        <div class="price-amount">Custom</div>
+                        <div class="price-desc">Mission-critical systems with strict SLAs</div>
+                        <ul class="price-features">
+                            <li>Everything in Professional</li>
+                            <li>On-premise deployment option</li>
+                            <li>24/7 support during cutover</li>
+                            <li>Executive steering committee</li>
+                            <li>Insurance/warranty coverage</li>
+                            <li>Multi-year support contract</li>
+                        </ul>
+                        <button class="cta-btn" style="width: 100%;">Contact Sales</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="cta-section" id="cta">
+            <div class="container">
+                <h2>Ready to Modernize Your Legacy Systems?</h2>
+                <p>Free up 80% of engineering capacity for innovation. Stop maintaining, start building.</p>
+                <button class="cta-large" onclick="alert('Scheduling assessment...')">Schedule Your Free Assessment</button>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="logo">AGENTIC ARCHITECT</div>
+                <div class="footer-links">
+                    <a href="#features">Features</a>
+                    <a href="#process">Process</a>
+                    <a href="#pricing">Pricing</a>
+                    <a href="/cdn-cgi/l/email-protection#f4979b9a80959780b49593919a809d979695808095989d9b9ada979b99">Contact</a>
+                </div>
+            </div>
+            <p style="color: var(--text-light);">© 2026 Agentic Battalion. Modernizing Enterprise Legacy Systems.</p>
+        </div>
+    </footer>
+
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+        function scrollTo(id) {
+            document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Scroll reveal animation
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.feature-card, .timeline-item, .price-card').forEach(el => {
+            el.style.opacity = '0';
+            el.style.tra
