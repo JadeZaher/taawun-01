@@ -23,14 +23,14 @@ func NewDashboardHandler(userService *services.UserService, workspaceService *se
 }
 
 func (h *DashboardHandler) GetDashboardStats(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := CurrentUser(r.Context())
 	if !ok {
 		http.Error(w, "User not found in context", http.StatusUnauthorized)
 		return
 	}
 
 	// Get user-specific stats
-	workspaces, err := h.workspaceService.GetWorkspaces(user.ID)
+	workspaces, err := h.workspaceService.GetWorkspaces(user)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -49,11 +49,11 @@ func (h *DashboardHandler) GetDashboardStats(w http.ResponseWriter, r *http.Requ
 	}
 
 	stats := &models.DashboardStats{
-		TotalUsers:      1, // Placeholder - in real app, would count from DB
-		ActiveUsers:     1,
-		TotalWorkspaces: len(workspaces),
-		ActiveWorkspaces: countActiveWorkspaces(workspaces),
-		TotalNotifications: len(notifications),
+		TotalUsers:          1, // Placeholder - in real app, would count from DB
+		ActiveUsers:         1,
+		TotalWorkspaces:     len(workspaces),
+		ActiveWorkspaces:    countActiveWorkspaces(workspaces),
+		TotalNotifications:  len(notifications),
 		UnreadNotifications: unreadCount,
 	}
 
@@ -62,7 +62,7 @@ func (h *DashboardHandler) GetDashboardStats(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *DashboardHandler) GetRecentActivity(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := CurrentUser(r.Context())
 	if !ok {
 		http.Error(w, "User not found in context", http.StatusUnauthorized)
 		return

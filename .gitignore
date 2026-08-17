@@ -3,3 +3,11 @@
 
 # Environment files
 .env
+
+# Local agent/task state
+.mpg/
+.omc/
+
+# Runtime state and generated immutable artifacts
+data/
+src/data/

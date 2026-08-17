@@ -1,0 +1,26 @@
+{
+  "id": "p0_private_beta_20260816",
+  "title": "P0 Sellable MVP — Complete Primitive Loop",
+  "status": "in_progress",
+  "createdAt": "2026-08-16",
+  "scope": [
+    "pkg/artifacts",
+    "pkg/mcp",
+    "pkg/ethics",
+    "pkg/primitives",
+    "pkg/shura",
+    "pkg/financial",
+    "pkg/bazaar",
+    "remote MCP authorization",
+    "approved domains",
+    "Datastar card surfaces",
+    "browser runtime",
+    "Railway deployment"
+  ],
+  "dependsOn": [],
+  "completionCriteria": [
+    "Sellable MVP acceptance criteria in spec.md pass",
+    "full package test suite passes",
+    "security review completed"
+  ]
+}

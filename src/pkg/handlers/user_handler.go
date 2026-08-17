@@ -19,6 +19,9 @@ func NewUserHandler(service *services.UserService) *UserHandler {
 }
 
 func (h *UserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
+	if !requireAdminUser(w, r) {
+		return
+	}
 	users, err := h.service.GetAllUsers()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -33,6 +36,9 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+	if !requireSelfOrAdmin(w, r, id) {
 		return
 	}
 
@@ -50,6 +56,9 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+	if !requireSelfOrAdmin(w, r, id) {
 		return
 	}
 
@@ -75,6 +84,9 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
+	if !requireSelfOrAdmin(w, r, id) {
+		return
+	}
 
 	if err := h.service.DeleteUser(id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -84,11 +96,37 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := CurrentUser(r.Context())
 	if !ok {
 		http.Error(w, "User not found in context", http.StatusUnauthorized)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user)
+}
+
+func requireAdminUser(w http.ResponseWriter, r *http.Request) bool {
+	user, ok := CurrentUser(r.Context())
+	if !ok {
+		http.Error(w, "User not found in context", http.StatusUnauthorized)
+		return false
+	}
+	if user.Role != models.RoleAdmin {
+		http.Error(w, "Administrator access required", http.StatusForbidden)
+		return false
+	}
+	return true
+}
+
+func requireSelfOrAdmin(w http.ResponseWriter, r *http.Request, targetUserID int) bool {
+	user, ok := CurrentUser(r.Context())
+	if !ok {
+		http.Error(w, "User not found in context", http.StatusUnauthorized)
+		return false
+	}
+	if user.ID != targetUserID && user.Role != models.RoleAdmin {
+		http.Error(w, "User access forbidden", http.StatusForbidden)
+		return false
+	}
+	return true
 }

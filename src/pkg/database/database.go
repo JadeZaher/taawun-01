@@ -1,13 +1,18 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var DB *sql.DB
@@ -15,34 +20,61 @@ var DB *sql.DB
 func InitDB() (*sql.DB, error) {
 	var err error
 
-	// Central point of truth for database path
-	dbPath := os.Getenv("APP_DB_PATH")
+	dbPath := strings.TrimSpace(os.Getenv("APP_DB_PATH"))
 	if dbPath == "" {
 		dbPath = filepath.Join("data", "user_auth.db")
 	}
-
-	// Ensure the directory exists before SQLite tries to write
-	dir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create data directory: %v", err)
-	}
-
-	DB, err = sql.Open("sqlite3", dbPath)
+	absPath, err := filepath.Abs(dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %v", err)
+		return nil, fmt.Errorf("failed to resolve database path: %w", err)
 	}
 
-	if err = DB.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping database: %v", err)
+	dir := filepath.Dir(absPath)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return nil, fmt.Errorf("failed to create data directory: %w", err)
+	}
+
+	DB, err = sql.Open("sqlite3", sqliteDSN(absPath))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+	DB.SetMaxOpenConns(8)
+	DB.SetMaxIdleConns(8)
+	DB.SetConnMaxLifetime(0)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err = DB.PingContext(ctx); err != nil {
+		_ = DB.Close()
+		DB = nil
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	// Create tables
 	if err = createTables(); err != nil {
+		_ = DB.Close()
+		DB = nil
 		return nil, fmt.Errorf("failed to create tables: %v", err)
 	}
 
-	log.Printf("Database initialized successfully at: %s", dbPath)
+	log.Printf("Database initialized successfully at: %s", absPath)
 	return DB, nil
+}
+
+func sqliteDSN(absPath string) string {
+	uriPath := filepath.ToSlash(absPath)
+	if filepath.VolumeName(absPath) != "" && !strings.HasPrefix(uriPath, "/") {
+		uriPath = "/" + uriPath
+	}
+	uri := url.URL{Scheme: "file", Path: uriPath}
+	query := uri.Query()
+	query.Set("_busy_timeout", "5000")
+	query.Set("_foreign_keys", "on")
+	query.Set("_journal_mode", "WAL")
+	query.Set("_synchronous", "NORMAL")
+	query.Set("_txlock", "immediate")
+	uri.RawQuery = query.Encode()
+	return uri.String()
 }
 
 func createTables() error {
@@ -100,22 +132,37 @@ func createTables() error {
 		}
 	}
 
-	// Create default admin user if not exists
+	return bootstrapAdmin()
+}
+
+func bootstrapAdmin() error {
+	username := strings.TrimSpace(os.Getenv("TAWUN_BOOTSTRAP_ADMIN_USERNAME"))
+	email := strings.TrimSpace(os.Getenv("TAWUN_BOOTSTRAP_ADMIN_EMAIL"))
+	password := os.Getenv("TAWUN_BOOTSTRAP_ADMIN_PASSWORD")
+	if username == "" && email == "" && password == "" {
+		return nil
+	}
+	if username == "" || email == "" || len(password) < 12 {
+		return fmt.Errorf("bootstrap admin requires username, email, and a password of at least 12 characters")
+	}
+
 	var count int
-	err := DB.QueryRow("SELECT COUNT(*) FROM users WHERE role = 'admin'").Scan(&count)
-	if err != nil {
+	if err := DB.QueryRow("SELECT COUNT(*) FROM users WHERE role = 'admin'").Scan(&count); err != nil {
 		return fmt.Errorf("failed to check admin user: %v", err)
 	}
-
-	if count == 0 {
-		_, err = DB.Exec(`INSERT INTO users (username, email, password, role, status)
-			VALUES ('admin', 'admin@example.com', '$2a$10$X1Y2Z3A4B5C6D7E8F9G0H1I2J3K4L5M6N7O8P9Q0R1S2T3U4V5W6X7Y8Z9A0B', 'admin', 'active')`)
-		if err != nil {
-			return fmt.Errorf("failed to create default admin: %v", err)
-		}
-		log.Println("Default admin user created: admin@example.com / password: admin123")
+	if count > 0 {
+		return nil
 	}
 
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash bootstrap admin password: %v", err)
+	}
+	if _, err := DB.Exec(`INSERT INTO users (username, email, password, role, status)
+		VALUES (?, ?, ?, 'admin', 'active')`, username, email, string(hash)); err != nil {
+		return fmt.Errorf("failed to create bootstrap admin: %v", err)
+	}
+	log.Printf("Bootstrap admin created for %s", email)
 	return nil
 }
 

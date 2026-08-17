@@ -59,8 +59,8 @@ func (s *NotificationService) GetUnreadNotifications(userID int) ([]*models.Noti
 	return notifications, nil
 }
 
-func (s *NotificationService) MarkAsRead(notificationID int) error {
-	if err := s.notificationRepo.MarkAsRead(notificationID); err != nil {
+func (s *NotificationService) MarkAsRead(userID, notificationID int) error {
+	if err := s.notificationRepo.MarkAsReadForUser(notificationID, userID); err != nil {
 		return fmt.Errorf("failed to mark notification as read: %v", err)
 	}
 	return nil

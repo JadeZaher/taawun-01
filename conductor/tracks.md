@@ -1,14 +1,23 @@
 ---
 type: track-index
 title: Conductor Tracks — Taawun Platform
-lastReconciled: 2026-08-10
+lastReconciled: 2026-08-16
 ---
 
 # Conductor Master Tracks Index
 
-**Status is authoritative in each track's `metadata.json`.** This index summarizes the architectural roadmap of the Taawun Platform, reconciled on 2026-08-10.
+**Status is authoritative in each track's `metadata.json`.** This index summarizes the architectural roadmap of the Taawun Platform, reconciled on 2026-08-16.
 
-Total Tracks: 8 | 4 Completed · 0 InProgress · 4 Planned
+Total Tracks: 9 | 4 Foundation Tracks Completed · 1 In Progress · 4 Planned
+
+## Program — Sellable MVP integration (Wave 4)
+
+| Wave | Track ID | Title | Status | Scope |
+|:---|:---|:---|:---|:---|
+| 4 | `p0_private_beta_20260816` | Sellable MVP — Complete Primitive Loop | **In Progress** | Hosted MCP, signed cards, Datastar surfaces, local-first runtime, Shura, Bazaar, AZOA, compliance, federation, deployment |
+
+The earlier “Completed” labels record foundation-track completion, not current
+sellable-product readiness. Wave 4 owns the integrated production gate.
 
 ---
 

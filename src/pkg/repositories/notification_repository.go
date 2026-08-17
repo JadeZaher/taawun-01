@@ -19,7 +19,7 @@ func NewNotificationRepository(db *sql.DB) *NotificationRepository {
 func (r *NotificationRepository) Create(notification *models.Notification) error {
 	query := `INSERT INTO notifications (user_id, type, title, message, read) 
 		VALUES (?, ?, ?, ?, ?) RETURNING id, created_at, updated_at`
-	
+
 	err := r.db.QueryRow(query, notification.UserID, notification.Type, notification.Title, notification.Message, notification.Read).
 		Scan(&notification.ID, &notification.CreatedAt, &notification.UpdatedAt)
 	if err != nil {
@@ -31,7 +31,7 @@ func (r *NotificationRepository) Create(notification *models.Notification) error
 func (r *NotificationRepository) GetByID(id int) (*models.Notification, error) {
 	query := `SELECT id, user_id, type, title, message, read, created_at, updated_at 
 		FROM notifications WHERE id = ?`
-	
+
 	var notification models.Notification
 	err := r.db.QueryRow(query, id).Scan(
 		&notification.ID, &notification.UserID, &notification.Type,
@@ -50,7 +50,7 @@ func (r *NotificationRepository) GetByID(id int) (*models.Notification, error) {
 func (r *NotificationRepository) GetByUser(userID int) ([]*models.Notification, error) {
 	query := `SELECT id, user_id, type, title, message, read, created_at, updated_at 
 		FROM notifications WHERE user_id = ? ORDER BY created_at DESC`
-	
+
 	rows, err := r.db.Query(query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get notifications: %v", err)
@@ -76,7 +76,7 @@ func (r *NotificationRepository) GetByUser(userID int) ([]*models.Notification, 
 func (r *NotificationRepository) GetUnreadByUser(userID int) ([]*models.Notification, error) {
 	query := `SELECT id, user_id, type, title, message, read, created_at, updated_at 
 		FROM notifications WHERE user_id = ? AND read = 0 ORDER BY created_at DESC`
-	
+
 	rows, err := r.db.Query(query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get unread notifications: %v", err)
@@ -99,14 +99,14 @@ func (r *NotificationRepository) GetUnreadByUser(userID int) ([]*models.Notifica
 	return notifications, nil
 }
 
-func (r *NotificationRepository) MarkAsRead(id int) error {
-	query := `UPDATE notifications SET read = 1, updated_at = ? WHERE id = ?`
-	
-	result, err := r.db.Exec(query, time.Now(), id)
+func (r *NotificationRepository) MarkAsReadForUser(id, userID int) error {
+	query := `UPDATE notifications SET read = 1, updated_at = ? WHERE id = ? AND user_id = ?`
+
+	result, err := r.db.Exec(query, time.Now(), id, userID)
 	if err != nil {
 		return fmt.Errorf("failed to mark notification as read: %v", err)
 	}
-	
+
 	rows, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %v", err)
@@ -119,7 +119,7 @@ func (r *NotificationRepository) MarkAsRead(id int) error {
 
 func (r *NotificationRepository) MarkAllAsRead(userID int) error {
 	query := `UPDATE notifications SET read = 1, updated_at = ? WHERE user_id = ? AND read = 0`
-	
+
 	_, err := r.db.Exec(query, time.Now(), userID)
 	if err != nil {
 		return fmt.Errorf("failed to mark all notifications as read: %v", err)
@@ -129,12 +129,12 @@ func (r *NotificationRepository) MarkAllAsRead(userID int) error {
 
 func (r *NotificationRepository) Delete(id int) error {
 	query := `DELETE FROM notifications WHERE id = ?`
-	
+
 	result, err := r.db.Exec(query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete notification: %v", err)
 	}
-	
+
 	rows, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %v", err)

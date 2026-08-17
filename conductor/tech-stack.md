@@ -1,3 +1,7 @@
+---
+type: architecture
+---
+
 # Tech Stack Specification: Taawun Platform Blueprint v0.2
 
 ## Architecture Overview
@@ -10,9 +14,9 @@ Taawun is structured as a 5-layer local-first vibecoding ecosystem with zero rea
 
 | Layer | Technology | Key Components | Purpose & Rationale |
 |:---|:---|:---|:---|
-| **Layer 1: Vibecoding Engine** | Go 1.21+, MCP JSON-RPC 2.0, LLM Sandboxes | `pkg/mcp`, `pkg/iac` | Generates static microfrontend bundles with embedded Compliance RAG |
+| **Layer 1: Vibecoding Engine** | Go 1.25, official MCP Go SDK, Streamable HTTP, curated artifact builder | `pkg/mcp`, `pkg/artifacts` | Generates immutable modular bundles with embedded Compliance RAG and no arbitrary-code execution path |
 | **Layer 2: Shared Primitives** | Taawun SSO, WebRTC Signaling, STUN/TURN | `pkg/primitives` | Cross-app identity, WebRTC signaling & encrypted sync super-peers |
-| **Layer 3: App Runtime** | RxDB, WebRTC Replication, IndexedDB, Taawun SDK | In-Browser JS Runtime | Local-first convergent state replication; offline-first default |
+| **Layer 3: App Runtime** | Datastar 1.0.2, signed card manifests, IndexedDB/CRDT runtime, WebRTC/opaque relay | `web`, generated bundles | Local-first convergent state plus server-owned control/transactional projections across approved-domain card, embed, and monolithic surfaces |
 | **Layer 4: Financial Engine** | AZOA Quest Graphs, STAR Primitives | `pkg/financial` | Fail-closed, exactly-once settlement for escrows, Zakat, Qard Hasan |
 | **Layer 5: Compliance** | Scholar-Authored RAG Corpus, Fiqh-Linter | `pkg/ethics` | Generation, publish (Bazaar), and runtime fiqh compliance audit |
 

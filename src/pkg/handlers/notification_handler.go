@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
-	"taawun/pkg/models"
 	"taawun/pkg/services"
 )
 
@@ -19,7 +18,7 @@ func NewNotificationHandler(service *services.NotificationService) *Notification
 }
 
 func (h *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := CurrentUser(r.Context())
 	if !ok {
 		http.Error(w, "User not found in context", http.StatusUnauthorized)
 		return
@@ -35,6 +34,11 @@ func (h *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.Re
 }
 
 func (h *NotificationHandler) MarkAsRead(w http.ResponseWriter, r *http.Request) {
+	user, ok := CurrentUser(r.Context())
+	if !ok {
+		http.Error(w, "User not found in context", http.StatusUnauthorized)
+		return
+	}
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -42,7 +46,7 @@ func (h *NotificationHandler) MarkAsRead(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := h.service.MarkAsRead(id); err != nil {
+	if err := h.service.MarkAsRead(user.ID, id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -50,7 +54,7 @@ func (h *NotificationHandler) MarkAsRead(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *NotificationHandler) MarkAllAsRead(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := CurrentUser(r.Context())
 	if !ok {
 		http.Error(w, "User not found in context", http.StatusUnauthorized)
 		return

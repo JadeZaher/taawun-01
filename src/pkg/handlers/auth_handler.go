@@ -64,20 +64,53 @@ func (h *AuthHandler) AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
+		parts := strings.Fields(authHeader)
+		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
 			http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
 			return
 		}
 
 		token := parts[1]
+		if len(token) > 8192 {
+			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			return
+		}
 		user, err := h.authService.ValidateToken(token)
 		if err != nil {
 			http.Error(w, "Invalid token", http.StatusUnauthorized)
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), "user", user)
+		ctx := WithCurrentUser(r.Context(), user)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+type contextKey string
+
+const userContextKey contextKey = "taawun-user"
+
+// WithCurrentUser binds a verified platform identity to a request context.
+func WithCurrentUser(ctx context.Context, user *models.User) context.Context {
+	return context.WithValue(ctx, userContextKey, user)
+}
+
+func CurrentUser(ctx context.Context) (*models.User, bool) {
+	user, ok := ctx.Value(userContextKey).(*models.User)
+	return user, ok && user != nil
+}
+
+func (h *AuthHandler) RequireAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := CurrentUser(r.Context())
+		if !ok {
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			return
+		}
+		if user.Role != models.RoleAdmin {
+			http.Error(w, "Administrator access required", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }

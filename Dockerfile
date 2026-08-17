@@ -1,42 +1,33 @@
-# Build stage
-FROM golang:1.21-alpine AS builder
-WORKDIR /app
+# syntax=docker/dockerfile:1.7
+FROM golang:1.25-alpine AS builder
 
-# Copy workspace and module manifests first for better layer caching
-COPY go.work go.work.sum ./
-COPY go.mod go.sum ./
-COPY cmd/server/go.mod cmd/server/go.sum ./cmd/server/
+RUN apk add --no-cache build-base
+WORKDIR /workspace/src
 
-# Download dependencies
+COPY src/go.mod src/go.sum ./
 RUN go mod download
 
-# Copy the rest of the source code
-COPY . .
+COPY src/ ./
+RUN CGO_ENABLED=1 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/taawun ./cmd
 
-# Build the application binary
-RUN go build -ldflags="-s -w" -o /app/taawun ./cmd/server
+FROM alpine:3.22
 
-# Runtime stage
-FROM alpine:latest
-
-# Install runtime dependencies
-RUN apk --no-cache add ca-certificates sqlite
+RUN apk add --no-cache ca-certificates tzdata \
+    && addgroup -S -g 10001 taawun \
+    && adduser -S -D -H -u 10001 -G taawun taawun \
+    && install -d -o taawun -g taawun /app /data /data/artifacts
 
 WORKDIR /app
+COPY --from=builder --chown=taawun:taawun /out/taawun /app/taawun
 
-# Copy binary and web assets from builder
-COPY --from=builder /app/taawun .
-COPY --from=builder /app/internal/web ./internal/web
-
-# Prepare data directory and declare volume
-RUN mkdir -p /app/data
-VOLUME /app/data
-
+USER taawun
+ENV PORT=8080 \
+    APP_DB_PATH=/data/taawun.db \
+    TAWUN_ARTIFACT_ROOT=/data/artifacts
+VOLUME ["/data"]
 EXPOSE 8080
 
-# Default environment variables
-ENV PORT=8080
-ENV DB_PATH=/app/data/taawun.db
-ENV COOKIE_SECURE=false
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- "http://127.0.0.1:${PORT}/api/health" >/dev/null || exit 1
 
-CMD ["./taawun"]
+ENTRYPOINT ["/app/taawun"]

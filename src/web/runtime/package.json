@@ -1,0 +1,8 @@
+{
+  "name": "@taawun/browser-runtime",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test runtime.test.mjs"
+  }
+}

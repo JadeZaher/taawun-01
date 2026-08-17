@@ -1,0 +1,12 @@
+.git
+.codex
+.omc
+.mpg
+.agents
+data
+deliverable
+node_modules
+*.db
+*.db-shm
+*.db-wal
+*.log

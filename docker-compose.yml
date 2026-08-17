@@ -1,23 +1,34 @@
-version: '3.8'
-
 services:
   taawun:
-    build: .
-    container_name: taawun-app
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     env_file:
       - .env
     environment:
-      - PORT=8080
-      - DB_PATH=/app/data/taawun.db
-      - COOKIE_SECURE=false
+      PORT: "8080"
+      APP_DB_PATH: /data/taawun.db
+      TAWUN_ARTIFACT_ROOT: /data/artifacts
+      TAWUN_PUBLIC_BASE_URL: http://localhost:8080
+      TAWUN_ALLOWED_ORIGINS: http://localhost:8080
+      TAWUN_MCP_ALLOWED_HOSTS: localhost:8080
+      RELAY_ALLOWED_ORIGINS: http://localhost:8080
     volumes:
-      - ./data:/app/data
-      - ./internal/web:/app/internal/web
+      - taawun-data:/data
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/health"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
+      start_period: 10s
       retries: 3
+
+volumes:
+  taawun-data:

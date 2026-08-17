@@ -1,9 +1,16 @@
 package services
 
 import (
+	"errors"
 	"fmt"
+
 	"taawun/pkg/models"
 	"taawun/pkg/repositories"
+)
+
+var (
+	ErrWorkspaceForbidden = errors.New("workspace access forbidden")
+	ErrWorkspaceNotFound  = errors.New("workspace not found")
 )
 
 type WorkspaceService struct {
@@ -18,7 +25,10 @@ func NewWorkspaceService(workspaceRepo *repositories.WorkspaceRepository, userRe
 	}
 }
 
-func (s *WorkspaceService) CreateWorkspace(userID int, req *models.CreateWorkspaceRequest) (*models.Workspace, error) {
+func (s *WorkspaceService) CreateWorkspace(actor *models.User, req *models.CreateWorkspaceRequest) (*models.Workspace, error) {
+	if actor == nil || actor.ID <= 0 {
+		return nil, ErrWorkspaceForbidden
+	}
 	if req.Name == "" {
 		return nil, fmt.Errorf("workspace name is required")
 	}
@@ -26,7 +36,7 @@ func (s *WorkspaceService) CreateWorkspace(userID int, req *models.CreateWorkspa
 	workspace := &models.Workspace{
 		Name:        req.Name,
 		Description: req.Description,
-		OwnerID:     userID,
+		OwnerID:     actor.ID,
 		Status:      models.WorkspaceStatusActive,
 	}
 
@@ -35,39 +45,62 @@ func (s *WorkspaceService) CreateWorkspace(userID int, req *models.CreateWorkspa
 	}
 
 	// Add owner as member with owner role
-	if err := s.workspaceRepo.AddUser(workspace.ID, userID, models.WorkspaceRoleOwner); err != nil {
+	if err := s.workspaceRepo.AddUser(workspace.ID, actor.ID, models.WorkspaceRoleOwner); err != nil {
 		return nil, fmt.Errorf("failed to add owner to workspace: %v", err)
 	}
 
 	return workspace, nil
 }
 
-func (s *WorkspaceService) GetWorkspace(id int) (*models.Workspace, error) {
-	workspace, err := s.workspaceRepo.GetByID(id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get workspace: %v", err)
+func (s *WorkspaceService) GetWorkspace(actor *models.User, id int) (*models.Workspace, error) {
+	return s.authorize(actor, id, models.WorkspaceRoleOwner, models.WorkspaceRoleAdmin, models.WorkspaceRoleMember, models.WorkspaceRoleViewer)
+}
+
+// AuthorizeWorkspaceCapability maps persisted workspace roles to product capabilities.
+func (s *WorkspaceService) AuthorizeWorkspaceCapability(actor *models.User, id int, capability models.WorkspaceCapability) (*models.Workspace, error) {
+	var allowedRoles []string
+	switch capability {
+	case models.WorkspaceCapabilityView, models.WorkspaceCapabilityAudit:
+		allowedRoles = []string{models.WorkspaceRoleOwner, models.WorkspaceRoleAdmin, models.WorkspaceRoleMember, models.WorkspaceRoleViewer}
+	case models.WorkspaceCapabilityBuild:
+		allowedRoles = []string{models.WorkspaceRoleOwner, models.WorkspaceRoleAdmin, models.WorkspaceRoleMember}
+	case models.WorkspaceCapabilityPublish:
+		allowedRoles = []string{models.WorkspaceRoleOwner, models.WorkspaceRoleAdmin}
+	default:
+		return nil, ErrWorkspaceForbidden
 	}
-	if workspace == nil {
-		return nil, fmt.Errorf("workspace not found")
+	workspace, err := s.authorize(actor, id, allowedRoles...)
+	if err != nil {
+		return nil, err
+	}
+	if (capability == models.WorkspaceCapabilityBuild || capability == models.WorkspaceCapabilityPublish) && workspace.Status != models.WorkspaceStatusActive {
+		return nil, ErrWorkspaceForbidden
 	}
 	return workspace, nil
 }
 
-func (s *WorkspaceService) GetWorkspaces(userID int) ([]*models.Workspace, error) {
-	workspaces, err := s.workspaceRepo.GetByUser(userID)
+func (s *WorkspaceService) GetWorkspaces(actor *models.User) ([]*models.Workspace, error) {
+	if actor == nil || actor.ID <= 0 {
+		return nil, ErrWorkspaceForbidden
+	}
+	if actor.Role == models.RoleAdmin {
+		workspaces, err := s.workspaceRepo.GetAll()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get workspaces: %v", err)
+		}
+		return workspaces, nil
+	}
+	workspaces, err := s.workspaceRepo.GetByUser(actor.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workspaces: %v", err)
 	}
 	return workspaces, nil
 }
 
-func (s *WorkspaceService) UpdateWorkspace(id int, req *models.UpdateWorkspaceRequest) (*models.Workspace, error) {
-	workspace, err := s.workspaceRepo.GetByID(id)
+func (s *WorkspaceService) UpdateWorkspace(actor *models.User, id int, req *models.UpdateWorkspaceRequest) (*models.Workspace, error) {
+	workspace, err := s.authorize(actor, id, models.WorkspaceRoleOwner, models.WorkspaceRoleAdmin)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get workspace: %v", err)
-	}
-	if workspace == nil {
-		return nil, fmt.Errorf("workspace not found")
+		return nil, err
 	}
 
 	if req.Name != "" {
@@ -77,6 +110,9 @@ func (s *WorkspaceService) UpdateWorkspace(id int, req *models.UpdateWorkspaceRe
 		workspace.Description = req.Description
 	}
 	if req.Status != "" {
+		if !validWorkspaceStatus(req.Status) {
+			return nil, fmt.Errorf("invalid workspace status")
+		}
 		workspace.Status = req.Status
 	}
 
@@ -87,14 +123,26 @@ func (s *WorkspaceService) UpdateWorkspace(id int, req *models.UpdateWorkspaceRe
 	return workspace, nil
 }
 
-func (s *WorkspaceService) DeleteWorkspace(id int) error {
+func (s *WorkspaceService) DeleteWorkspace(actor *models.User, id int) error {
+	if _, err := s.authorize(actor, id, models.WorkspaceRoleOwner); err != nil {
+		return err
+	}
 	if err := s.workspaceRepo.Delete(id); err != nil {
 		return fmt.Errorf("failed to delete workspace: %v", err)
 	}
 	return nil
 }
 
-func (s *WorkspaceService) AddUserToWorkspace(workspaceID, userID int, role string) error {
+func (s *WorkspaceService) AddUserToWorkspace(actor *models.User, workspaceID, userID int, role string) error {
+	if _, err := s.authorize(actor, workspaceID, models.WorkspaceRoleOwner, models.WorkspaceRoleAdmin); err != nil {
+		return err
+	}
+	if role == "" {
+		role = models.WorkspaceRoleMember
+	}
+	if !validAssignableWorkspaceRole(role) {
+		return fmt.Errorf("invalid workspace role")
+	}
 	// Check if user exists
 	user, err := s.userRepo.GetByID(userID)
 	if err != nil {
@@ -122,10 +170,6 @@ func (s *WorkspaceService) AddUserToWorkspace(workspaceID, userID int, role stri
 		return fmt.Errorf("user already in workspace")
 	}
 
-	if role == "" {
-		role = models.WorkspaceRoleMember
-	}
-
 	if err := s.workspaceRepo.AddUser(workspaceID, userID, role); err != nil {
 		return fmt.Errorf("failed to add user to workspace: %v", err)
 	}
@@ -133,7 +177,10 @@ func (s *WorkspaceService) AddUserToWorkspace(workspaceID, userID int, role stri
 	return nil
 }
 
-func (s *WorkspaceService) RemoveUserFromWorkspace(workspaceID, userID int) error {
+func (s *WorkspaceService) RemoveUserFromWorkspace(actor *models.User, workspaceID, userID int) error {
+	if _, err := s.authorize(actor, workspaceID, models.WorkspaceRoleOwner, models.WorkspaceRoleAdmin); err != nil {
+		return err
+	}
 	// Check if user exists
 	user, err := s.userRepo.GetByID(userID)
 	if err != nil {
@@ -168,13 +215,9 @@ func (s *WorkspaceService) RemoveUserFromWorkspace(workspaceID, userID int) erro
 	return nil
 }
 
-func (s *WorkspaceService) InitializeWorkspace(workspaceID int) error {
-	workspace, err := s.workspaceRepo.GetByID(workspaceID)
-	if err != nil {
-		return fmt.Errorf("failed to get workspace: %v", err)
-	}
-	if workspace == nil {
-		return fmt.Errorf("workspace not found")
+func (s *WorkspaceService) InitializeWorkspace(actor *models.User, workspaceID int) error {
+	if _, err := s.authorize(actor, workspaceID, models.WorkspaceRoleOwner, models.WorkspaceRoleAdmin); err != nil {
+		return err
 	}
 
 	// Perform initialization tasks
@@ -185,10 +228,63 @@ func (s *WorkspaceService) InitializeWorkspace(workspaceID int) error {
 	return nil
 }
 
-func (s *WorkspaceService) GetWorkspaceUsers(workspaceID int) ([]*models.User, error) {
+func (s *WorkspaceService) GetWorkspaceUsers(actor *models.User, workspaceID int) ([]*models.User, error) {
+	if _, err := s.authorize(actor, workspaceID, models.WorkspaceRoleOwner, models.WorkspaceRoleAdmin, models.WorkspaceRoleMember, models.WorkspaceRoleViewer); err != nil {
+		return nil, err
+	}
 	users, err := s.userRepo.GetWorkspaceUsers(workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workspace users: %v", err)
 	}
 	return users, nil
+}
+
+func (s *WorkspaceService) authorize(actor *models.User, workspaceID int, allowedRoles ...string) (*models.Workspace, error) {
+	if actor == nil || actor.ID <= 0 {
+		return nil, ErrWorkspaceForbidden
+	}
+	workspace, err := s.workspaceRepo.GetByID(workspaceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workspace: %v", err)
+	}
+	if workspace == nil {
+		return nil, ErrWorkspaceNotFound
+	}
+	if actor.Role == models.RoleAdmin {
+		return workspace, nil
+	}
+
+	role := ""
+	if workspace.OwnerID == actor.ID {
+		role = models.WorkspaceRoleOwner
+	} else {
+		role, err = s.workspaceRepo.GetUserRole(workspaceID, actor.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get workspace role: %v", err)
+		}
+	}
+	for _, allowedRole := range allowedRoles {
+		if role == allowedRole {
+			return workspace, nil
+		}
+	}
+	return nil, ErrWorkspaceForbidden
+}
+
+func validAssignableWorkspaceRole(role string) bool {
+	switch role {
+	case models.WorkspaceRoleAdmin, models.WorkspaceRoleMember, models.WorkspaceRoleViewer:
+		return true
+	default:
+		return false
+	}
+}
+
+func validWorkspaceStatus(status string) bool {
+	switch status {
+	case models.WorkspaceStatusActive, models.WorkspaceStatusInactive, models.WorkspaceStatusArchived:
+		return true
+	default:
+		return false
+	}
 }

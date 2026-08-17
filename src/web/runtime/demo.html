@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self' ws://localhost:* wss:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Taawun Runtime Demonstrator</title>
+  <style>
+    :root { --ink:#11161a; --panel:#171e24; --paper:#eee7d8; --dim:#c9c0ac; --green:#57a68e; --gold:#c7a24a; --line:rgba(238,231,216,.2); }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; padding:28px; background:var(--ink); color:var(--paper); font:14px/1.5 system-ui,sans-serif; }
+    main { width:min(900px,100%); margin:auto; }
+    h1,h2 { font-family:Georgia,serif; font-weight:500; }
+    h1 { margin:5px 0 8px; font-size:34px; }
+    h2 { margin:0; font-size:19px; }
+    p { color:var(--dim); }
+    .eyebrow { color:var(--green); font:11px/1.2 ui-monospace,monospace; letter-spacing:.1em; text-transform:uppercase; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:24px; }
+    .panel { padding:18px; border:1px solid var(--line); background:var(--panel); }
+    .wide { grid-column:1/-1; }
+    .fields { display:grid; gap:11px; margin-top:14px; }
+    label { display:grid; gap:5px; color:var(--dim); font-size:12px; }
+    input,select,textarea,button { width:100%; border:1px solid var(--line); border-radius:2px; padding:9px 10px; background:var(--ink); color:var(--paper); font:inherit; }
+    textarea { min-height:82px; resize:vertical; }
+    button { background:#3c7263; border-color:#3c7263; font-weight:650; cursor:pointer; }
+    button.secondary { background:transparent; border-color:var(--line); }
+    button:disabled { opacity:.45; cursor:not-allowed; }
+    .actions { display:flex; gap:8px; }
+    .status { min-height:42px; margin-top:12px; padding:10px; border-left:2px solid var(--gold); background:rgba(199,162,74,.08); color:var(--dim); }
+    pre { min-height:180px; margin:12px 0 0; padding:12px; overflow:auto; background:#0b0f12; color:var(--green); white-space:pre-wrap; overflow-wrap:anywhere; }
+    code { color:var(--green); }
+    ol { color:var(--dim); padding-left:20px; }
+    @media(max-width:700px){ body{padding:16px}.grid{grid-template-columns:1fr}.wide{grid-column:auto}.actions{display:grid} }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Local-only engineering surface</div>
+    <h1>Browser runtime demonstrator</h1>
+    <p>This page proves IndexedDB replay and same-origin tab convergence. It does not contact the relay unless a host constructs a runtime with an enabled, authenticated relay configuration.</p>
+
+    <div class="grid">
+      <section class="panel" aria-labelledby="sessionTitle">
+        <h2 id="sessionTitle">1 · Inject session and key</h2>
+        <div class="fields">
+          <label>Artifact ID<input id="artifactId" value="runtime-demo-v1" pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,127}"></label>
+          <label>Workspace ID<input id="workspaceId" type="number" min="1" value="42"></label>
+          <label>Peer ID<input id="peerId" pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,127}"></label>
+          <label>Trusted peer IDs <span>(comma-separated)</span><input id="trustedPeers" placeholder="browser-second-tab"></label>
+          <label>Actor ID<input id="actorId" value="architect-demo" pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,127}"></label>
+          <label>Role<select id="role"><option>Architect</option><option>Maintainer</option><option>Viewer</option></select></label>
+          <label>Workspace key (base64url)<input id="workspaceKey" type="password" autocomplete="off" spellcheck="false"></label>
+          <div class="actions"><button id="generateKey" class="secondary" type="button">Generate ephemeral key</button><button id="startRuntime" type="button">Start runtime</button></div>
+        </div>
+        <div id="sessionStatus" class="status" role="status">Key material exists only in this input and runtime memory. Copy it manually to a second tab for the encryption contract.</div>
+      </section>
+
+      <section class="panel" aria-labelledby="editorTitle">
+        <h2 id="editorTitle">2 · Write convergent content</h2>
+        <div class="fields">
+          <label>Announcement<textarea id="announcement" disabled>Community iftar begins at sunset.</textarea></label>
+          <div class="actions"><button id="saveAnnouncement" type="button" disabled>Save offline</button><button id="deleteAnnouncement" class="secondary" type="button" disabled>Write tombstone</button></div>
+        </div>
+        <div id="writeStatus" class="status" role="status">Start the runtime to write.</div>
+      </section>
+
+      <section class="panel wide" aria-labelledby="snapshotTitle">
+        <h2 id="snapshotTitle">Current deterministic projection</h2>
+        <pre id="snapshot">{}</pre>
+      </section>
+
+      <section class="panel wide" aria-labelledby="verifyTitle">
+        <h2 id="verifyTitle">Manual browser verification</h2>
+        <ol>
+          <li>Generate a key and start this tab. Save an announcement, then reload with the same key and IDs; IndexedDB replay restores it.</li>
+          <li>Open this URL in a second same-origin tab. Use the same artifact, workspace, actor, and key but a different peer ID. Add each tab’s peer ID to the other tab’s trusted-peer field before starting; BroadcastChannel then converges both projections.</li>
+          <li>Select Viewer and restart with a new artifact ID. A write must fail closed. Maintainer can write only the configured announcements collection.</li>
+          <li>For cross-device testing, inject valid peer-bound relay sessions through the host integration. WebSocket <code>crdt-sync</code> payloads must contain ciphertext and never the announcement text.</li>
+        </ol>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="./demo.js"></script>
+</body>
+</html>

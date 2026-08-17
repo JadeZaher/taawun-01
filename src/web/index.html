@@ -1,297 +1,1048 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>User Auth API Dashboard</title>
-    <style>
-        :root {
-            --bg: #f0f4f8; --card: #ffffff; --text: #1a202c; --muted: #64748b;
-            --border: #e2e8f0; --accent: #2563eb; --accent-hover: #1d4ed8;
-            --success: #10b981; --success-bg: #ecfdf5; --error: #ef4444; --error-bg: #fef2f2;
-            --sidebar-width: 240px;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-        
-        /* Auth Page */
-        .auth-container { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
-        .auth-card { background: var(--card); border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); padding: 40px; width: 100%; max-width: 420px; }
-        .auth-card h1 { font-size: 24px; margin-bottom: 8px; }
-        .auth-card p { color: var(--muted); margin-bottom: 24px; font-size: 14px; }
-        .auth-tabs { display: flex; gap: 4px; background: var(--bg); border-radius: 8px; padding: 4px; margin-bottom: 24px; }
-        .auth-tab { flex: 1; padding: 10px; text-align: center; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 14px; transition: all 0.2s; border: none; background: transparent; }
-        .auth-tab.active { background: var(--card); box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: var(--accent); }
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
-        .form-group input, .form-group textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; transition: border-color 0.2s; }
-        .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
-        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: white; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-        .btn:hover { background: var(--accent-hover); }
-        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; display: none; }
-        .alert.error { display: block; background: var(--error-bg); color: var(--error); }
-        .alert.success { display: block; background: var(--success-bg); color: var(--success); }
-        
-        /* App Layout */
-        .app-container { display: none; }
-        .app-container.active { display: flex; min-height: 100vh; }
-        .sidebar { width: var(--sidebar-width); background: var(--card); border-right: 1px solid var(--border); padding: 20px 0; position: fixed; height: 100vh; overflow-y: auto; }
-        .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
-        .sidebar-header h2 { font-size: 16px; color: var(--accent); }
-        .sidebar-header p { font-size: 12px; color: var(--muted); margin-top: 4px; }
-        .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; font-size: 14px; color: var(--muted); transition: all 0.2s; border-left: 3px solid transparent; }
-        .nav-item:hover { background: var(--bg); color: var(--text); }
-        .nav-item.active { background: var(--bg); color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
-        .nav-item .icon { width: 20px; text-align: center; }
-        .main-content { margin-left: var(--sidebar-width); flex: 1; padding: 30px; }
-        .main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-        .main-header h1 { font-size: 22px; }
-        .user-badge { display: flex; align-items: center; gap: 12px; }
-        .user-badge span { font-size: 14px; color: var(--muted); }
-        .btn-logout { padding: 8px 16px; background: var(--error); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
-        
-        /* Pages & Cards */
-        .page-section { display: none; }
-        .page-section.active { display: block; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .stat-card { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
-        .stat-card .label { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
-        .stat-card .value { font-size: 28px; font-weight: 700; color: var(--accent); }
-        .table-card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
-        .table-card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .table-card-header h3 { font-size: 15px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px 20px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; }
-        th { background: var(--bg); font-weight: 600; color: var(--muted); }
-        tr:last-child td { border-bottom: none; }
-        .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-        .badge.active { background: var(--success-bg); color: var(--success); }
-        .badge.admin { background: #eff6ff; color: var(--accent); }
-        .badge.user { background: var(--bg); color: var(--muted); }
-        .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer; }
-        .btn-primary { background: var(--accent); color: white; }
-        .btn-danger { background: var(--error); color: white; }
-        .loading { text-align: center; padding: 40px; color: var(--muted); }
-        .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#11161a">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <title>Taawun Builder</title>
+  <script type="module" src="/assets/datastar-v1.0.2.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #11161a;
+      --ink-2: #171e24;
+      --ink-3: #1d262d;
+      --parchment: #eee7d8;
+      --parchment-dim: #c9c0ac;
+      --emerald: #3c7263;
+      --emerald-bright: #57a68e;
+      --gold: #c7a24a;
+      --rust: #c8501e;
+      --danger: #dc6b5d;
+      --line: rgba(238, 231, 216, 0.14);
+      --line-strong: rgba(238, 231, 216, 0.28);
+      --soft-emerald: rgba(87, 166, 142, 0.12);
+      --soft-gold: rgba(199, 162, 74, 0.12);
+      --radius: 2px;
+      --serif: "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+      --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+    }
 
-        /* MODALS */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
-        .modal-overlay.active { display: flex; }
-        .modal { background: var(--card); border-radius: 16px; padding: 28px; width: 100%; max-width: 480px; box-shadow: 0 25px 50px rgba(0,0,0,0.25); animation: slideUp 0.3s ease-out; }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .modal h2 { margin-bottom: 20px; font-size: 18px; color: var(--text); }
-        .modal-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
-        .btn-secondary { padding: 10px 20px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; }
-        .btn-secondary:hover { background: #e2e8f0; }
-        .modal .btn { width: auto; padding: 10px 24px; }
-    </style>
+    * { box-sizing: border-box; }
+    html { min-width: 320px; background: var(--ink); }
+    body { margin: 0; min-height: 100vh; background: var(--ink); color: var(--parchment); font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      opacity: 0.055;
+      pointer-events: none;
+      background-image:
+        linear-gradient(30deg, transparent 24%, var(--parchment) 25%, transparent 26%),
+        linear-gradient(150deg, transparent 24%, var(--parchment) 25%, transparent 26%),
+        linear-gradient(30deg, transparent 74%, var(--parchment) 75%, transparent 76%),
+        linear-gradient(150deg, transparent 74%, var(--parchment) 75%, transparent 76%);
+      background-size: 56px 96px;
+      background-position: 0 0, 0 0, 28px 48px, 28px 48px;
+    }
+
+    button, input, select, textarea { font: inherit; }
+    button, select { touch-action: manipulation; }
+    button { color: inherit; }
+    a { color: inherit; }
+    h1, h2, h3, p { margin: 0; }
+    [hidden] { display: none !important; }
+    ::selection { background: var(--emerald); color: var(--parchment); }
+
+    :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+    .skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; padding: 10px 14px; background: var(--parchment); color: var(--ink); transform: translateY(-150%); }
+    .skip-link:focus { transform: translateY(0); }
+
+    .eyebrow { color: var(--emerald-bright); font: 500 11px/1.3 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
+    .muted { color: var(--parchment-dim); }
+    .mono { font-family: var(--mono); }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+    .brand { display: inline-flex; align-items: center; gap: 10px; font: 500 19px/1 var(--serif); letter-spacing: 0.01em; }
+    .brand-mark { width: 22px; height: 22px; position: relative; transform: rotate(45deg); border: 1px solid var(--emerald-bright); }
+    .brand-mark::before, .brand-mark::after { content: ""; position: absolute; inset: 5px -6px; border: 1px solid rgba(87, 166, 142, 0.7); }
+    .brand-mark::after { transform: rotate(90deg); }
+
+    .button { min-height: 42px; border: 1px solid transparent; border-radius: var(--radius); padding: 10px 16px; background: var(--emerald); color: #f8f3e8; font-weight: 600; cursor: pointer; transition: background 150ms ease, border-color 150ms ease, transform 150ms ease; }
+    .button:hover:not(:disabled) { background: var(--emerald-bright); color: var(--ink); }
+    .button:active:not(:disabled) { transform: translateY(1px); }
+    .button:disabled { opacity: 0.46; cursor: not-allowed; }
+    .button.secondary { background: transparent; border-color: var(--line-strong); color: var(--parchment); }
+    .button.secondary:hover:not(:disabled) { background: rgba(238, 231, 216, 0.06); border-color: var(--parchment-dim); color: var(--parchment); }
+    .button.tertiary { min-height: auto; padding: 6px 0; background: transparent; border: 0; color: var(--emerald-bright); font: 500 12px/1.4 var(--mono); }
+    .button.tertiary:hover:not(:disabled) { background: transparent; color: var(--parchment); }
+
+    label, legend { color: var(--parchment); font-size: 13px; font-weight: 600; }
+    input, select, textarea {
+      width: 100%; border: 1px solid var(--line-strong); border-radius: var(--radius); background: rgba(17, 22, 26, 0.78); color: var(--parchment); padding: 10px 12px; transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+    input:hover, select:hover, textarea:hover { border-color: rgba(238, 231, 216, 0.42); }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--emerald-bright); box-shadow: 0 0 0 3px rgba(87, 166, 142, 0.13); }
+    input::placeholder, textarea::placeholder { color: rgba(201, 192, 172, 0.55); }
+    textarea { min-height: 98px; resize: vertical; }
+    select { appearance: none; padding-right: 34px; background-image: linear-gradient(45deg, transparent 50%, var(--parchment-dim) 50%), linear-gradient(135deg, var(--parchment-dim) 50%, transparent 50%); background-position: calc(100% - 17px) 17px, calc(100% - 12px) 17px; background-size: 5px 5px; background-repeat: no-repeat; }
+    .field { display: grid; gap: 7px; }
+    .field-help { color: var(--parchment-dim); font-size: 12px; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .required::after { content: " *"; color: var(--gold); }
+
+    .notice { display: flex; gap: 10px; padding: 11px 12px; border: 1px solid var(--line); background: rgba(238, 231, 216, 0.035); color: var(--parchment-dim); font-size: 12px; }
+    .notice::before { content: "i"; flex: 0 0 auto; width: 17px; height: 17px; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; font: 500 10px/1 var(--mono); }
+    .notice.gold { background: var(--soft-gold); border-color: rgba(199, 162, 74, 0.32); color: #dfc476; }
+    .notice.error { background: rgba(220, 107, 93, 0.1); border-color: rgba(220, 107, 93, 0.4); color: #ef9d93; }
+    .notice.success { background: var(--soft-emerald); border-color: rgba(87, 166, 142, 0.35); color: #8ccab7; }
+
+    .auth-view { min-height: 100vh; display: grid; place-items: center; padding: 28px; }
+    .auth-shell { width: min(940px, 100%); display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr); border: 1px solid var(--line-strong); background: var(--ink-2); box-shadow: var(--shadow); }
+    .auth-story { min-height: 560px; padding: 52px; border-right: 1px solid var(--line-strong); display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(135deg, rgba(60, 114, 99, 0.2), transparent 58%); }
+    .auth-story h1 { max-width: 9ch; margin-top: 56px; font: 500 clamp(38px, 5vw, 58px)/1.03 var(--serif); letter-spacing: -0.025em; }
+    .auth-story h1 em { color: var(--emerald-bright); font-weight: 400; }
+    .auth-story p { max-width: 48ch; color: var(--parchment-dim); }
+    .auth-verse { margin-top: 28px; padding-left: 15px; border-left: 2px solid var(--gold); color: var(--gold); font: italic 15px/1.5 var(--serif); }
+    .auth-panel { padding: 52px 42px; align-self: center; }
+    .auth-panel h2 { margin: 12px 0 8px; font: 500 30px/1.15 var(--serif); }
+    .auth-panel > p { color: var(--parchment-dim); margin-bottom: 24px; }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; margin-bottom: 22px; background: var(--ink); border: 1px solid var(--line); }
+    .tab { min-height: 38px; border: 0; background: transparent; color: var(--parchment-dim); cursor: pointer; font: 500 12px/1 var(--mono); letter-spacing: 0.04em; text-transform: uppercase; }
+    .tab[aria-selected="true"] { background: var(--ink-3); color: var(--parchment); box-shadow: inset 0 -2px var(--emerald-bright); }
+    .auth-form { display: grid; gap: 16px; }
+    .auth-alert:empty { display: none; }
+
+    .app-view { min-height: 100vh; }
+    .topbar { position: sticky; top: 0; z-index: 20; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 24px; background: rgba(17, 22, 26, 0.93); border-bottom: 1px solid var(--line); backdrop-filter: blur(12px); }
+    .topbar-left, .topbar-right { display: flex; align-items: center; gap: 18px; min-width: 0; }
+    .beta-tag { border: 1px solid rgba(199, 162, 74, 0.4); padding: 3px 7px; color: var(--gold); font: 500 10px/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
+    .session { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .session-copy { min-width: 0; text-align: right; }
+    .session-copy strong, .session-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .session-copy strong { font-size: 13px; }
+    .session-copy span { color: var(--parchment-dim); font-size: 11px; }
+    .avatar { width: 30px; height: 30px; display: grid; place-items: center; background: var(--soft-emerald); border: 1px solid rgba(87, 166, 142, 0.4); color: var(--emerald-bright); font: 600 11px/1 var(--mono); }
+    .logout { border: 0; border-left: 1px solid var(--line); padding: 8px 0 8px 18px; background: transparent; color: var(--parchment-dim); font: 500 11px/1 var(--mono); text-transform: uppercase; cursor: pointer; }
+    .logout:hover { color: var(--parchment); }
+
+    .cockpit { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: calc(100vh - 64px); }
+    .rail { position: sticky; top: 64px; align-self: start; height: calc(100vh - 64px); padding: 28px 22px; border-right: 1px solid var(--line); background: rgba(17, 22, 26, 0.68); overflow-y: auto; }
+    .rail-title { color: var(--parchment-dim); font: 500 10px/1.3 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; }
+    .step-list { list-style: none; margin: 22px 0 0; padding: 0; counter-reset: steps; }
+    .step { position: relative; min-height: 64px; padding: 0 0 24px 34px; color: var(--parchment-dim); }
+    .step:not(:last-child)::after { content: ""; position: absolute; left: 11px; top: 24px; bottom: 0; width: 1px; background: var(--line-strong); }
+    .step::before { counter-increment: steps; content: "0" counter(steps); position: absolute; left: 0; top: 0; width: 23px; height: 23px; display: grid; place-items: center; border: 1px solid var(--line-strong); background: var(--ink); color: var(--parchment-dim); font: 500 9px/1 var(--mono); }
+    .step.active { color: var(--parchment); }
+    .step.active::before { border-color: var(--emerald-bright); color: var(--emerald-bright); }
+    .step.complete::before { border-color: var(--emerald); background: var(--emerald); color: var(--parchment); }
+    .step strong { display: block; margin-bottom: 3px; font-size: 13px; }
+    .step span { display: block; font-size: 11px; line-height: 1.35; }
+    .rail-boundary { margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--line); }
+    .rail-boundary p { margin-top: 8px; color: var(--parchment-dim); font-size: 11px; }
+
+    .workspace { min-width: 0; padding: 34px; }
+    .workspace-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin: 0 auto 28px; max-width: 1500px; }
+    .workspace-header h1 { margin-top: 6px; font: 500 clamp(29px, 3vw, 42px)/1.08 var(--serif); letter-spacing: -0.02em; }
+    .workspace-header p { max-width: 62ch; margin-top: 10px; color: var(--parchment-dim); }
+    .build-state { flex: 0 0 auto; min-width: 188px; border: 1px solid var(--line); padding: 10px 12px; }
+    .build-state span { display: block; color: var(--parchment-dim); font: 500 9px/1.2 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; }
+    .build-state strong { display: block; margin-top: 5px; font-size: 13px; }
+
+    .builder-grid { max-width: 1500px; margin: 0 auto; display: grid; grid-template-columns: minmax(330px, 430px) minmax(430px, 1fr); gap: 18px; align-items: start; }
+    .panel { border: 1px solid var(--line-strong); background: rgba(23, 30, 36, 0.88); }
+    .panel-head { min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
+    .panel-head h2 { font: 500 18px/1.2 var(--serif); }
+    .panel-number { color: var(--gold); font: 500 10px/1 var(--mono); }
+    .panel-body { padding: 16px; }
+    .builder-form { display: grid; gap: 14px; }
+    .section-rule { height: 1px; margin: 4px 0; background: var(--line); }
+    .subhead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .subhead h3 { font: 500 15px/1.3 var(--serif); }
+    .subhead span { color: var(--parchment-dim); font: 500 9px/1 var(--mono); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    .workspace-picker { display: grid; gap: 9px; }
+    .workspace-state { display: grid; gap: 10px; }
+    .compact-state { padding: 12px; border: 1px dashed var(--line-strong); color: var(--parchment-dim); font-size: 12px; }
+    .compact-state strong { display: block; margin-bottom: 3px; color: var(--parchment); }
+    details.create-workspace { border: 1px solid var(--line); }
+    details.create-workspace summary { padding: 10px 12px; color: var(--emerald-bright); cursor: pointer; font: 500 11px/1.2 var(--mono); }
+    .create-fields { display: grid; gap: 10px; padding: 3px 12px 12px; }
+
+    .template-card { position: relative; padding: 14px; border: 1px solid rgba(87, 166, 142, 0.4); background: linear-gradient(120deg, var(--soft-emerald), transparent 70%); }
+    .template-card::before { content: ""; position: absolute; top: -1px; left: -1px; width: 52px; height: 2px; background: var(--emerald-bright); }
+    .template-card-top { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+    .template-card h3 { margin-top: 4px; font: 500 18px/1.2 var(--serif); }
+    .template-card p { margin-top: 7px; color: var(--parchment-dim); font-size: 12px; }
+    .template-badge { padding: 4px 7px; border: 1px solid rgba(87, 166, 142, 0.36); color: var(--emerald-bright); font: 500 9px/1 var(--mono); text-transform: uppercase; white-space: nowrap; }
+    .template-meta { margin-top: 11px; display: flex; gap: 7px; flex-wrap: wrap; }
+    .template-meta span { padding: 3px 6px; background: rgba(17, 22, 26, 0.58); color: var(--parchment-dim); font: 500 9px/1.2 var(--mono); }
+
+    .composition-contract { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; padding: 1px; background: var(--line-strong); }
+    .composition-mode { min-height: 58px; display: grid; align-content: center; gap: 3px; padding: 9px 10px; background: var(--ink); }
+    .composition-mode strong { font-size: 11px; }
+    .composition-mode small { color: var(--parchment-dim); font-size: 10px; line-height: 1.3; }
+    .composition-mode span { color: var(--emerald-bright); font: 500 8px/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
+
+    .module-list { display: grid; gap: 7px; }
+    .module-option { position: relative; display: grid; grid-template-columns: 18px 1fr auto; gap: 10px; align-items: start; padding: 11px; border: 1px solid var(--line); background: rgba(17, 22, 26, 0.48); cursor: pointer; }
+    .module-option:hover { border-color: var(--line-strong); }
+    .module-option input { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--emerald-bright); }
+    .module-option strong { display: block; font-size: 12px; }
+    .module-option small { display: block; margin-top: 2px; color: var(--parchment-dim); font-size: 10px; line-height: 1.35; }
+    .module-option code { margin-top: 2px; color: var(--emerald-bright); font: 500 9px/1.2 var(--mono); }
+
+    .color-control { display: grid; grid-template-columns: 46px 1fr; gap: 10px; }
+    input[type="color"] { width: 46px; height: 42px; padding: 4px; cursor: pointer; }
+    .compliance-note { padding: 12px; border-left: 2px solid var(--gold); background: var(--soft-gold); }
+    .compliance-note strong { display: block; color: var(--gold); font-size: 12px; }
+    .compliance-note p { margin-top: 4px; color: var(--parchment-dim); font-size: 11px; }
+    .build-actions { display: grid; gap: 9px; margin-top: 3px; }
+    .privacy-copy { color: var(--parchment-dim); font-size: 10px; text-align: center; }
+
+    .preview-column { display: grid; gap: 18px; min-width: 0; }
+    .preview-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .status-pill { display: inline-flex; align-items: center; gap: 7px; color: var(--parchment-dim); font: 500 10px/1 var(--mono); text-transform: uppercase; letter-spacing: 0.05em; }
+    .status-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); }
+    .status-pill.loading::before { background: var(--gold); animation: pulse 1.2s ease-in-out infinite; }
+    .status-pill.ready::before { background: var(--emerald-bright); box-shadow: 0 0 0 3px rgba(87, 166, 142, 0.12); }
+    .status-pill.error::before { background: var(--danger); }
+    .preview-frame-wrap { position: relative; min-height: 540px; background: #0b0f12; }
+    .preview-frame { width: 100%; height: 610px; display: block; border: 0; background: #f5f0e5; }
+    .preview-empty { min-height: 540px; display: grid; place-items: center; padding: 50px; text-align: center; }
+    .empty-star { width: 86px; height: 86px; position: relative; margin: 0 auto 26px; transform: rotate(45deg); border: 1px solid rgba(87, 166, 142, 0.35); }
+    .empty-star::before, .empty-star::after { content: ""; position: absolute; inset: 18px -19px; border: 1px solid rgba(87, 166, 142, 0.3); }
+    .empty-star::after { transform: rotate(90deg); }
+    .preview-empty h3 { font: 500 24px/1.2 var(--serif); }
+    .preview-empty p { max-width: 46ch; margin: 9px auto 0; color: var(--parchment-dim); }
+    .preview-empty .sample-title { color: var(--emerald-bright); }
+    .preview-loading { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; background: rgba(17, 22, 26, 0.87); backdrop-filter: blur(4px); }
+    .spinner { width: 26px; height: 26px; margin: 0 auto 12px; border: 2px solid var(--line-strong); border-top-color: var(--emerald-bright); border-radius: 50%; animation: spin 700ms linear infinite; }
+    .preview-loading p { color: var(--parchment-dim); font: 500 11px/1.3 var(--mono); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    .contract-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(270px, 0.95fr); gap: 18px; }
+    .contract-section { border: 1px solid var(--line-strong); background: rgba(23, 30, 36, 0.78); }
+    .contract-head { padding: 13px 15px; border-bottom: 1px solid var(--line); }
+    .contract-head h2 { font: 500 16px/1.2 var(--serif); }
+    .contract-head p { margin-top: 3px; color: var(--parchment-dim); font-size: 10px; }
+    .contract-body { padding: 14px; }
+    .manifest-empty { color: var(--parchment-dim); font-size: 12px; }
+    .manifest-list { margin: 0; display: grid; gap: 0; }
+    .manifest-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+    .manifest-row:last-child { border-bottom: 0; }
+    .manifest-row dt { color: var(--parchment-dim); font: 500 9px/1.4 var(--mono); text-transform: uppercase; letter-spacing: 0.05em; }
+    .manifest-row dd { margin: 0; overflow-wrap: anywhere; font-size: 11px; }
+    details.raw-manifest { margin-top: 10px; border-top: 1px solid var(--line); }
+    details.raw-manifest summary { padding: 10px 0 0; color: var(--emerald-bright); cursor: pointer; font: 500 10px/1.3 var(--mono); }
+    details.raw-manifest pre { max-height: 280px; overflow: auto; margin: 10px 0 0; padding: 10px; background: var(--ink); color: var(--parchment-dim); font: 10px/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+    .boundary-list, .adapter-list { display: grid; gap: 8px; }
+    .boundary { padding: 10px 11px; border-left: 2px solid var(--emerald); background: rgba(17, 22, 26, 0.46); }
+    .boundary.transactional { border-left-color: var(--gold); }
+    .boundary strong { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; }
+    .boundary strong span { color: var(--emerald-bright); font: 500 8px/1 var(--mono); text-transform: uppercase; }
+    .boundary.transactional strong span { color: var(--gold); }
+    .boundary p { margin-top: 4px; color: var(--parchment-dim); font-size: 10px; }
+    .adapter-list { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .adapter { display: grid; grid-template-columns: 74px 1fr; gap: 10px; }
+    .adapter code { color: var(--emerald-bright); font: 500 9px/1.4 var(--mono); }
+    .adapter p { color: var(--parchment-dim); font-size: 10px; }
+
+    .deploy-strip { display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; padding: 15px 16px; border: 1px solid var(--line-strong); background: linear-gradient(90deg, rgba(199, 162, 74, 0.08), rgba(23, 30, 36, 0.86) 40%); }
+    .deploy-strip strong { display: block; font-size: 12px; }
+    .deploy-strip p { margin-top: 3px; color: var(--parchment-dim); font-size: 10px; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 50% { opacity: 0.35; } }
+
+    @media (max-width: 1120px) {
+      .cockpit { grid-template-columns: 164px minmax(0, 1fr); }
+      .rail { padding-inline: 16px; }
+      .workspace { padding: 28px 22px; }
+      .builder-grid { grid-template-columns: minmax(300px, 390px) minmax(390px, 1fr); }
+      .contract-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 880px) {
+      .cockpit { display: block; }
+      .rail { position: static; width: 100%; height: auto; padding: 13px 20px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .rail-title, .rail-boundary { display: none; }
+      .step-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: 0; }
+      .step { min-height: 0; padding: 30px 4px 0; text-align: center; }
+      .step:not(:last-child)::after { left: calc(50% + 14px); right: calc(-50% + 14px); top: 11px; bottom: auto; width: auto; height: 1px; }
+      .step::before { left: 50%; transform: translateX(-50%); }
+      .step span { display: none; }
+      .step strong { font-size: 10px; }
+      .builder-grid { grid-template-columns: 1fr; }
+      .preview-frame, .preview-frame-wrap, .preview-empty { min-height: 480px; height: 480px; }
+    }
+    @media (max-width: 720px) {
+      .auth-view { padding: 16px; }
+      .auth-shell { grid-template-columns: 1fr; }
+      .auth-story { min-height: 280px; padding: 30px; border-right: 0; border-bottom: 1px solid var(--line-strong); }
+      .auth-story h1 { margin-top: 42px; font-size: 39px; }
+      .auth-story p { display: none; }
+      .auth-panel { padding: 34px 28px; }
+      .topbar { padding: 0 16px; }
+      .beta-tag, .session-copy { display: none; }
+      .workspace { padding: 24px 16px; }
+      .workspace-header { display: block; }
+      .build-state { margin-top: 18px; }
+      .field-row { grid-template-columns: 1fr; }
+      .deploy-strip { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 430px) {
+      .composition-contract { grid-template-columns: 1fr; }
+      .module-option { grid-template-columns: 18px 1fr; }
+      .module-option code { grid-column: 2; }
+      .preview-frame, .preview-frame-wrap, .preview-empty { min-height: 410px; height: 410px; }
+      .preview-empty { padding: 28px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
 </head>
 <body>
-    <!-- AUTH PAGE -->
-    <div id="authPage" class="auth-container">
-        <div class="auth-card">
-            <h1>Welcome</h1>
-            <p>User Auth API Dashboard</p>
-            <div class="auth-tabs">
-                <button class="auth-tab active" onclick="switchTab('login')">Sign In</button>
-                <button class="auth-tab" onclick="switchTab('register')">Register</button>
-            </div>
-            <div id="authAlert" class="alert"></div>
-            <form id="loginForm" onsubmit="handleLogin(event)">
-                <div class="form-group"><label>Email</label><input type="email" id="loginEmail" placeholder="admin@example.com" required></div>
-                <div class="form-group"><label>Password</label><input type="password" id="loginPassword" placeholder="Enter your password" required></div>
-                <button type="submit" class="btn" id="loginBtn">Sign In</button>
-            </form>
-            <form id="registerForm" style="display:none" onsubmit="handleRegister(event)">
-                <div class="form-group"><label>Username</label><input type="text" id="regUsername" placeholder="Choose a username" required minlength="3"></div>
-                <div class="form-group"><label>Email</label><input type="email" id="regEmail" placeholder="you@example.com" required></div>
-                <div class="form-group"><label>Password</label><input type="password" id="regPassword" placeholder="Minimum 8 characters" required minlength="8"></div>
-                <button type="submit" class="btn" id="registerBtn">Create Account</button>
-            </form>
+  <a class="skip-link" href="#mainContent">Skip to builder</a>
+
+  <main id="authView" class="auth-view">
+    <div class="auth-shell">
+      <section class="auth-story" aria-labelledby="authStoryTitle">
+        <div>
+          <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>Taawun</span></div>
+          <h1 id="authStoryTitle">Build for your <em>community.</em></h1>
+          <div class="auth-verse">“And cooperate in righteousness and piety.” — Qur’an 5:2</div>
         </div>
+        <p>One honest app for private beta: fixed community modules, visible trust boundaries, and a working staging artifact before deployment.</p>
+      </section>
+
+      <section class="auth-panel" aria-labelledby="authTitle">
+        <div class="eyebrow">Private beta · Architect access</div>
+        <h2 id="authTitle">Enter the builder</h2>
+        <p>Your session stays in this browser tab and clears when you sign out or reload.</p>
+
+        <div class="tabs" role="tablist" aria-label="Account access">
+          <button id="loginTab" class="tab" type="button" role="tab" aria-selected="true" aria-controls="loginForm" data-auth-tab="login">Sign in</button>
+          <button id="registerTab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="registerForm" data-auth-tab="register">Create account</button>
+        </div>
+
+        <div id="authAlert" class="notice auth-alert" role="alert" aria-live="polite"></div>
+
+        <form id="loginForm" class="auth-form" aria-labelledby="loginTab">
+          <div class="field">
+            <label class="required" for="loginEmail">Email</label>
+            <input id="loginEmail" name="email" type="email" autocomplete="email" required>
+          </div>
+          <div class="field">
+            <label class="required" for="loginPassword">Password</label>
+            <input id="loginPassword" name="password" type="password" autocomplete="current-password" required>
+          </div>
+          <button id="loginButton" class="button" type="submit">Sign in</button>
+        </form>
+
+        <form id="registerForm" class="auth-form" aria-labelledby="registerTab" hidden>
+          <div class="field">
+            <label class="required" for="registerUsername">Username</label>
+            <input id="registerUsername" name="username" type="text" autocomplete="username" minlength="3" maxlength="60" required>
+          </div>
+          <div class="field">
+            <label class="required" for="registerEmail">Email</label>
+            <input id="registerEmail" name="email" type="email" autocomplete="email" required>
+          </div>
+          <div class="field">
+            <label class="required" for="registerPassword">Password</label>
+            <input id="registerPassword" name="password" type="password" autocomplete="new-password" minlength="8" required>
+            <div class="field-help">Use at least 8 characters.</div>
+          </div>
+          <button id="registerButton" class="button" type="submit">Create account</button>
+        </form>
+      </section>
     </div>
-    
-    <!-- MAIN APP -->
-    <div id="appPage" class="app-container">
-        <nav class="sidebar">
-            <div class="sidebar-header"><h2>Dashboard</h2><p id="sidebarUser">Welcome back</p></div>
-            <div class="nav-item active" onclick="showPage('dashboard')"><span class="icon">📊</span> Dashboard</div>
-            <div class="nav-item" onclick="showPage('workspaces')"><span class="icon">🏢</span> Workspaces</div>
-            <div class="nav-item" onclick="showPage('notifications')"><span class="icon">🔔</span> Notifications</div>
-            <div class="nav-item" onclick="showPage('users')"><span class="icon">👥</span> Users</div>
-            <div class="nav-item" onclick="showPage('admin')"><span class="icon">🛡️</span> Admin Panel</div>
-            <div class="nav-item" onclick="showPage('profile')"><span class="icon">👤</span> Profile</div>
-        </nav>
-        <main class="main-content">
-            <div class="main-header">
-                <h1 id="pageTitle">Dashboard</h1>
-                <div class="user-badge"><span id="headerUser"></span><button class="btn-logout" onclick="logout()">Logout</button></div>
-            </div>
-            
-            <div id="page-dashboard" class="page-section active">
-                <div class="stats-grid" id="statsGrid"><div class="loading"><div class="spinner"></div></div></div>
-                <div class="table-card"><div class="table-card-header"><h3>Recent Activity</h3></div><div id="recentActivity"><div class="loading"><div class="spinner"></div></div></div></div>
-            </div>
-            
-            <div id="page-workspaces" class="page-section">
-                <div class="table-card">
-                    <div class="table-card-header"><h3>My Workspaces</h3><button class="btn-sm btn-primary" onclick="showCreateWorkspace()">+ New Workspace</button></div>
-                    <div id="workspacesList"><div class="loading"><div class="spinner"></div></div></div>
+  </main>
+
+  <div
+    id="appView"
+    class="app-view"
+    hidden
+    data-signals="{_appName: 'Community Iftar', _organizationName: '', _city: '', _madhhab: 'hanafi', _accentColor: '#57a68e', _buildBrief: '', _moduleRegistration: true, _moduleAnnouncements: true, _moduleDonation: true, _previewDirty: false}"
+  >
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>Taawun</span></div>
+        <span class="beta-tag">Private beta</span>
+      </div>
+      <div class="topbar-right">
+        <div class="session" aria-label="Signed-in user">
+          <div class="session-copy"><strong id="profileName">Architect</strong><span id="profileEmail"></span></div>
+          <div id="profileInitials" class="avatar" aria-hidden="true">TA</div>
+        </div>
+        <button id="logoutButton" class="logout" type="button">Sign out</button>
+      </div>
+    </header>
+
+    <div class="cockpit">
+      <aside class="rail" aria-label="Build progress">
+        <div class="rail-title">Artifact lifecycle</div>
+        <ol class="step-list">
+          <li id="stepConfigure" class="step active"><strong>Configure</strong><span>Template, modules, theme</span></li>
+          <li id="stepPreview" class="step"><strong>Preview</strong><span>Immutable staging artifact</span></li>
+          <li id="stepReview" class="step"><strong>Review</strong><span>Manifest and boundaries</span></li>
+          <li id="stepDeploy" class="step"><strong>Deploy</strong><span>Review-gated in beta</span></li>
+        </ol>
+        <div class="rail-boundary">
+          <div class="eyebrow">Amanah boundary</div>
+          <p>Taawun holds identity and transit. Readable community records stay in the browser-owned app.</p>
+        </div>
+      </aside>
+
+      <main id="mainContent" class="workspace" tabindex="-1">
+        <header class="workspace-header">
+          <div>
+            <div class="eyebrow">Builder cockpit · Community Iftar</div>
+            <h1>Shape one deployable community app.</h1>
+            <p>Compose the approved modules, set a jurisprudence reference baseline, and inspect the exact artifact contract before deployment.</p>
+          </div>
+          <div class="build-state" aria-live="polite">
+            <span>Build state</span>
+            <strong id="buildStateText">Draft · not yet previewed</strong>
+          </div>
+        </header>
+
+        <div class="builder-grid">
+          <section class="panel" aria-labelledby="configureTitle">
+            <div class="panel-head"><div><span class="panel-number">01</span><h2 id="configureTitle">Build configuration</h2></div></div>
+            <div class="panel-body">
+              <form id="builderForm" class="builder-form" data-on:input="$_previewDirty = true">
+                <div class="subhead"><h3>Workspace</h3><span>Identity boundary</span></div>
+                <div class="workspace-picker">
+                  <div id="workspaceLoading" class="compact-state" role="status">Loading your workspaces…</div>
+                  <div id="workspaceError" class="notice error" role="alert" hidden></div>
+                  <div id="workspaceReady" class="field" hidden>
+                    <label class="required" for="workspaceSelect">Build inside</label>
+                    <select id="workspaceSelect" required aria-describedby="workspaceHelp"></select>
+                    <div id="workspaceHelp" class="field-help">The artifact is scoped to this workspace.</div>
+                  </div>
+                  <div id="workspaceEmpty" class="compact-state" hidden>
+                    <strong>No workspace yet</strong>
+                    Create one below to start building.
+                  </div>
+                  <button id="retryWorkspaces" class="button tertiary" type="button" hidden>Retry workspaces</button>
+                  <details class="create-workspace">
+                    <summary>Create a workspace</summary>
+                    <div class="create-fields">
+                      <div class="field"><label for="workspaceName">Workspace name</label><input id="workspaceName" maxlength="120" placeholder="Wasatch Community Mosque"></div>
+                      <div class="field"><label for="workspaceDescription">Description <span class="muted">(optional)</span></label><input id="workspaceDescription" maxlength="240" placeholder="Community programs and events"></div>
+                      <button id="createWorkspaceButton" class="button secondary" type="button">Create workspace</button>
+                      <div id="createWorkspaceAlert" class="notice" role="status" hidden></div>
+                    </div>
+                  </details>
                 </div>
-            </div>
-            
-            <div id="page-notifications" class="page-section">
-                <div class="table-card"><div class="table-card-header"><h3>Notifications</h3><button class="btn-sm btn-primary" onclick="markAllRead()">Mark All Read</button></div><div id="notificationsList"><div class="loading"><div class="spinner"></div></div></div></div>
-            </div>
-            
-            <div id="page-users" class="page-section">
-                <div class="table-card"><div class="table-card-header"><h3>All Users</h3></div><div id="usersList"><div class="loading"><div class="spinner"></div></div></div></div>
-            </div>
-            
-            <div id="page-admin" class="page-section">
-                <div class="stats-grid" id="adminStats"><div class="loading"><div class="spinner"></div></div></div>
-                <div class="table-card"><div class="table-card-header"><h3>Admin Statistics</h3></div><div id="adminDetails"><div class="loading"><div class="spinner"></div></div></div></div>
-            </div>
-            
-            <div id="page-profile" class="page-section">
-                <div class="table-card"><div class="table-card-header"><h3>My Profile</h3></div><div id="profileContent"><div class="loading"><div class="spinner"></div></div></div></div>
-            </div>
-        </main>
-    </div>
 
-    <!-- MODAL OVERLAY -->
-    <div id="modalOverlay" class="modal-overlay">
-        <div class="modal">
-            <h2 id="modalTitle">Modal</h2>
-            <div id="modalContent"></div>
-            <div class="modal-actions">
-                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
-                <button class="btn" id="modalConfirmBtn">Confirm</button>
+                <div class="section-rule" aria-hidden="true"></div>
+                <div class="subhead"><h3>Prompt &amp; template</h3><span>Curated P0</span></div>
+                <div class="field">
+                  <label for="buildBrief">What should this app help your community do?</label>
+                  <textarea id="buildBrief" maxlength="500" data-bind:_build-brief placeholder="Coordinate Ramadan registration, announcements, and a transparent sandbox donation campaign."></textarea>
+                  <div class="field-help">This private brief stays on this device. The structured controls below are the only fields submitted to build.</div>
+                </div>
+                <article class="template-card" aria-labelledby="templateTitle">
+                  <div class="template-card-top">
+                    <div><div class="eyebrow">Selected template</div><h3 id="templateTitle">Community Iftar</h3></div>
+                    <span id="templateBadge" class="template-badge">Loading</span>
+                  </div>
+                  <p id="templateDescription">Checking the approved template catalog…</p>
+                  <div class="template-meta"><span>community-iftar</span><span>Fixed server template</span><span>3 adapters</span></div>
+                  <button id="retryTemplate" class="button tertiary" type="button" hidden>Retry template catalog</button>
+                </article>
+
+                <div class="section-rule" aria-hidden="true"></div>
+                <div class="subhead"><h3>Composition</h3><span>3 approved modules</span></div>
+                <div class="composition-contract" aria-label="Included composition modes">
+                  <div class="composition-mode"><span>Included</span><strong>Monolithic shell</strong><small>One cohesive standalone community app.</small></div>
+                  <div class="composition-mode"><span>Included</span><strong>Isolated modules</strong><small>Stable routes for embed and MCP adapters.</small></div>
+                </div>
+                <div class="module-list" aria-label="Included modules">
+                  <label class="module-option"><input id="moduleRegistration" type="checkbox" value="iftar-registration" data-bind:_module-registration checked><span><strong>Iftar registration</strong><small>Browser-owned attendee and household registration.</small></span><code>convergent</code></label>
+                  <label class="module-option"><input id="moduleAnnouncements" type="checkbox" value="announcements" data-bind:_module-announcements checked><span><strong>Community announcements</strong><small>Locally editable event notices and schedule updates.</small></span><code>convergent</code></label>
+                  <label class="module-option"><input id="moduleDonation" type="checkbox" value="donation-campaign" data-bind:_module-donation checked><span><strong>Donation campaign</strong><small>AZOA sandbox intent handoff; never a local ledger.</small></span><code>transactional</code></label>
+                </div>
+
+                <div class="section-rule" aria-hidden="true"></div>
+                <div class="subhead"><h3>Identity &amp; theme</h3><span>Template slots</span></div>
+                <div class="field"><label class="required" for="appName">App name</label><input id="appName" maxlength="80" value="Community Iftar" data-bind:_app-name required></div>
+                <div class="field"><label class="required" for="organizationName">Organization</label><input id="organizationName" maxlength="120" data-bind:_organization-name placeholder="Wasatch Community Mosque" required></div>
+                <div class="field-row">
+                  <div class="field"><label class="required" for="city">City</label><input id="city" maxlength="80" data-bind:_city placeholder="Salt Lake City" required></div>
+                  <div class="field"><label class="required" for="madhhab">Reference baseline</label><select id="madhhab" data-bind:_madhhab required><option value="hanafi">Hanafi</option><option value="shafii">Shafi‘i</option><option value="maliki">Maliki</option><option value="hanbali">Hanbali</option></select></div>
+                </div>
+                <div class="field">
+                  <label for="accentColor">Accent color</label>
+                  <div class="color-control"><input id="accentColor" type="color" value="#57a68e" data-bind:_accent-color aria-label="Choose accent color"><input id="accentHex" type="text" value="#57A68E" maxlength="7" inputmode="text" pattern="#[0-9A-Fa-f]{6}" aria-label="Accent color hex value"></div>
+                </div>
+                <div class="compliance-note">
+                  <strong>Reference-only jurisprudence baseline</strong>
+                  <p>The selected madhhab filters seed compliance references pending qualified scholarly review. It is not a fatwa, certification, or substitute for a local scholar.</p>
+                </div>
+
+                <div id="builderAlert" class="notice" role="alert" aria-live="polite" hidden></div>
+                <div class="build-actions">
+                  <button id="previewButton" class="button" type="submit" disabled>Create staging preview</button>
+                  <p class="privacy-copy">Explicit build action sends only workspace ID, curated slots, selected module IDs, theme token, and an empty origin policy. No member, donor, or event records are uploaded.</p>
+                </div>
+              </form>
             </div>
+          </section>
+
+          <div class="preview-column">
+            <section class="panel" aria-labelledby="previewTitle">
+              <div class="panel-head preview-toolbar">
+                <div><span class="panel-number">02</span><h2 id="previewTitle">Live staging preview</h2></div>
+                <span id="previewStatus" class="status-pill">Waiting for build</span>
+              </div>
+              <div class="preview-frame-wrap">
+                <div id="previewEmpty" class="preview-empty">
+                  <div>
+                    <div class="empty-star" aria-hidden="true"></div>
+                    <h3>Preview <span class="sample-title" data-text="$_appName">Community Iftar</span></h3>
+                    <p>Complete the build contract and create a staging artifact. The preview is sandboxed and cannot navigate the builder.</p>
+                  </div>
+                </div>
+                <div id="previewLoading" class="preview-loading" role="status" hidden><div><div class="spinner" aria-hidden="true"></div><p>Building immutable artifact…</p></div></div>
+                <iframe id="previewFrame" class="preview-frame" title="Community Iftar staging preview" sandbox="allow-scripts allow-forms" referrerpolicy="no-referrer" hidden></iframe>
+              </div>
+            </section>
+
+            <div class="contract-grid">
+              <section class="contract-section" aria-labelledby="manifestTitle">
+                <div class="contract-head"><h2 id="manifestTitle">Artifact manifest</h2><p>The receipt for exactly what was built.</p></div>
+                <div class="contract-body">
+                  <p id="manifestEmpty" class="manifest-empty">A manifest will appear after the first successful preview.</p>
+                  <dl id="manifestList" class="manifest-list" hidden></dl>
+                  <details id="rawManifestDetails" class="raw-manifest" hidden><summary>Inspect complete JSON manifest</summary><pre id="rawManifest"></pre></details>
+                </div>
+              </section>
+
+              <section class="contract-section" aria-labelledby="boundaryTitle">
+                <div class="contract-head"><h2 id="boundaryTitle">Data &amp; delivery boundary</h2><p>Visible before any deployment decision.</p></div>
+                <div class="contract-body">
+                  <div class="boundary-list">
+                    <div class="boundary"><strong>Community state <span>Browser-owned</span></strong><p>Registrations and announcements remain local-first, convergent data.</p></div>
+                    <div class="boundary transactional"><strong>Donation actions <span>AZOA sandbox</span></strong><p>Intent handoff only. No local ledger, custody, or settlement claim.</p></div>
+                    <div class="boundary"><strong>Relay <span>Encrypted transit</span></strong><p>Moves opaque sync bytes for cross-device use; it is not a readable database.</p></div>
+                  </div>
+                  <div class="adapter-list" aria-label="Signed card publication modes">
+                    <div class="adapter"><code>standalone</code><p>Workspace-signed Datastar card on an approved HTTPS domain.</p></div>
+                    <div class="adapter"><code>module</code><p>Isolated signed card composed only by an approved host origin.</p></div>
+                    <div class="adapter"><code>monolith</code><p>The same signed modules assembled into one cohesive app shell.</p></div>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <section class="deploy-strip" aria-labelledby="deployTitle">
+              <div><strong id="deployTitle">Deployment state: <span id="deployStateText">Not ready</span></strong><p id="deployStateHelp">Create and review a staging preview first. Production deployment remains review-gated during private beta.</p></div>
+              <button id="deployButton" class="button secondary" type="button" disabled>Deploy unavailable</button>
+            </section>
+          </div>
         </div>
+      </main>
     </div>
+  </div>
 
-    <script>
-        let token = localStorage.getItem('auth_token');
-        let currentUser = JSON.parse(localStorage.getItem('current_user') || 'null');
-        
-        async function api(endpoint, method = 'GET', body = null) {
-            const options = { method, headers: { 'Content-Type': 'application/json' } };
-            if (token) options.headers['Authorization'] = 'Bearer ' + token;
-            if (body) options.body = JSON.stringify(body);
-            const response = await fetch('/api' + endpoint, options);
-            if (!response.ok) throw new Error(await response.text());
-            if (response.status === 204) return null;
-            return response.json();
-        }
-        
-        function switchTab(tab) {
-            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
-            document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
-            document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
-            hideAlert();
-        }
-        function showAlert(msg, type) { const a = document.getElementById('authAlert'); a.className = 'alert ' + type; a.textContent = msg; }
-        function hideAlert() { document.getElementById('authAlert').className = 'alert'; }
-        
-        async function handleLogin(e) {
-            e.preventDefault(); const btn = document.getElementById('loginBtn'); btn.disabled = true; btn.textContent = 'Signing in...';
-            try {
-                const res = await api('/login', 'POST', { email: document.getElementById('loginEmail').value, password: document.getElementById('loginPassword').value });
-                token = res.token; currentUser = res.user; localStorage.setItem('auth_token', token); localStorage.setItem('current_user', JSON.stringify(currentUser));
-                showAlert('Login successful!', 'success'); setTimeout(() => showApp(), 500);
-            } catch (err) { showAlert(err.message, 'error'); } finally { btn.disabled = false; btn.textContent = 'Sign In'; }
-        }
-        
-        async function handleRegister(e) {
-            e.preventDefault(); const btn = document.getElementById('registerBtn'); btn.disabled = true; btn.textContent = 'Creating...';
-            try {
-                await api('/register', 'POST', { username: document.getElementById('regUsername').value, email: document.getElementById('regEmail').value, password: document.getElementById('regPassword').value });
-                showAlert('Account created! Please sign in.', 'success'); setTimeout(() => switchTab('login'), 1500);
-            } catch (err) { showAlert(err.message, 'error'); } finally { btn.disabled = false; btn.textContent = 'Create Account'; }
-        }
-        
-        function logout() { token = null; currentUser = null; localStorage.removeItem('auth_token'); localStorage.removeItem('current_user'); document.getElementById('authPage').style.display = 'flex'; document.getElementById('appPage').classList.remove('active'); }
-        
-        function showApp() {
-            document.getElementById('authPage').style.display = 'none'; document.getElementById('appPage').classList.add('active');
-            document.getElementById('sidebarUser').textContent = currentUser.username; document.getElementById('headerUser').textContent = currentUser.email; loadDashboard();
-        }
-        
-        function showPage(page) {
-            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-            event.target.closest('.nav-item').classList.add('active');
-            document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
-            document.getElementById('page-' + page).classList.add('active');
-            const titles = { dashboard: 'Dashboard', workspaces: 'Workspaces', notifications: 'Notifications', users: 'Users', admin: 'Admin Panel', profile: 'Profile' };
-            document.getElementById('pageTitle').textContent = titles[page];
-            if(page==='dashboard') loadDashboard(); if(page==='workspaces') loadWorkspaces(); if(page==='notifications') loadNotifications(); if(page==='users') loadUsers(); if(page==='admin') loadAdmin(); if(page==='profile') loadProfile();
-        }
+  <script type="module">
+    const TEMPLATE_ID = 'community-iftar';
+    const MODULE_IDS = ['iftar-registration', 'announcements', 'donation-campaign'];
+    const state = {
+      token: '',
+      user: null,
+      templateReady: false,
+      workspacesReady: false,
+      workspaces: [],
+      previewReady: false,
+      building: false,
+    };
 
-        // --- MODAL SYSTEM ---
-        function openModal(title, contentHtml, onConfirm, showConfirm = true) {
-            document.getElementById('modalTitle').textContent = title;
-            document.getElementById('modalContent').innerHTML = contentHtml;
-            document.getElementById('modalOverlay').classList.add('active');
-            const confirmBtn = document.getElementById('modalConfirmBtn');
-            if (showConfirm) { confirmBtn.style.display = 'inline-block'; confirmBtn.onclick = onConfirm; } 
-            else { confirmBtn.style.display = 'none'; }
-        }
-        function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
+    const element = (id) => document.getElementById(id);
 
-        // --- DASHBOARD ---
-        async function loadDashboard() {
-            try {
-                const stats = await api('/dashboard/stats');
-                document.getElementById('statsGrid').innerHTML = `<div class="stat-card"><div class="label">Total Users</div><div class="value">${stats.total_users}</div></div><div class="stat-card"><div class="label">Active Users</div><div class="value">${stats.active_users}</div></div><div class="stat-card"><div class="label">Workspaces</div><div class="value">${stats.total_workspaces}</div></div><div class="stat-card"><div class="label">Unread Notifications</div><div class="value">${stats.unread_notifications}</div></div>`;
-                const act = await api('/dashboard/recent');
-                document.getElementById('recentActivity').innerHTML = act && act.length > 0 ? `<table><thead><tr><th>Action</th><th>User</th><th>Type</th><th>Time</th></tr></thead><tbody>${act.map(a => `<tr><td>${a.action}</td><td>${a.user}</td><td>${a.type}</td><td>${a.timestamp}</td></tr>`).join('')}</tbody></table>` : '<div style="padding:20px;color:var(--muted)">No recent activity</div>';
-            } catch (e) { document.getElementById('statsGrid').innerHTML = `<div class="alert error">${e.message}</div>`; }
-        }
-        
-        // --- WORKSPACES ---
-        async function loadWorkspaces() {
-            try {
-                const ws = await api('/workspaces');
-                document.getElementById('workspacesList').innerHTML = ws && ws.length > 0 ? `<table><thead><tr><th>Name</th><th>Description</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody>${ws.map(w => `<tr><td>${w.name}</td><td>${w.description || '-'}</td><td><span class="badge ${w.status}">${w.status}</span></td><td>${new Date(w.created_at).toLocaleDateString()}</td><td><button class="btn-sm btn-primary" onclick="viewWorkspace(${w.id})">View</button></td></tr>`).join('')}</tbody></table>` : '<div style="padding:20px;color:var(--muted)">No workspaces yet. Create one!</div>';
-            } catch (e) { document.getElementById('workspacesList').innerHTML = `<div class="alert error">${e.message}</div>`; }
-        }
-        
-        function showCreateWorkspace() {
-            const content = `<div class="form-group"><label>Workspace Name</label><input type="text" id="newWsName" placeholder="e.g. Marketing Team"></div><div class="form-group"><label>Description</label><input type="text" id="newWsDesc" placeholder="Optional description"></div>`;
-            openModal('Create New Workspace', content, async () => {
-                const name = document.getElementById('newWsName').value;
-                if (!name) return alert('Name is required');
-                try { await api('/workspaces', 'POST', { name, description: document.getElementById('newWsDesc').value }); closeModal(); loadWorkspaces(); } 
-                catch (e) { alert('Error: ' + e.message); }
-            });
-        }
-        
-        async function viewWorkspace(id) {
-            try {
-                const ws = await api('/workspaces/' + id);
-                const content = `<p style="margin-bottom:12px"><strong>Name:</strong> ${ws.name}</p><p style="margin-bottom:12px"><strong>Description:</strong> ${ws.description || 'None'}</p><p style="margin-bottom:12px"><strong>Status:</strong> <span class="badge ${ws.status}">${ws.status}</span></p><p style="margin-bottom:20px"><strong>Created:</strong> ${new Date(ws.created_at).toLocaleDateString()}</p><hr style="border-color:var(--border); margin-bottom:16px"><button class="btn-sm btn-danger" onclick="deleteWorkspace(${id})">Delete Workspace</button>`;
-                openModal('Workspace Details', content, null, false);
-            } catch (e) { alert('Error: ' + e.message); }
-        }
+    class ApiError extends Error {
+      constructor(message, status) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+      }
+    }
 
-        async function deleteWorkspace(id) {
-            if (!confirm('Are you sure you want to permanently delete this workspace?')) return;
-            try { await api('/workspaces/' + id, 'DELETE'); closeModal(); loadWorkspaces(); } 
-            catch (e) { alert('Error: ' + e.message); }
+    async function api(path, options = {}) {
+      const method = options.method || 'GET';
+      const headers = { Accept: 'application/json' };
+      if (options.auth !== false) {
+        if (!state.token) throw new ApiError('Your session is not active. Please sign in again.', 401);
+        headers.Authorization = `Bearer ${state.token}`;
+      }
+      if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+      const response = await fetch(`/api${path}`, {
+        method,
+        headers,
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        credentials: 'same-origin',
+      });
+      const text = await response.text();
+      let data = null;
+      if (text) {
+        try { data = JSON.parse(text); } catch { data = text; }
+      }
+      if (!response.ok) {
+        const message = typeof data === 'object' && data && (data.error || data.message)
+          ? String(data.error || data.message)
+          : (typeof data === 'string' && data.trim() ? data.trim() : `Request failed (${response.status})`);
+        if (response.status === 401 && options.auth !== false) showAuth('Your session expired. Please sign in again.');
+        throw new ApiError(message, response.status);
+      }
+      return data;
+    }
+
+    function setNotice(target, message, kind = '') {
+      target.textContent = message || '';
+      target.className = `notice${kind ? ` ${kind}` : ''}`;
+      target.hidden = !message;
+    }
+
+    function setBusy(button, busy, busyLabel, idleLabel) {
+      button.disabled = busy;
+      button.textContent = busy ? busyLabel : idleLabel;
+      button.setAttribute('aria-busy', String(busy));
+    }
+
+    function switchAuthTab(tab) {
+      const login = tab === 'login';
+      element('loginTab').setAttribute('aria-selected', String(login));
+      element('registerTab').setAttribute('aria-selected', String(!login));
+      element('loginForm').hidden = !login;
+      element('registerForm').hidden = login;
+      setNotice(element('authAlert'), '');
+      (login ? element('loginEmail') : element('registerUsername')).focus();
+    }
+
+    function clearSession() {
+      state.token = '';
+      state.user = null;
+      state.previewReady = false;
+      state.templateReady = false;
+      state.workspacesReady = false;
+      state.workspaces = [];
+      const frame = element('previewFrame');
+      frame.removeAttribute('src');
+      frame.hidden = true;
+      element('previewEmpty').hidden = false;
+      element('previewLoading').hidden = true;
+      element('manifestList').replaceChildren();
+      element('manifestList').hidden = true;
+      element('manifestEmpty').hidden = false;
+      element('rawManifest').textContent = '';
+      element('rawManifestDetails').hidden = true;
+      element('workspaceSelect').replaceChildren();
+      element('builderForm').reset();
+      element('accentHex').value = '#57A68E';
+      ['appName', 'organizationName', 'city', 'madhhab', 'accentColor', 'buildBrief', 'moduleRegistration', 'moduleAnnouncements', 'moduleDonation'].forEach((id) => {
+        element(id).dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      element('previewButton').textContent = 'Create staging preview';
+      element('buildStateText').textContent = 'Draft · not yet previewed';
+      element('deployStateText').textContent = 'Not ready';
+      element('deployStateHelp').textContent = 'Create and review a staging preview first. Production deployment remains review-gated during private beta.';
+      setPreviewState('', 'Waiting for build');
+      setNotice(element('builderAlert'), '');
+      setLifecycle(0);
+    }
+
+    function showAuth(message = '') {
+      clearSession();
+      element('appView').hidden = true;
+      element('authView').hidden = false;
+      setNotice(element('authAlert'), message, message ? 'error' : '');
+      element('loginEmail').focus();
+    }
+
+    async function enterBuilder(loginUser) {
+      state.user = loginUser || state.user;
+      element('authView').hidden = true;
+      element('appView').hidden = false;
+      renderProfile(state.user);
+      await Promise.allSettled([loadProfile(), loadWorkspaces(), loadTemplate()]);
+      updatePreviewAvailability();
+      element('mainContent').focus();
+    }
+
+    function renderProfile(user) {
+      if (!user) return;
+      const username = String(user.username || 'Architect');
+      const email = String(user.email || '');
+      element('profileName').textContent = username;
+      element('profileEmail').textContent = email;
+      element('profileInitials').textContent = username.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'TA';
+    }
+
+    async function loadProfile() {
+      try {
+        const profile = await api('/profile');
+        state.user = profile;
+        renderProfile(profile);
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 401)) {
+          element('profileEmail').textContent = 'Profile unavailable';
         }
-        
-        // --- OTHER PAGES ---
-        async function loadNotifications() { try { const n = await api('/notifications'); document.getElementById('notificationsList').innerHTML = n && n.length > 0 ? n.map(x => `<div style="padding:16px 20px; border-bottom:1px solid var(--border)"><strong>${x.title}</strong><div style="font-size:13px;color:var(--muted)">${x.message}</div></div>`).join('') : '<div style="padding:20px;color:var(--muted)">No notifications</div>'; } catch (e) {} }
-        async function markAllRead() { try { await api('/notifications/read-all', 'PUT'); loadNotifications(); } catch (e) {} }
-        async function loadUsers() { try { const u = await api('/users'); document.getElementById('usersList').innerHTML = `<table><thead><tr><th>ID</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>${u.map(x => `<tr><td>${x.id}</td><td>${x.username}</td><td>${x.email}</td><td><span class="badge ${x.role}">${x.role}</span></td><td><span class="badge ${x.status}">${x.status}</span></td></tr>`).join('')}</tbody></table>`; } catch (e) {} }
-        async function loadAdmin() { try { const s = await api('/admin/statistics'); document.getElementById('adminStats').innerHTML = `<div class="stat-card"><div class="label">Total Users</div><div class="value">${s.total_users}</div></div><div class="stat-card"><div class="label">Active Users</div><div class="value">${s.active_users}</div></div><div class="stat-card"><div class="label">Total Workspaces</div><div class="value">${s.total_workspaces}</div></div><div class="stat-card"><div class="label">Active Workspaces</div><div class="value">${s.active_workspaces}</div></div>`; document.getElementById('adminDetails').innerHTML = '<div style="padding:20px">Detailed admin stats will be formatted here.</div>'; } catch (e) {} }
-        async function loadProfile() { try { const p = await api('/profile'); document.getElementById('profileContent').innerHTML = `<div style="padding:20px"><p><strong>Username:</strong> ${p.username}</p><p><strong>Email:</strong> ${p.email}</p><p><strong>Role:</strong> <span class="badge ${p.role}">${p.role}</span></p></div>`; } catch (e) {} }
-        
-        if (token && currentUser) showApp();
-    </script>
+      }
+    }
+
+    function normalizeCollection(payload, key) {
+      if (Array.isArray(payload)) return payload;
+      if (payload && Array.isArray(payload[key])) return payload[key];
+      return [];
+    }
+
+    async function loadWorkspaces(preferredId = '') {
+      element('workspaceLoading').hidden = false;
+      element('workspaceError').hidden = true;
+      element('workspaceReady').hidden = true;
+      element('workspaceEmpty').hidden = true;
+      element('retryWorkspaces').hidden = true;
+      state.workspacesReady = false;
+      try {
+        const payload = await api('/workspaces');
+        const workspaces = normalizeCollection(payload, 'workspaces');
+        state.workspaces = workspaces;
+        const select = element('workspaceSelect');
+        select.replaceChildren();
+        if (!workspaces.length) {
+          element('workspaceEmpty').hidden = false;
+        } else {
+          for (const workspace of workspaces) {
+            const option = document.createElement('option');
+            option.value = String(workspace.id);
+            option.textContent = String(workspace.name || `Workspace ${workspace.id}`);
+            select.append(option);
+          }
+          const preferred = String(preferredId || '');
+          if (preferred && workspaces.some((workspace) => String(workspace.id) === preferred)) select.value = preferred;
+          element('workspaceReady').hidden = false;
+          seedOrganizationFromWorkspace();
+        }
+        state.workspacesReady = true;
+      } catch (error) {
+        setNotice(element('workspaceError'), error.message || 'Could not load workspaces.', 'error');
+        element('retryWorkspaces').hidden = false;
+      } finally {
+        element('workspaceLoading').hidden = true;
+        updatePreviewAvailability();
+      }
+    }
+
+    function seedOrganizationFromWorkspace() {
+      const organization = element('organizationName');
+      if (organization.value.trim()) return;
+      const selected = state.workspaces.find((workspace) => String(workspace.id) === element('workspaceSelect').value);
+      if (selected && selected.name) {
+        organization.value = String(selected.name);
+        organization.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+
+    async function createWorkspace() {
+      const name = element('workspaceName').value.trim();
+      const description = element('workspaceDescription').value.trim();
+      if (!name) {
+        setNotice(element('createWorkspaceAlert'), 'Enter a workspace name.', 'error');
+        element('workspaceName').focus();
+        return;
+      }
+      const button = element('createWorkspaceButton');
+      setBusy(button, true, 'Creating…', 'Create workspace');
+      setNotice(element('createWorkspaceAlert'), '');
+      try {
+        const workspace = await api('/workspaces', { method: 'POST', body: { name, description } });
+        element('workspaceName').value = '';
+        element('workspaceDescription').value = '';
+        setNotice(element('createWorkspaceAlert'), 'Workspace created.', 'success');
+        await loadWorkspaces(workspace && workspace.id ? workspace.id : '');
+      } catch (error) {
+        setNotice(element('createWorkspaceAlert'), error.message || 'Could not create the workspace.', 'error');
+      } finally {
+        setBusy(button, false, 'Creating…', 'Create workspace');
+      }
+    }
+
+    async function loadTemplate() {
+      state.templateReady = false;
+      element('templateBadge').textContent = 'Loading';
+      element('templateDescription').textContent = 'Checking the approved template catalog…';
+      element('retryTemplate').hidden = true;
+      try {
+        const payload = await api('/templates');
+        const templates = normalizeCollection(payload, 'templates');
+        const template = templates.find((item) => String(item.id || item.templateId || (item.template && item.template.id) || '') === TEMPLATE_ID);
+        if (!template) throw new Error('The Community Iftar template is not available in this catalog.');
+        const version = String(template.version || (template.template && template.template.version) || '1.0.0');
+        const description = String(template.description || 'Registration, announcements, and a sandbox-only donation campaign for one community.');
+        element('templateBadge').textContent = `Ready · v${version}`;
+        element('templateDescription').textContent = description;
+        state.templateReady = true;
+      } catch (error) {
+        element('templateBadge').textContent = 'Unavailable';
+        element('templateDescription').textContent = error.message || 'Could not load the template catalog.';
+        element('retryTemplate').hidden = false;
+      } finally {
+        updatePreviewAvailability();
+      }
+    }
+
+    function updatePreviewAvailability() {
+      const hasWorkspace = state.workspacesReady && element('workspaceSelect').options.length > 0;
+      element('previewButton').disabled = state.building || !state.templateReady || !hasWorkspace;
+    }
+
+    function selectedModules() {
+      return MODULE_IDS.filter((id) => {
+        if (id === 'iftar-registration') return element('moduleRegistration').checked;
+        if (id === 'announcements') return element('moduleAnnouncements').checked;
+        return element('moduleDonation').checked;
+      });
+    }
+
+    function buildPayload() {
+      const workspaceValue = element('workspaceSelect').value;
+      const workspaceId = Number(workspaceValue);
+      return {
+        workspaceId,
+        appName: element('appName').value.trim(),
+        organizationName: element('organizationName').value.trim(),
+        city: element('city').value.trim(),
+        madhhab: element('madhhab').value,
+        templateId: TEMPLATE_ID,
+        theme: { accentColor: element('accentColor').value.toUpperCase() },
+        modules: selectedModules(),
+        allowedOrigins: { embedders: [], connections: [], resources: [] },
+      };
+    }
+
+    function validateBuilder() {
+      if (!element('builderForm').reportValidity()) return false;
+      if (!selectedModules().length) {
+        setNotice(element('builderAlert'), 'Choose at least one approved module.', 'error');
+        element('moduleRegistration').focus();
+        return false;
+      }
+      if (!Number.isInteger(Number(element('workspaceSelect').value)) || Number(element('workspaceSelect').value) <= 0) {
+        setNotice(element('builderAlert'), 'Select a valid workspace.', 'error');
+        return false;
+      }
+      return true;
+    }
+
+    function safePreviewURL(value) {
+      if (typeof value !== 'string' || !value.trim()) throw new Error('The build did not return a staging URL.');
+      const url = new URL(value, window.location.href);
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('The staging URL uses an unsupported protocol.');
+      if (url.origin !== window.location.origin) throw new Error('The staging preview must be served from the Taawun origin.');
+      return url.href;
+    }
+
+    function loadPreviewFrame(frame, url) {
+      return new Promise((resolve, reject) => {
+        const timeout = window.setTimeout(() => {
+          frame.onload = null;
+          frame.onerror = null;
+          reject(new Error('The staging artifact was built, but its preview did not finish loading.'));
+        }, 12000);
+        frame.onload = () => {
+          window.clearTimeout(timeout);
+          frame.onload = null;
+          frame.onerror = null;
+          resolve();
+        };
+        frame.onerror = () => {
+          window.clearTimeout(timeout);
+          frame.onload = null;
+          frame.onerror = null;
+          reject(new Error('The staging artifact was built, but its preview could not be loaded.'));
+        };
+        frame.src = url;
+      });
+    }
+
+    function setPreviewState(kind, text) {
+      const status = element('previewStatus');
+      status.className = `status-pill${kind ? ` ${kind}` : ''}`;
+      status.textContent = text;
+    }
+
+    function setLifecycle(stage) {
+      const steps = [element('stepConfigure'), element('stepPreview'), element('stepReview'), element('stepDeploy')];
+      steps.forEach((step, index) => {
+        step.classList.toggle('complete', index < stage);
+        step.classList.toggle('active', index === stage);
+      });
+    }
+
+    function manifestValue(value) {
+      if (value === null || value === undefined || value === '') return '—';
+      if (Array.isArray(value)) return value.map((item) => typeof item === 'object' ? (item.id || item.path || JSON.stringify(item)) : String(item)).join(', ') || '—';
+      if (typeof value === 'object') return JSON.stringify(value);
+      return String(value);
+    }
+
+    function appendManifestRow(list, label, value) {
+      const row = document.createElement('div');
+      row.className = 'manifest-row';
+      const term = document.createElement('dt');
+      term.textContent = label;
+      const description = document.createElement('dd');
+      description.textContent = manifestValue(value);
+      row.append(term, description);
+      list.append(row);
+    }
+
+    function renderManifest(manifest) {
+      const list = element('manifestList');
+      list.replaceChildren();
+      const source = manifest && typeof manifest === 'object' ? manifest : { manifest };
+      appendManifestRow(list, 'Contract', source.contractVersion);
+      appendManifestRow(list, 'Artifact', source.artifactId);
+      appendManifestRow(list, 'Content hash', source.contentHash);
+      appendManifestRow(list, 'Template', source.template && (source.template.id ? `${source.template.id} · v${source.template.version || '?'}` : source.template));
+      appendManifestRow(list, 'Modules', source.modules);
+      appendManifestRow(list, 'Render modes', source.renderModes);
+      appendManifestRow(list, 'Compliance', source.compliance && (source.compliance.status || source.compliance));
+      appendManifestRow(list, 'Financial', source.financial && (source.financial.status || source.financial));
+      element('manifestEmpty').hidden = true;
+      list.hidden = false;
+      element('rawManifest').textContent = JSON.stringify(source, null, 2);
+      element('rawManifestDetails').hidden = false;
+    }
+
+    async function createPreview(event) {
+      event.preventDefault();
+      setNotice(element('builderAlert'), '');
+      if (!validateBuilder()) return;
+      state.building = true;
+      updatePreviewAvailability();
+      element('previewLoading').hidden = false;
+      setPreviewState('loading', 'Building preview');
+      element('buildStateText').textContent = 'Build in progress';
+      setLifecycle(1);
+      let artifactBuilt = false;
+      try {
+        const result = await api('/artifacts/preview', { method: 'POST', body: buildPayload() });
+        if (!result || !result.manifest || typeof result.manifest !== 'object') throw new Error('The build did not return an artifact manifest.');
+        const previewURL = safePreviewURL(result && result.previewUrl);
+        renderManifest(result.manifest);
+        artifactBuilt = true;
+        const frame = element('previewFrame');
+        frame.title = `${element('appName').value.trim()} staging preview`;
+        frame.hidden = false;
+        element('previewEmpty').hidden = true;
+        setPreviewState('loading', 'Loading staging app');
+        await loadPreviewFrame(frame, previewURL);
+        state.previewReady = true;
+        setPreviewState('ready', 'Staging ready');
+        element('buildStateText').textContent = 'Preview ready · review required';
+        element('deployStateText').textContent = 'Ready for review';
+        element('deployStateHelp').textContent = 'Inspect the staging app, manifest, compliance references, and trust boundary. Production deploy is intentionally review-gated in this beta.';
+        setNotice(element('builderAlert'), 'Staging artifact created. Review the preview and manifest before deployment.', 'success');
+        setLifecycle(2);
+      } catch (error) {
+        element('previewFrame').hidden = true;
+        element('previewEmpty').hidden = false;
+        setPreviewState('error', artifactBuilt ? 'Preview unavailable' : 'Build failed');
+        element('buildStateText').textContent = artifactBuilt ? 'Artifact built · preview unavailable' : 'Draft · build failed';
+        element('deployStateText').textContent = artifactBuilt ? 'Preview required' : 'Not ready';
+        setNotice(element('builderAlert'), error.message || 'The preview could not be created.', 'error');
+        setLifecycle(artifactBuilt ? 2 : 0);
+      } finally {
+        state.building = false;
+        element('previewLoading').hidden = true;
+        updatePreviewAvailability();
+      }
+    }
+
+    function markPreviewDirty() {
+      if (!state.previewReady || state.building) return;
+      setPreviewState('', 'Changes not previewed');
+      element('buildStateText').textContent = 'Draft changed · refresh preview';
+      element('deployStateText').textContent = 'Preview out of date';
+      element('deployStateHelp').textContent = 'Create a fresh staging preview so its immutable manifest matches these settings.';
+      element('previewButton').textContent = 'Refresh staging preview';
+      setLifecycle(0);
+    }
+
+    function syncAccent(source) {
+      const color = source.value.trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(color)) {
+        element('accentColor').value = color;
+        element('accentHex').value = color.toUpperCase();
+      }
+    }
+
+    document.querySelectorAll('[data-auth-tab]').forEach((button) => button.addEventListener('click', () => switchAuthTab(button.dataset.authTab)));
+
+    element('loginForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = element('loginButton');
+      setBusy(button, true, 'Signing in…', 'Sign in');
+      setNotice(element('authAlert'), '');
+      try {
+        const response = await api('/login', {
+          method: 'POST',
+          auth: false,
+          body: { email: element('loginEmail').value.trim(), password: element('loginPassword').value },
+        });
+        if (!response || !response.token || !response.user) throw new Error('The sign-in response was incomplete.');
+        state.token = String(response.token);
+        await enterBuilder(response.user);
+        element('loginForm').reset();
+      } catch (error) {
+        setNotice(element('authAlert'), error.message || 'Sign-in failed.', 'error');
+      } finally {
+        setBusy(button, false, 'Signing in…', 'Sign in');
+      }
+    });
+
+    element('registerForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = element('registerButton');
+      setBusy(button, true, 'Creating…', 'Create account');
+      setNotice(element('authAlert'), '');
+      try {
+        await api('/register', {
+          method: 'POST',
+          auth: false,
+          body: { username: element('registerUsername').value.trim(), email: element('registerEmail').value.trim(), password: element('registerPassword').value },
+        });
+        element('loginEmail').value = element('registerEmail').value.trim();
+        element('registerForm').reset();
+        switchAuthTab('login');
+        setNotice(element('authAlert'), 'Account created. Sign in to continue.', 'success');
+      } catch (error) {
+        setNotice(element('authAlert'), error.message || 'Account creation failed.', 'error');
+      } finally {
+        setBusy(button, false, 'Creating…', 'Create account');
+      }
+    });
+
+    element('logoutButton').addEventListener('click', () => showAuth());
+    element('retryWorkspaces').addEventListener('click', () => loadWorkspaces());
+    element('retryTemplate').addEventListener('click', loadTemplate);
+    element('createWorkspaceButton').addEventListener('click', createWorkspace);
+    element('workspaceSelect').addEventListener('change', seedOrganizationFromWorkspace);
+    element('builderForm').addEventListener('submit', createPreview);
+    element('builderForm').addEventListener('input', markPreviewDirty);
+    element('accentColor').addEventListener('input', () => syncAccent(element('accentColor')));
+    element('accentHex').addEventListener('input', () => syncAccent(element('accentHex')));
+
+    showAuth();
+  </script>
 </body>
 </html>

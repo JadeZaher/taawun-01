@@ -37,12 +37,19 @@ type AddUserToWorkspaceRequest struct {
 	Role   string `json:"role"`
 }
 
+// WorkspaceCapability names an operation authorized from persisted workspace membership.
+type WorkspaceCapability string
+
 const (
-	WorkspaceStatusActive    = "active"
-	WorkspaceStatusInactive  = "inactive"
-	WorkspaceStatusArchived  = "archived"
-	WorkspaceRoleOwner       = "owner"
-	WorkspaceRoleAdmin       = "admin"
-	WorkspaceRoleMember      = "member"
-	WorkspaceRoleViewer      = "viewer"
+	WorkspaceStatusActive                          = "active"
+	WorkspaceStatusInactive                        = "inactive"
+	WorkspaceStatusArchived                        = "archived"
+	WorkspaceRoleOwner                             = "owner"
+	WorkspaceRoleAdmin                             = "admin"
+	WorkspaceRoleMember                            = "member"
+	WorkspaceRoleViewer                            = "viewer"
+	WorkspaceCapabilityView    WorkspaceCapability = "view"
+	WorkspaceCapabilityAudit   WorkspaceCapability = "audit"
+	WorkspaceCapabilityBuild   WorkspaceCapability = "build"
+	WorkspaceCapabilityPublish WorkspaceCapability = "publish"
 )

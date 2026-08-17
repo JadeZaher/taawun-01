@@ -3,6 +3,8 @@ package services
 import (
 	"fmt"
 	"regexp"
+	"strings"
+
 	"golang.org/x/crypto/bcrypt"
 	"taawun/pkg/models"
 	"taawun/pkg/repositories"
@@ -17,6 +19,8 @@ func NewUserService(repo *repositories.UserRepository) *UserService {
 }
 
 func (s *UserService) CreateUser(req *models.RegisterRequest) (*models.User, error) {
+	req.Username = strings.TrimSpace(req.Username)
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 	// Validate input
 	if err := s.validateRegisterRequest(req); err != nil {
 		return nil, err
@@ -146,8 +150,8 @@ func (s *UserService) validateRegisterRequest(req *models.RegisterRequest) error
 	if req.Password == "" {
 		return fmt.Errorf("password is required")
 	}
-	if len(req.Password) < 8 {
-		return fmt.Errorf("password must be at least 8 characters")
+	if len(req.Password) < 12 {
+		return fmt.Errorf("password must be at least 12 characters")
 	}
 
 	return nil

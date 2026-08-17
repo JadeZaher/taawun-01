@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -19,7 +20,7 @@ func NewWorkspaceHandler(service *services.WorkspaceService) *WorkspaceHandler {
 }
 
 func (h *WorkspaceHandler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := CurrentUser(r.Context())
 	if !ok {
 		http.Error(w, "User not found in context", http.StatusUnauthorized)
 		return
@@ -31,25 +32,26 @@ func (h *WorkspaceHandler) CreateWorkspace(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	workspace, err := h.service.CreateWorkspace(user.ID, &req)
+	workspace, err := h.service.CreateWorkspace(user, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeWorkspaceError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(workspace)
 }
 
 func (h *WorkspaceHandler) GetWorkspaces(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value("user").(*models.User)
+	user, ok := CurrentUser(r.Context())
 	if !ok {
 		http.Error(w, "User not found in context", http.StatusUnauthorized)
 		return
 	}
 
-	workspaces, err := h.service.GetWorkspaces(user.ID)
+	workspaces, err := h.service.GetWorkspaces(user)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeWorkspaceError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -57,6 +59,11 @@ func (h *WorkspaceHandler) GetWorkspaces(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *WorkspaceHandler) GetWorkspace(w http.ResponseWriter, r *http.Request) {
+	user, ok := CurrentUser(r.Context())
+	if !ok {
+		http.Error(w, "User not found in context", http.StatusUnauthorized)
+		return
+	}
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -64,9 +71,9 @@ func (h *WorkspaceHandler) GetWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	workspace, err := h.service.GetWorkspace(id)
+	workspace, err := h.service.GetWorkspace(user, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		writeWorkspaceError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -74,6 +81,11 @@ func (h *WorkspaceHandler) GetWorkspace(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *WorkspaceHandler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
+	user, ok := CurrentUser(r.Context())
+	if !ok {
+		http.Error(w, "User not found in context", http.StatusUnauthorized)
+		return
+	}
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -87,9 +99,9 @@ func (h *WorkspaceHandler) UpdateWorkspace(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	workspace, err := h.service.UpdateWorkspace(id, &req)
+	workspace, err := h.service.UpdateWorkspace(user, id, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeWorkspaceError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -97,6 +109,11 @@ func (h *WorkspaceHandler) UpdateWorkspace(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *WorkspaceHandler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
+	user, ok := CurrentUser(r.Context())
+	if !ok {
+		http.Error(w, "User not found in context", http.StatusUnauthorized)
+		return
+	}
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -104,14 +121,19 @@ func (h *WorkspaceHandler) DeleteWorkspace(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := h.service.DeleteWorkspace(id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := h.service.DeleteWorkspace(user, id); err != nil {
+		writeWorkspaceError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *WorkspaceHandler) AddUserToWorkspace(w http.ResponseWriter, r *http.Request) {
+	user, ok := CurrentUser(r.Context())
+	if !ok {
+		http.Error(w, "User not found in context", http.StatusUnauthorized)
+		return
+	}
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -125,14 +147,19 @@ func (h *WorkspaceHandler) AddUserToWorkspace(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := h.service.AddUserToWorkspace(id, req.UserID, req.Role); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := h.service.AddUserToWorkspace(user, id, req.UserID, req.Role); err != nil {
+		writeWorkspaceError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
 }
 
 func (h *WorkspaceHandler) RemoveUserFromWorkspace(w http.ResponseWriter, r *http.Request) {
+	user, ok := CurrentUser(r.Context())
+	if !ok {
+		http.Error(w, "User not found in context", http.StatusUnauthorized)
+		return
+	}
 	vars := mux.Vars(r)
 	workspaceID, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -146,14 +173,19 @@ func (h *WorkspaceHandler) RemoveUserFromWorkspace(w http.ResponseWriter, r *htt
 		return
 	}
 
-	if err := h.service.RemoveUserFromWorkspace(workspaceID, userID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := h.service.RemoveUserFromWorkspace(user, workspaceID, userID); err != nil {
+		writeWorkspaceError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *WorkspaceHandler) InitializeWorkspace(w http.ResponseWriter, r *http.Request) {
+	user, ok := CurrentUser(r.Context())
+	if !ok {
+		http.Error(w, "User not found in context", http.StatusUnauthorized)
+		return
+	}
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -161,10 +193,21 @@ func (h *WorkspaceHandler) InitializeWorkspace(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if err := h.service.InitializeWorkspace(id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := h.service.InitializeWorkspace(user, id); err != nil {
+		writeWorkspaceError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "initialized"})
+}
+
+func writeWorkspaceError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, services.ErrWorkspaceForbidden):
+		http.Error(w, "Workspace access forbidden", http.StatusForbidden)
+	case errors.Is(err, services.ErrWorkspaceNotFound):
+		http.Error(w, "Workspace not found", http.StatusNotFound)
+	default:
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
 }

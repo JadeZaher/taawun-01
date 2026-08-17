@@ -2,27 +2,61 @@ package services
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
+
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+
 	"taawun/pkg/models"
 	"taawun/pkg/repositories"
 )
 
+const (
+	jwtIssuer   = "taawun"
+	jwtAudience = "taawun-web"
+	jwtLifetime = 12 * time.Hour
+)
+
 type AuthService struct {
-	userRepo *repositories.UserRepository
+	userRepo  *repositories.UserRepository
 	jwtSecret []byte
 }
 
-func NewAuthService(userRepo *repositories.UserRepository) *AuthService {
-	return &AuthService{
-		userRepo: userRepo,
-		jwtSecret: []byte("your-secret-key-change-in-production"),
+type accessTokenClaims struct {
+	UserID int `json:"user_id"`
+	jwt.RegisteredClaims
+}
+
+func NewAuthService(userRepo *repositories.UserRepository, jwtSecret []byte) (*AuthService, error) {
+	if len(jwtSecret) < 32 {
+		return nil, fmt.Errorf("JWT secret must contain at least 32 bytes")
 	}
+	secretCopy := append([]byte(nil), jwtSecret...)
+	return &AuthService{userRepo: userRepo, jwtSecret: secretCopy}, nil
 }
 
 func (s *AuthService) Login(email, password string) (*models.LoginResponse, error) {
-	user, err := s.userRepo.GetByEmail(email)
+	user, err := s.Authenticate(email, password)
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := s.generateToken(user)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate token: %v", err)
+	}
+
+	return &models.LoginResponse{
+		Token: token,
+		User:  *user,
+	}, nil
+}
+
+// Authenticate verifies platform credentials without minting a first-party JWT.
+func (s *AuthService) Authenticate(email, password string) (*models.User, error) {
+	user, err := s.userRepo.GetByEmail(strings.ToLower(strings.TrimSpace(email)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %v", err)
 	}
@@ -37,63 +71,53 @@ func (s *AuthService) Login(email, password string) (*models.LoginResponse, erro
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
 		return nil, fmt.Errorf("invalid credentials")
 	}
-
-	token, err := s.generateToken(user)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate token: %v", err)
-	}
-
-	return &models.LoginResponse{
-		Token: token,
-		User:  *user,
-	}, nil
+	return user, nil
 }
 
 func (s *AuthService) ValidateToken(tokenString string) (*models.User, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+	claims := &accessTokenClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		if token.Method != jwt.SigningMethodHS256 {
+			return nil, fmt.Errorf("unexpected signing method")
 		}
 		return s.jwtSecret, nil
-	})
+	},
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithIssuer(jwtIssuer),
+		jwt.WithAudience(jwtAudience),
+		jwt.WithExpirationRequired(),
+		jwt.WithIssuedAt(),
+	)
 
+	if err != nil || !token.Valid || claims.UserID <= 0 || claims.Subject != strconv.Itoa(claims.UserID) {
+		return nil, fmt.Errorf("invalid token")
+	}
+
+	user, err := s.userRepo.GetByID(claims.UserID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid token: %v", err)
+		return nil, fmt.Errorf("failed to get user: %v", err)
 	}
-
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		userIDFloat, ok := claims["user_id"].(float64)
-		if !ok {
-			return nil, fmt.Errorf("invalid user_id in token")
-		}
-		userID := int(userIDFloat)
-
-		user, err := s.userRepo.GetByID(userID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get user: %v", err)
-		}
-		if user == nil {
-			return nil, fmt.Errorf("user not found")
-		}
-
-		if user.Status != models.StatusActive {
-			return nil, fmt.Errorf("account is not active")
-		}
-
-		return user, nil
+	if user == nil {
+		return nil, fmt.Errorf("user not found")
 	}
-
-	return nil, fmt.Errorf("invalid token")
+	if user.Status != models.StatusActive {
+		return nil, fmt.Errorf("account is not active")
+	}
+	return user, nil
 }
 
 func (s *AuthService) generateToken(user *models.User) (string, error) {
-	claims := jwt.MapClaims{
-		"user_id":    user.ID,
-		"username":   user.Username,
-		"email":      user.Email,
-		"role":       user.Role,
-		"exp":        time.Now().Add(time.Hour * 24).Unix(),
-		"iat":        time.Now().Unix(),
+	now := time.Now().UTC()
+	claims := accessTokenClaims{
+		UserID: user.ID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    jwtIssuer,
+			Subject:   strconv.Itoa(user.ID),
+			Audience:  jwt.ClaimStrings{jwtAudience},
+			ExpiresAt: jwt.NewNumericDate(now.Add(jwtLifetime)),
+			NotBefore: jwt.NewNumericDate(now),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
