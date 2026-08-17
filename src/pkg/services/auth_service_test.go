@@ -46,10 +46,13 @@ func TestAuthServiceRequiresStrongSecretAndValidatesTypedClaims(t *testing.T) {
 	if authenticated.ID != user.ID {
 		t.Fatalf("authenticated user %d, want %d", authenticated.ID, user.ID)
 	}
+	if authenticated.SessionVersion != 1 {
+		t.Fatalf("session version = %d, want 1", authenticated.SessionVersion)
+	}
 
 	now := time.Now().UTC()
 	claims := accessTokenClaims{
-		UserID: user.ID,
+		UserID: user.ID, SessionVersion: authenticated.SessionVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    jwtIssuer,
 			Subject:   strconv.Itoa(user.ID + 1),
@@ -71,5 +74,43 @@ func TestAuthServiceRequiresStrongSecretAndValidatesTypedClaims(t *testing.T) {
 	}
 	if _, err := service.ValidateToken(login.Token); err == nil {
 		t.Fatal("expected a token for a suspended user to be rejected")
+	}
+}
+
+func TestPasswordUpdateRevokesExistingAccessTokens(t *testing.T) {
+	db, userRepo, _ := newSecurityTestRepositories(t)
+	userService := NewUserService(userRepo)
+	created, err := userService.CreateUser(&models.RegisterRequest{
+		Username: "member", Email: "member@example.com", Password: "initial-password",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	authService, err := NewAuthService(userRepo, []byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	login, err := authService.Login(created.Email, "initial-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := userService.UpdateUser(created.ID, &models.UpdateUserRequest{Password: "replacement-password"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := authService.ValidateToken(login.Token); err == nil {
+		t.Fatal("expected password replacement to revoke the prior token")
+	}
+	if _, err := authService.Login(created.Email, "replacement-password"); err != nil {
+		t.Fatalf("expected replacement password to authenticate: %v", err)
+	}
+	if _, err := userService.UpdateUser(created.ID, &models.UpdateUserRequest{Password: "too-short"}); err == nil {
+		t.Fatal("expected password update to enforce registration password policy")
+	}
+	var version int64
+	if err := db.QueryRow(`SELECT session_version FROM users WHERE id = ?`, created.ID).Scan(&version); err != nil {
+		t.Fatal(err)
+	}
+	if version != 2 {
+		t.Fatalf("stored session version = %d, want 2", version)
 	}
 }

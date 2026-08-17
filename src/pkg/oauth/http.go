@@ -12,14 +12,16 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const oauthSessionCookie = "__Host-taawun-oauth-session"
 
 type HTTPHandler struct {
-	service    *Service
-	cookieName string
-	secure     bool
+	service       *Service
+	cookieName    string
+	secure        bool
+	publicLimiter *oauthPublicRateLimiter
 }
 
 func NewHTTPHandler(service *Service) *HTTPHandler {
@@ -28,7 +30,9 @@ func NewHTTPHandler(service *Service) *HTTPHandler {
 	if !secure {
 		name = "taawun-oauth-session"
 	}
-	return &HTTPHandler{service: service, cookieName: name, secure: secure}
+	limiter := newOAuthPublicRateLimiter(publicOAuthWindow, maximumPublicOAuthSources)
+	limiter.now = service.config.Now
+	return &HTTPHandler{service: service, cookieName: name, secure: secure, publicLimiter: limiter}
 }
 
 func (h *HTTPHandler) ProtectedResourceMetadata(w http.ResponseWriter, _ *http.Request) {
@@ -74,15 +78,23 @@ func (h *HTTPHandler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !h.allowPublicAttempt(w, r, "register", OAuthRegistrationAttemptLimit) {
+		return
+	}
 	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || mediaType != "application/json" {
 		writeOAuthError(w, http.StatusUnsupportedMediaType, "invalid_client_metadata", "Content-Type must be application/json")
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	r.Body = http.MaxBytesReader(w, r.Body, maximumPublicOAuthBodyBytes)
 	var request registrationRequest
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&request); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeOAuthError(w, http.StatusRequestEntityTooLarge, "invalid_client_metadata", "registration metadata is too large")
+			return
+		}
 		writeOAuthError(w, http.StatusBadRequest, "invalid_client_metadata", "registration metadata must be valid JSON")
 		return
 	}
@@ -93,6 +105,11 @@ func (h *HTTPHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	client, err := h.service.RegisterClient(Client{Name: request.ClientName, ClientURI: request.ClientURI, RedirectURIs: request.RedirectURIs, GrantTypes: request.GrantTypes, ResponseTypes: request.ResponseTypes, TokenEndpointAuthMethod: request.TokenEndpointAuthMethod})
 	if err != nil {
+		if errors.Is(err, ErrCapacity) {
+			w.Header().Set("Retry-After", "3600")
+			writeOAuthError(w, http.StatusServiceUnavailable, "temporarily_unavailable", "Client registration capacity is temporarily unavailable.")
+			return
+		}
 		writeOAuthError(w, http.StatusBadRequest, "invalid_client_metadata", err.Error())
 		return
 	}
@@ -131,6 +148,9 @@ func (h *HTTPHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) Login(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost && !h.allowPublicAttempt(w, r, "login", OAuthLoginAttemptLimit) {
+		return
+	}
 	if !parseForm(w, r) {
 		return
 	}
@@ -239,12 +259,32 @@ func parseForm(w http.ResponseWriter, r *http.Request) bool {
 		writeOAuthError(w, http.StatusUnsupportedMediaType, "invalid_request", "Content-Type must be application/x-www-form-urlencoded")
 		return false
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	r.Body = http.MaxBytesReader(w, r.Body, maximumPublicOAuthBodyBytes)
 	if err := r.ParseForm(); err != nil {
 		writeOAuthError(w, http.StatusBadRequest, "invalid_request", "form body could not be parsed")
 		return false
 	}
 	return true
+}
+
+const maximumPublicOAuthBodyBytes = 16 << 10
+
+func (h *HTTPHandler) allowPublicAttempt(w http.ResponseWriter, r *http.Request, operation string, limit int) bool {
+	if h.publicLimiter == nil {
+		h.publicLimiter = newOAuthPublicRateLimiter(publicOAuthWindow, maximumPublicOAuthSources)
+		h.publicLimiter.now = h.service.config.Now
+	}
+	allowed, retryAfter := h.publicLimiter.Allow(operation, oauthRequestSource(r), limit)
+	if allowed {
+		return true
+	}
+	seconds := int(retryAfter.Round(time.Second) / time.Second)
+	if seconds < 1 {
+		seconds = 1
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(seconds))
+	writeOAuthError(w, http.StatusTooManyRequests, "temporarily_unavailable", "Too many authorization attempts. Please try again later.")
+	return false
 }
 
 func (s *Service) resourceMetadataURL() string {

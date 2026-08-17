@@ -31,10 +31,11 @@ var themeTokenNames = []string{
 }
 
 const (
-	datastarRuntimeName    = "Datastar"
-	datastarRuntimeVersion = "1.0.2"
-	datastarRuntimePath    = "/assets/datastar-v1.0.2.js"
-	datastarRuntimeSHA256  = "2837d87acf6ee0ba8e4e63765926c25a98d63883b02f88be194a86b81d3fd24a"
+	datastarRuntimeName       = "Datastar"
+	datastarRuntimeVersion    = "1.0.2"
+	datastarRuntimePath       = "/assets/datastar-v1.0.2.js"
+	datastarRuntimeBundlePath = "assets/datastar-v1.0.2.js"
+	datastarRuntimeSHA256     = "2837d87acf6ee0ba8e4e63765926c25a98d63883b02f88be194a86b81d3fd24a"
 )
 
 var dataCatalog = map[string]DataClassification{
@@ -154,7 +155,12 @@ func assembleBundle(request BuildRequest, signerKeyID string) (Manifest, map[str
 		Slots:       append([]string(nil), templateDefinition.Slots...),
 	}
 
-	files := make(map[string][]byte, 7+len(modules))
+	runtime, err := bundledDatastarRuntime()
+	if err != nil {
+		return Manifest{}, nil, err
+	}
+	files := make(map[string][]byte, 8+len(modules))
+	files[datastarRuntimeBundlePath] = runtime
 	files["theme.css"] = renderThemeCSS(request.Theme.AccentColor)
 	if files["template.json"], err = marshalDocument(template); err != nil {
 		return Manifest{}, nil, fmt.Errorf("encode template descriptor: %w", err)
@@ -199,8 +205,8 @@ func assembleBundle(request BuildRequest, signerKeyID string) (Manifest, map[str
 		},
 		Runtime: RuntimeRequirement{
 			Name: datastarRuntimeName, Version: datastarRuntimeVersion, Path: datastarRuntimePath,
-			SHA256: datastarRuntimeSHA256, RequiredBy: []RenderMode{RenderModeStandalone, RenderModeEmbed}, Bundled: false,
-			PackagingRequirement: "The approved serving or export adapter must materialize this exact same-origin versioned runtime and verify its SHA-256 before serving.",
+			SHA256: datastarRuntimeSHA256, RequiredBy: []RenderMode{RenderModeStandalone, RenderModeEmbed}, Bundled: true,
+			PackagingRequirement: "This immutable bundle includes the exact same-origin versioned runtime at /assets/datastar-v1.0.2.js; serving verifies its signed manifest file digest before returning it.",
 		},
 		StateSplit: StateSplit{
 			Statement: "Convergent community records belong to browser storage; transactional financial records belong to the authenticated server; relay nodes carry opaque coordination traffic only.",

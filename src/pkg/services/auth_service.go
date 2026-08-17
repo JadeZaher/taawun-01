@@ -25,7 +25,8 @@ type AuthService struct {
 }
 
 type accessTokenClaims struct {
-	UserID int `json:"user_id"`
+	UserID         int   `json:"user_id"`
+	SessionVersion int64 `json:"session_version"`
 	jwt.RegisteredClaims
 }
 
@@ -89,7 +90,7 @@ func (s *AuthService) ValidateToken(tokenString string) (*models.User, error) {
 		jwt.WithIssuedAt(),
 	)
 
-	if err != nil || !token.Valid || claims.UserID <= 0 || claims.Subject != strconv.Itoa(claims.UserID) {
+	if err != nil || !token.Valid || claims.UserID <= 0 || claims.SessionVersion <= 0 || claims.Subject != strconv.Itoa(claims.UserID) {
 		return nil, fmt.Errorf("invalid token")
 	}
 
@@ -103,13 +104,16 @@ func (s *AuthService) ValidateToken(tokenString string) (*models.User, error) {
 	if user.Status != models.StatusActive {
 		return nil, fmt.Errorf("account is not active")
 	}
+	if user.SessionVersion != claims.SessionVersion {
+		return nil, fmt.Errorf("session is no longer valid")
+	}
 	return user, nil
 }
 
 func (s *AuthService) generateToken(user *models.User) (string, error) {
 	now := time.Now().UTC()
 	claims := accessTokenClaims{
-		UserID: user.ID,
+		UserID: user.ID, SessionVersion: user.SessionVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    jwtIssuer,
 			Subject:   strconv.Itoa(user.ID),

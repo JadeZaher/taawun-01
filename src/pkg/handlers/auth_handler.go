@@ -3,29 +3,48 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
+	"mime"
+	"net"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"taawun/pkg/models"
 	"taawun/pkg/services"
 )
 
+const (
+	maximumPublicAuthBodyBytes = 16 << 10
+	publicAuthWindow           = 15 * time.Minute
+	maximumPublicAuthClients   = 4096
+	registrationAttemptLimit   = 5
+	loginAttemptLimit          = 10
+)
+
 type AuthHandler struct {
-	authService *services.AuthService
-	userService *services.UserService
+	authService   *services.AuthService
+	userService   *services.UserService
+	publicLimiter *authRateLimiter
 }
 
 func NewAuthHandler(authService *services.AuthService, userService *services.UserService) *AuthHandler {
 	return &AuthHandler{
-		authService: authService,
-		userService: userService,
+		authService:   authService,
+		userService:   userService,
+		publicLimiter: newAuthRateLimiter(publicAuthWindow, maximumPublicAuthClients),
 	}
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+	if !h.allowPublicAttempt(w, r, "register", registrationAttemptLimit) {
+		return
+	}
 	var req models.RegisterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if !decodeBoundedJSON(w, r, &req, maximumPublicAuthBodyBytes) {
 		return
 	}
 
@@ -41,9 +60,11 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	if !h.allowPublicAttempt(w, r, "login", loginAttemptLimit) {
+		return
+	}
 	var req models.LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if !decodeBoundedJSON(w, r, &req, maximumPublicAuthBodyBytes) {
 		return
 	}
 
@@ -113,4 +134,107 @@ func (h *AuthHandler) RequireAdmin(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (h *AuthHandler) allowPublicAttempt(w http.ResponseWriter, r *http.Request, operation string, limit int) bool {
+	if h.publicLimiter == nil {
+		h.publicLimiter = newAuthRateLimiter(publicAuthWindow, maximumPublicAuthClients)
+	}
+	allowed, retryAfter := h.publicLimiter.Allow(operation, requestSource(r), limit)
+	if allowed {
+		return true
+	}
+	seconds := int(retryAfter.Round(time.Second) / time.Second)
+	if seconds < 1 {
+		seconds = 1
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(seconds))
+	http.Error(w, "Too many authentication attempts. Please try again later.", http.StatusTooManyRequests)
+	return false
+}
+
+// decodeBoundedJSON accepts one strict JSON object with a small endpoint-specific limit.
+func decodeBoundedJSON(w http.ResponseWriter, r *http.Request, target any, maximumBytes int64) bool {
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || mediaType != "application/json" {
+		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+		return false
+	}
+	if r.ContentLength > maximumBytes {
+		http.Error(w, "Request body is too large", http.StatusRequestEntityTooLarge)
+		return false
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maximumBytes)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			http.Error(w, "Request body is too large", http.StatusRequestEntityTooLarge)
+		} else {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+		}
+		return false
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return false
+	}
+	return true
+}
+
+type authRateLimitEntry struct {
+	started  time.Time
+	attempts int
+}
+
+// authRateLimiter deliberately bounds both the request window and its in-memory accounting.
+type authRateLimiter struct {
+	mu         sync.Mutex
+	entries    map[string]authRateLimitEntry
+	window     time.Duration
+	maxEntries int
+	now        func() time.Time
+}
+
+func newAuthRateLimiter(window time.Duration, maxEntries int) *authRateLimiter {
+	return &authRateLimiter{entries: make(map[string]authRateLimitEntry), window: window, maxEntries: maxEntries, now: time.Now}
+}
+
+func (l *authRateLimiter) Allow(operation, source string, maximumAttempts int) (bool, time.Duration) {
+	now := l.now().UTC()
+	key := operation + "\x00" + source
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for candidate, entry := range l.entries {
+		if !entry.started.Add(l.window).After(now) {
+			delete(l.entries, candidate)
+		}
+	}
+	entry, exists := l.entries[key]
+	if !exists {
+		if len(l.entries) >= l.maxEntries {
+			return false, l.window
+		}
+		l.entries[key] = authRateLimitEntry{started: now, attempts: 1}
+		return true, 0
+	}
+	if entry.attempts >= maximumAttempts {
+		return false, entry.started.Add(l.window).Sub(now)
+	}
+	entry.attempts++
+	l.entries[key] = entry
+	return true, 0
+}
+
+func requestSource(r *http.Request) string {
+	remote := strings.TrimSpace(r.RemoteAddr)
+	if host, _, err := net.SplitHostPort(remote); err == nil && host != "" {
+		return host
+	}
+	if remote != "" {
+		return remote
+	}
+	return "unknown"
 }

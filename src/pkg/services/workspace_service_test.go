@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -75,5 +76,28 @@ func TestWorkspaceServiceEnforcesMembershipAndManagementRoles(t *testing.T) {
 	}
 	if _, err := service.AuthorizeWorkspaceCapability(users[1], workspace.ID, models.WorkspaceCapabilityPublish); err != nil {
 		t.Fatalf("workspace admin should have publish capability: %v", err)
+	}
+}
+
+func TestWorkspaceServiceAcceptsInvitationsIdempotentlyWithoutSelfAuthorization(t *testing.T) {
+	db, userRepo, workspaceRepo := newSecurityTestRepositories(t)
+	owner := &models.User{Username: "owner", Email: "owner-invite@example.com", Password: "x", Role: models.RoleUser, Status: models.StatusActive}
+	invitee := &models.User{Username: "invitee", Email: "invitee@example.com", Password: "x", Role: models.RoleUser, Status: models.StatusActive}
+	insertSecurityTestUser(t, db, owner)
+	insertSecurityTestUser(t, db, invitee)
+	service := NewWorkspaceService(workspaceRepo, userRepo)
+	workspace, err := service.CreateWorkspace(owner, &models.CreateWorkspaceRequest{Name: "Invited community"})
+	if err != nil {
+		t.Fatalf("CreateWorkspace() error = %v", err)
+	}
+	if err := service.AcceptWorkspaceInvitation(context.Background(), invitee, workspace.ID, models.WorkspaceRoleViewer); err != nil {
+		t.Fatalf("AcceptWorkspaceInvitation() error = %v", err)
+	}
+	if err := service.AcceptWorkspaceInvitation(context.Background(), invitee, workspace.ID, models.WorkspaceRoleViewer); err != nil {
+		t.Fatalf("idempotent AcceptWorkspaceInvitation() error = %v", err)
+	}
+	role, err := workspaceRepo.GetUserRole(workspace.ID, invitee.ID)
+	if err != nil || role != models.WorkspaceRoleViewer {
+		t.Fatalf("invited membership = %q, %v", role, err)
 	}
 }

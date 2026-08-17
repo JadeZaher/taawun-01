@@ -203,6 +203,13 @@ func TestDomainLifecycleAuthorizationAndPublicRollback(t *testing.T) {
 	if response.Code != http.StatusOK || response.Body.String() != "first" || store.openCalls < 4 || store.readCalls != 1 {
 		t.Fatalf("public response = %d %q; calls open=%d read=%d", response.Code, response.Body.String(), store.openCalls, store.readCalls)
 	}
+	runtimeRequest := httptest.NewRequest(http.MethodGet, "http://app.example.com/assets/datastar-v1.0.2.js", nil)
+	runtimeRequest.Host = "app.example.com"
+	runtimeResponse := httptest.NewRecorder()
+	public.ServeHTTP(runtimeResponse, runtimeRequest)
+	if runtimeResponse.Code != http.StatusOK || runtimeResponse.Body.String() != "pinned runtime" {
+		t.Fatalf("published runtime response = %d %q", runtimeResponse.Code, runtimeResponse.Body.String())
+	}
 	controlRequest := httptest.NewRequest(http.MethodGet, "http://localhost:8080/", nil)
 	controlRequest.Host = "localhost:8080"
 	controlResponse := httptest.NewRecorder()
@@ -286,6 +293,7 @@ func storeArtifact(store *fakeArtifacts, hash, artifactID string, workspaceID in
 	}
 	store.results[hash] = artifacts.BuildResult{ArtifactID: artifactID, ContentHash: hash, Manifest: manifest}
 	store.files[hash] = map[string]artifacts.ArtifactFile{
-		"index.html": {Path: "index.html", Contents: body, SHA256: hash},
+		"index.html":                {Path: "index.html", Contents: body, SHA256: hash},
+		"assets/datastar-v1.0.2.js": {Path: "assets/datastar-v1.0.2.js", Contents: []byte("pinned runtime"), SHA256: hash},
 	}
 }

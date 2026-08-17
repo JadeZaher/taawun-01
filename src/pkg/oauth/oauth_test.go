@@ -1,9 +1,11 @@
 package oauth
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -56,6 +58,7 @@ type oauthFixture struct {
 	service *Service
 	handler *HTTPHandler
 	client  *Client
+	user    *models.User
 	now     time.Time
 }
 
@@ -74,7 +77,7 @@ func newOAuthFixture(t *testing.T) *oauthFixture {
 		t.Fatal(err)
 	}
 	now := time.Date(2026, 8, 17, 5, 0, 0, 0, time.UTC)
-	user := &models.User{ID: 7, Email: "owner@example.com", Status: models.StatusActive}
+	user := &models.User{ID: 7, Email: "owner@example.com", Status: models.StatusActive, SessionVersion: 1}
 	workspace := &models.Workspace{ID: 42, Name: "Relief Fund", OwnerID: 7, Status: models.WorkspaceStatusActive}
 	service, err := NewService(repository, fakeIdentity{user}, fakeUsers{user}, fakeWorkspaces{workspace}, func(ctx context.Context, _ *models.User) context.Context { return ctx }, Config{
 		Issuer: "https://taawun.example", Resource: "https://taawun.example/mcp", Now: func() time.Time { return now },
@@ -86,7 +89,7 @@ func newOAuthFixture(t *testing.T) *oauthFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &oauthFixture{db: db, service: service, handler: NewHTTPHandler(service), client: client, now: now}
+	return &oauthFixture{db: db, service: service, handler: NewHTTPHandler(service), client: client, user: user, now: now}
 }
 
 func (f *oauthFixture) authorize(t *testing.T, scopes string) (code, verifier string) {
@@ -187,6 +190,154 @@ func TestLoginConsentUsesSecureCookieAndDisclosesRedirectHost(t *testing.T) {
 	}
 }
 
+func TestOAuthPublicLoginAndRegistrationAreBounded(t *testing.T) {
+	fixture := newOAuthFixture(t)
+	limiter := newOAuthPublicRateLimiter(time.Minute, 16)
+	limiter.now = func() time.Time { return fixture.now }
+	fixture.handler.publicLimiter = limiter
+
+	registration := []byte(`{"client_name":"Bounded desktop","redirect_uris":["http://127.0.0.1:49200/callback"]}`)
+	for attempt := 0; attempt < OAuthRegistrationAttemptLimit; attempt++ {
+		request := httptest.NewRequest(http.MethodPost, "/oauth/register", bytes.NewReader(registration))
+		request.Header.Set("Content-Type", "application/json")
+		request.RemoteAddr = "203.0.113.10:4444"
+		response := httptest.NewRecorder()
+		fixture.handler.Register(response, request)
+		if response.Code != http.StatusCreated {
+			t.Fatalf("registration attempt %d status = %d body=%s", attempt+1, response.Code, response.Body.String())
+		}
+	}
+	request := httptest.NewRequest(http.MethodPost, "/oauth/register", bytes.NewReader(registration))
+	request.Header.Set("Content-Type", "application/json")
+	request.RemoteAddr = "203.0.113.10:4444"
+	response := httptest.NewRecorder()
+	fixture.handler.Register(response, request)
+	if response.Code != http.StatusTooManyRequests || response.Header().Get("Retry-After") != "60" {
+		t.Fatalf("registration rate limit = %d Retry-After=%q", response.Code, response.Header().Get("Retry-After"))
+	}
+
+	requestID, err := fixture.service.BeginAuthorization(AuthorizationInput{
+		ClientID: fixture.client.ID, RedirectURI: fixture.client.RedirectURIs[0], ResponseType: "code", Scope: ScopeRead,
+		State: "state-login-limit", Resource: fixture.service.config.Resource, CodeChallenge: strings.Repeat("a", 43), CodeChallengeMethod: "S256",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	form := url.Values{"request_id": {requestID}, "email": {fixture.user.Email}, "password": {"not the password"}}
+	for attempt := 0; attempt < OAuthLoginAttemptLimit; attempt++ {
+		request := httptest.NewRequest(http.MethodPost, "/oauth/login", strings.NewReader(form.Encode()))
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		request.RemoteAddr = "203.0.113.11:4444"
+		response := httptest.NewRecorder()
+		fixture.handler.Login(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("login attempt %d status = %d", attempt+1, response.Code)
+		}
+	}
+	request = httptest.NewRequest(http.MethodPost, "/oauth/login", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.RemoteAddr = "203.0.113.11:4444"
+	response = httptest.NewRecorder()
+	fixture.handler.Login(response, request)
+	if response.Code != http.StatusTooManyRequests || response.Header().Get("Retry-After") != "60" {
+		t.Fatalf("login rate limit = %d Retry-After=%q", response.Code, response.Header().Get("Retry-After"))
+	}
+
+	overdue := append([]byte(`{"client_name":"`), []byte(strings.Repeat("a", maximumPublicOAuthBodyBytes+1))...)
+	overdue = append(overdue, []byte(`","redirect_uris":["http://127.0.0.1:49201/callback"]}`)...)
+	request = httptest.NewRequest(http.MethodPost, "/oauth/register", bytes.NewReader(overdue))
+	request.Header.Set("Content-Type", "application/json")
+	request.RemoteAddr = "203.0.113.12:4444"
+	response = httptest.NewRecorder()
+	fixture.handler.Register(response, request)
+	if response.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized registration status = %d", response.Code)
+	}
+}
+
+func TestOAuthDurableCapsAndExpiryCleanup(t *testing.T) {
+	t.Run("client registration", func(t *testing.T) {
+		fixture := newOAuthFixture(t)
+		fixture.service.repository.maximumDynamicClients = 1
+		request := httptest.NewRequest(http.MethodPost, "/oauth/register", strings.NewReader(`{"client_name":"Capacity client","redirect_uris":["http://127.0.0.1:49202/callback"]}`))
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		fixture.handler.Register(response, request)
+		if response.Code != http.StatusServiceUnavailable || response.Header().Get("Retry-After") != "3600" {
+			t.Fatalf("registration capacity status = %d Retry-After=%q", response.Code, response.Header().Get("Retry-After"))
+		}
+	})
+
+	t.Run("browser session", func(t *testing.T) {
+		fixture := newOAuthFixture(t)
+		fixture.service.repository.maximumActiveSessionsPerUser = 1
+		newRequest := func(state string) string {
+			t.Helper()
+			requestID, err := fixture.service.BeginAuthorization(AuthorizationInput{
+				ClientID: fixture.client.ID, RedirectURI: fixture.client.RedirectURIs[0], ResponseType: "code", Scope: ScopeRead,
+				State: state, Resource: fixture.service.config.Resource, CodeChallenge: strings.Repeat("a", 43), CodeChallengeMethod: "S256",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return requestID
+		}
+		if _, _, err := fixture.service.LoginAuthorization(newRequest("first"), fixture.user.Email, "correct horse battery staple"); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := fixture.service.LoginAuthorization(newRequest("second"), fixture.user.Email, "correct horse battery staple"); !errors.Is(err, ErrCapacity) {
+			t.Fatalf("second browser session error = %v, want ErrCapacity", err)
+		}
+	})
+
+	t.Run("expiry cleanup", func(t *testing.T) {
+		fixture := newOAuthFixture(t)
+		newRequest := func(state string) string {
+			t.Helper()
+			requestID, err := fixture.service.BeginAuthorization(AuthorizationInput{
+				ClientID: fixture.client.ID, RedirectURI: fixture.client.RedirectURIs[0], ResponseType: "code", Scope: ScopeRead,
+				State: state, Resource: fixture.service.config.Resource, CodeChallenge: strings.Repeat("a", 43), CodeChallengeMethod: "S256",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return requestID
+		}
+		activeRequest := newRequest("active")
+		activeSession, _, err := fixture.service.LoginAuthorization(activeRequest, fixture.user.Email, "correct horse battery staple")
+		if err != nil {
+			t.Fatal(err)
+		}
+		staleRequest := newRequest("stale")
+		staleSession, _, err := fixture.service.LoginAuthorization(staleRequest, fixture.user.Email, "correct horse battery staple")
+		if err != nil {
+			t.Fatal(err)
+		}
+		expired := fixture.now.Add(-time.Second).Unix()
+		if _, err := fixture.db.Exec(`UPDATE oauth_authorization_requests SET expires_at = ? WHERE request_hash = ?`, expired, credentialHash(staleRequest)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fixture.db.Exec(`UPDATE oauth_sessions SET expires_at = ? WHERE session_hash = ?`, expired, credentialHash(staleSession)); err != nil {
+			t.Fatal(err)
+		}
+		if err := fixture.service.repository.cleanupExpired(fixture.now); err != nil {
+			t.Fatal(err)
+		}
+		if request, err := fixture.service.repository.getAuthorizationRequest(credentialHash(staleRequest)); err != nil || request != nil {
+			t.Fatalf("stale authorization request = %#v, %v", request, err)
+		}
+		if session, err := fixture.service.repository.getSession(credentialHash(staleSession)); err != nil || session != nil {
+			t.Fatalf("stale browser session = %#v, %v", session, err)
+		}
+		if _, err := fixture.service.activeRequest(activeRequest); err != nil {
+			t.Fatalf("active authorization request was removed: %v", err)
+		}
+		if _, _, err := fixture.service.sessionUser(activeSession); err != nil {
+			t.Fatalf("active browser session was removed: %v", err)
+		}
+	})
+}
+
 func TestAuthorizationCodeOpaqueStorageAndMCPMiddleware(t *testing.T) {
 	fixture := newOAuthFixture(t)
 	code, verifier := fixture.authorize(t, ScopeRead+" "+ScopeBuild)
@@ -278,6 +429,110 @@ func TestRevocationAndInsufficientScopeChallenges(t *testing.T) {
 	if _, err := fixture.service.ValidateAccess(tokens.AccessToken); err == nil {
 		t.Fatal("access token survived refresh-family revocation")
 	}
+}
+
+func TestGrantUsesPersistedClientSnapshotAfterAuthorizationStarts(t *testing.T) {
+	fixture := newOAuthFixture(t)
+	verifier := strings.Repeat("v", 64)
+	challenge, err := pkceChallenge(verifier)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestID, err := fixture.service.BeginAuthorization(AuthorizationInput{
+		ClientID: fixture.client.ID, RedirectURI: fixture.client.RedirectURIs[0], ResponseType: "code", Scope: ScopeRead,
+		State: "state-123", Resource: fixture.service.config.Resource, CodeChallenge: challenge, CodeChallengeMethod: "S256",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err := fixture.service.activeRequest(requestID)
+	if err != nil || request == nil || request.ClientFingerprint == "" {
+		t.Fatalf("authorization request snapshot = %#v, err = %v", request, err)
+	}
+	snapshot, err := fixture.service.repository.getClientSnapshot(request.ClientFingerprint)
+	if err != nil || snapshot == nil || snapshot.Client.Name != fixture.client.Name {
+		t.Fatalf("persisted snapshot = %#v, err = %v", snapshot, err)
+	}
+	session, csrf, err := fixture.service.LoginAuthorization(requestID, "owner@example.com", "correct horse battery staple")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.db.Exec(`UPDATE oauth_clients SET client_name = 'mutated', redirect_uris_json = '["https://example.invalid/callback"]' WHERE client_id = ?`, fixture.client.ID); err != nil {
+		t.Fatal(err)
+	}
+	view, err := fixture.service.ConsentView(requestID, session, csrf)
+	if err != nil || view.Client.Name != "Desktop MCP" || view.Client.RedirectURIs[0] != fixture.client.RedirectURIs[0] {
+		t.Fatalf("consent view did not use frozen client metadata: %#v, err = %v", view, err)
+	}
+	redirect, err := fixture.service.Approve(requestID, session, csrf, []int{42})
+	if err != nil {
+		t.Fatal(err)
+	}
+	codeURL, _ := url.Parse(redirect)
+	tokens, err := fixture.service.ExchangeCode(codeURL.Query().Get("code"), fixture.client.ID, fixture.client.RedirectURIs[0], fixture.service.config.Resource, verifier)
+	if err != nil {
+		t.Fatalf("code exchange depended on mutable client metadata: %v", err)
+	}
+	if _, err := fixture.service.ValidateAccess(tokens.AccessToken); err != nil {
+		t.Fatalf("access validation depended on mutable client metadata: %v", err)
+	}
+	if _, err := fixture.service.Refresh(tokens.RefreshToken, fixture.client.ID, fixture.service.config.Resource); err != nil {
+		t.Fatalf("refresh depended on mutable client metadata: %v", err)
+	}
+	if err := fixture.service.Revoke(tokens.RefreshToken, fixture.client.ID); err != nil {
+		t.Fatalf("revocation depended on mutable client metadata: %v", err)
+	}
+}
+
+func TestOAuthSessionVersionInvalidatesBrowserCodeAndTokenFamilies(t *testing.T) {
+	t.Run("browser session", func(t *testing.T) {
+		fixture := newOAuthFixture(t)
+		verifier := strings.Repeat("v", 64)
+		challenge, _ := pkceChallenge(verifier)
+		requestID, err := fixture.service.BeginAuthorization(AuthorizationInput{
+			ClientID: fixture.client.ID, RedirectURI: fixture.client.RedirectURIs[0], ResponseType: "code", Scope: ScopeRead,
+			State: "state-123", Resource: fixture.service.config.Resource, CodeChallenge: challenge, CodeChallengeMethod: "S256",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		session, csrf, err := fixture.service.LoginAuthorization(requestID, "owner@example.com", "correct horse battery staple")
+		if err != nil {
+			t.Fatal(err)
+		}
+		fixture.user.SessionVersion++
+		if _, err := fixture.service.ConsentView(requestID, session, csrf); err == nil {
+			t.Fatal("browser OAuth session survived password-session rotation")
+		}
+	})
+
+	t.Run("authorization code", func(t *testing.T) {
+		fixture := newOAuthFixture(t)
+		code, verifier := fixture.authorize(t, ScopeRead)
+		fixture.user.SessionVersion++
+		if _, err := fixture.service.ExchangeCode(code, fixture.client.ID, fixture.client.RedirectURIs[0], fixture.service.config.Resource, verifier); err == nil {
+			t.Fatal("authorization code survived password-session rotation")
+		}
+	})
+
+	t.Run("access and refresh family", func(t *testing.T) {
+		fixture := newOAuthFixture(t)
+		tokens := fixture.issue(t, ScopeRead)
+		fixture.user.SessionVersion++
+		if _, err := fixture.service.ValidateAccess(tokens.AccessToken); err == nil {
+			t.Fatal("access token survived password-session rotation")
+		}
+		if _, err := fixture.service.Refresh(tokens.RefreshToken, fixture.client.ID, fixture.service.config.Resource); err == nil {
+			t.Fatal("refresh token survived password-session rotation")
+		}
+		var revoked int
+		if err := fixture.db.QueryRow(`SELECT COUNT(*) FROM oauth_access_tokens WHERE revoked_at IS NOT NULL`).Scan(&revoked); err != nil {
+			t.Fatal(err)
+		}
+		if revoked == 0 {
+			t.Fatal("password-session rotation did not revoke the refresh token family")
+		}
+	})
 }
 
 func TestCIMDSSRFPrimitivesFailClosed(t *testing.T) {

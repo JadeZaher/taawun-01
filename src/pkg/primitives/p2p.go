@@ -21,7 +21,8 @@ import (
 const (
 	defaultRelayMaxMessageBytes      = 64 * 1024
 	defaultRelayConnectionsPerMinute = 10
-	maxRelaySessionLifetime          = 24 * time.Hour
+	maxRelaySessionLifetime          = 5 * time.Minute
+	RelayWebSocketSubprotocol        = "taawun-relay-v1"
 )
 
 var validP2PMessageTypes = map[string]struct{}{
@@ -36,13 +37,28 @@ type RelayConfig struct {
 	MaxConnectionsPerMinute int
 }
 
-// RelaySession is a short-lived authorization for one peer in one artifact network.
+// RelaySessionGrant is trusted control-plane authorization to open one relay connection.
+type RelaySessionGrant struct {
+	ArtifactID  string
+	WorkspaceID int
+	PrincipalID int
+	DeviceID    string
+	PeerID      string
+	Origin      string
+	ExpiresAt   time.Time
+}
+
+// RelaySession is the signed, short-lived relay authorization payload.
 type RelaySession struct {
-	ArtifactID string `json:"artifact_id"`
-	PeerID     string `json:"peer_id"`
-	ExpiresAt  int64  `json:"expires_at"`
-	IssuedAt   int64  `json:"issued_at"`
-	Nonce      string `json:"nonce"`
+	SessionID   string `json:"session_id"`
+	ArtifactID  string `json:"artifact_id"`
+	WorkspaceID int    `json:"workspace_id"`
+	PrincipalID int    `json:"principal_id"`
+	DeviceID    string `json:"device_id"`
+	PeerID      string `json:"peer_id"`
+	Origin      string `json:"origin"`
+	ExpiresAt   int64  `json:"expires_at"`
+	IssuedAt    int64  `json:"issued_at"`
 }
 
 type connectionWindow struct {
@@ -76,6 +92,7 @@ type P2PRelayHub struct {
 	maxMessageBytes   int64
 	connectionsPerMin int
 	connections       map[string]connectionWindow
+	usedSessions      map[string]int64
 	upgrader          websocket.Upgrader
 }
 
@@ -121,45 +138,58 @@ func NewP2PRelayHubWithConfig(config RelayConfig) (*P2PRelayHub, error) {
 		maxMessageBytes:   config.MaxMessageBytes,
 		connectionsPerMin: config.MaxConnectionsPerMinute,
 		connections:       make(map[string]connectionWindow),
+		usedSessions:      make(map[string]int64),
 	}
-	hub.upgrader = websocket.Upgrader{CheckOrigin: hub.isOriginAllowed}
+	hub.upgrader = websocket.Upgrader{CheckOrigin: hub.isOriginAllowed, Subprotocols: []string{RelayWebSocketSubprotocol}}
 	return hub, nil
 }
 
-// SignSession issues a session token for a known artifact and peer identity.
-func (h *P2PRelayHub) SignSession(artifactID, peerID string, expiresAt time.Time) (string, error) {
-	if !validRelayID(artifactID) || !validRelayID(peerID) {
-		return "", errors.New("artifact and peer IDs must contain only letters, digits, dot, underscore, or hyphen")
+// IssueSession signs a control-plane-authorized, principal-bound one-time relay session.
+func (h *P2PRelayHub) IssueSession(grant RelaySessionGrant) (string, *RelaySession, error) {
+	if h == nil {
+		return "", nil, errors.New("relay hub is required")
 	}
 	now := time.Now()
-	if expiresAt.UnixMilli() <= now.UnixMilli() {
-		return "", errors.New("relay session expiry must be in the future")
-	}
-	if expiresAt.After(now.Add(maxRelaySessionLifetime)) {
-		return "", fmt.Errorf("relay session expiry cannot exceed %s", maxRelaySessionLifetime)
-	}
-	nonce := make([]byte, 16)
-	if _, err := rand.Read(nonce); err != nil {
-		return "", fmt.Errorf("generate relay session nonce: %w", err)
-	}
-	payload, err := json.Marshal(RelaySession{
-		ArtifactID: artifactID,
-		PeerID:     peerID,
-		ExpiresAt:  expiresAt.UnixMilli(),
-		IssuedAt:   now.UnixMilli(),
-		Nonce:      base64.RawURLEncoding.EncodeToString(nonce),
-	})
+	origin, err := normalizeOrigin(grant.Origin)
 	if err != nil {
-		return "", fmt.Errorf("marshal relay session: %w", err)
+		return "", nil, errors.New("relay session origin must be an exact HTTP or HTTPS origin")
+	}
+	if !validRelayID(grant.ArtifactID) || !validRelayID(grant.DeviceID) || !validRelayID(grant.PeerID) || grant.WorkspaceID <= 0 || grant.PrincipalID <= 0 {
+		return "", nil, errors.New("relay session requires valid artifact, workspace, principal, device, and peer bindings")
+	}
+	if grant.ExpiresAt.UnixMilli() <= now.UnixMilli() {
+		return "", nil, errors.New("relay session expiry must be in the future")
+	}
+	if grant.ExpiresAt.After(now.Add(maxRelaySessionLifetime)) {
+		return "", nil, fmt.Errorf("relay session expiry cannot exceed %s", maxRelaySessionLifetime)
+	}
+	if _, allowed := h.allowedOrigins[origin]; !allowed {
+		return "", nil, errors.New("relay session origin is not allowed by this relay")
+	}
+	sessionID, err := relaySessionID()
+	if err != nil {
+		return "", nil, err
+	}
+	session := &RelaySession{
+		SessionID: sessionID, ArtifactID: grant.ArtifactID, WorkspaceID: grant.WorkspaceID,
+		PrincipalID: grant.PrincipalID, DeviceID: grant.DeviceID, PeerID: grant.PeerID,
+		Origin: origin, ExpiresAt: grant.ExpiresAt.UnixMilli(), IssuedAt: now.UnixMilli(),
+	}
+	payload, err := json.Marshal(session)
+	if err != nil {
+		return "", nil, fmt.Errorf("marshal relay session: %w", err)
 	}
 	encoded := base64.RawURLEncoding.EncodeToString(payload)
 	mac := hmac.New(sha256.New, h.sharedSecret)
 	_, _ = mac.Write([]byte(encoded))
-	return encoded + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
+	return encoded + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), session, nil
 }
 
-// VerifySession validates token integrity, expiry, and the requested peer binding.
-func (h *P2PRelayHub) VerifySession(token, artifactID, peerID string) (*RelaySession, error) {
+// VerifySession validates signed claims before a trusted caller issues an upgrade.
+func (h *P2PRelayHub) VerifySession(token string) (*RelaySession, error) {
+	if h == nil {
+		return nil, errors.New("relay hub is required")
+	}
 	parts := strings.Split(token, ".")
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return nil, errors.New("malformed relay session token")
@@ -181,11 +211,12 @@ func (h *P2PRelayHub) VerifySession(token, artifactID, peerID string) (*RelaySes
 	if err := json.Unmarshal(payload, &session); err != nil {
 		return nil, errors.New("malformed relay session")
 	}
-	if !validRelayID(session.ArtifactID) || !validRelayID(session.PeerID) {
+	if !validRelayID(session.SessionID) || !validRelayID(session.ArtifactID) || !validRelayID(session.DeviceID) || !validRelayID(session.PeerID) || session.WorkspaceID <= 0 || session.PrincipalID <= 0 {
 		return nil, errors.New("invalid relay session identity")
 	}
-	if session.ArtifactID != artifactID || session.PeerID != peerID {
-		return nil, errors.New("relay session does not match requested artifact or peer")
+	origin, err := normalizeOrigin(session.Origin)
+	if err != nil || origin != session.Origin {
+		return nil, errors.New("invalid relay session origin")
 	}
 	if session.ExpiresAt <= time.Now().UnixMilli() {
 		return nil, errors.New("relay session expired")
@@ -201,22 +232,37 @@ func (h *P2PRelayHub) HandleP2PStream(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "artifactId and peerId must be valid identifiers", http.StatusBadRequest)
 		return
 	}
-	token := r.URL.Query().Get("token")
-	if token == "" {
-		token = bearerToken(r.Header.Get("Authorization"))
+	if r.URL.Query().Has("token") || r.Header.Get("Authorization") != "" {
+		http.Error(w, "relay credentials must use the WebSocket subprotocol", http.StatusBadRequest)
+		return
 	}
-	session, err := h.VerifySession(token, artifactID, peerID)
+	token, ok := relayTokenFromSubprotocol(r)
+	if !ok {
+		http.Error(w, "valid relay session token required", http.StatusUnauthorized)
+		return
+	}
+	session, err := h.VerifySession(token)
 	if err != nil {
 		http.Error(w, "valid relay session token required", http.StatusUnauthorized)
+		return
+	}
+	origin, err := normalizeOrigin(r.Header.Get("Origin"))
+	if err != nil || session.ArtifactID != artifactID || session.PeerID != peerID || session.Origin != origin {
+		http.Error(w, "relay session does not match this connection", http.StatusUnauthorized)
 		return
 	}
 	if !h.allowConnection(r.RemoteAddr) {
 		http.Error(w, "relay connection rate limit exceeded", http.StatusTooManyRequests)
 		return
 	}
+	if !h.reserveSession(session) {
+		http.Error(w, "relay session has already been used", http.StatusUnauthorized)
+		return
+	}
 
 	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		h.releaseSession(session.SessionID)
 		return
 	}
 	client := &Client{ID: peerID, ArtifactID: artifactID, Conn: conn, Send: make(chan []byte, 64), expiresAt: session.ExpiresAt}
@@ -228,6 +274,58 @@ func (h *P2PRelayHub) HandleP2PStream(w http.ResponseWriter, r *http.Request) {
 
 	go client.writePump()
 	client.readPump(h)
+}
+
+func relaySessionID() (string, error) {
+	value := make([]byte, 18)
+	if _, err := rand.Read(value); err != nil {
+		return "", fmt.Errorf("generate relay session ID: %w", err)
+	}
+	return "relay_" + base64.RawURLEncoding.EncodeToString(value), nil
+}
+
+func relayTokenFromSubprotocol(r *http.Request) (string, bool) {
+	protocols := websocket.Subprotocols(r)
+	if len(protocols) != 2 {
+		return "", false
+	}
+	var token string
+	for _, protocol := range protocols {
+		switch {
+		case protocol == RelayWebSocketSubprotocol:
+			continue
+		case token == "" && len(protocol) <= 8192:
+			token = protocol
+		default:
+			return "", false
+		}
+	}
+	return token, token != ""
+}
+
+func (h *P2PRelayHub) reserveSession(session *RelaySession) bool {
+	if h == nil || session == nil {
+		return false
+	}
+	now := time.Now().UnixMilli()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for sessionID, expiresAt := range h.usedSessions {
+		if expiresAt <= now {
+			delete(h.usedSessions, sessionID)
+		}
+	}
+	if _, used := h.usedSessions[session.SessionID]; used {
+		return false
+	}
+	h.usedSessions[session.SessionID] = session.ExpiresAt
+	return true
+}
+
+func (h *P2PRelayHub) releaseSession(sessionID string) {
+	h.mu.Lock()
+	delete(h.usedSessions, sessionID)
+	h.mu.Unlock()
 }
 
 func (h *P2PRelayHub) registerClient(client *Client) error {
@@ -386,12 +484,4 @@ func normalizeOrigin(origin string) (string, error) {
 		return "", errors.New("origin must use http or https")
 	}
 	return strings.ToLower(parsed.Scheme + "://" + parsed.Host), nil
-}
-
-func bearerToken(value string) string {
-	parts := strings.Fields(value)
-	if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") {
-		return parts[1]
-	}
-	return ""
 }

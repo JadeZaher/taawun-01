@@ -5,14 +5,15 @@ import (
 )
 
 type User struct {
-	ID        int       `json:"id" db:"id"`
-	Username  string    `json:"username" db:"username"`
-	Email     string    `json:"email" db:"email"`
-	Password  string    `json:"-" db:"password"`
-	Role      string    `json:"role" db:"role"`
-	Status    string    `json:"status" db:"status"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+	ID             int       `json:"id" db:"id"`
+	Username       string    `json:"username" db:"username"`
+	Email          string    `json:"email" db:"email"`
+	Password       string    `json:"-" db:"password"`
+	Role           string    `json:"role" db:"role"`
+	Status         string    `json:"status" db:"status"`
+	SessionVersion int64     `json:"-" db:"session_version"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type RegisterRequest struct {
@@ -46,9 +47,9 @@ type UpdateUserStatusRequest struct {
 }
 
 const (
-	RoleAdmin    = "admin"
-	RoleUser     = "user"
-	StatusActive = "active"
-	StatusInactive = "inactive"
+	RoleAdmin       = "admin"
+	RoleUser        = "user"
+	StatusActive    = "active"
+	StatusInactive  = "inactive"
 	StatusSuspended = "suspended"
 )

@@ -2,10 +2,10 @@
 
 Checkpoint date: 2026-08-17
 
-This is a substantial, compiling foundation wave, not a finished or deployed
-product. The active product goal remains: ship a lean, sellable Taawun MVP whose
-hosted MCP lets Taawun's or a customer's LLM compose reviewed primitives into
-signed Datastar cards for verified domains.
+This is the private-beta product checkpoint for deployment, not a claim that
+every future federation or key-management capability is finished. The hosted
+MCP and central cockpit now compose reviewed primitives into signed Datastar
+cards for verified domains through the real service composition root.
 
 ## Product boundary now implemented
 
@@ -50,6 +50,26 @@ orchestration remain server-owned. No generated app contains a ledger.
 - Durable Conductor core replacing Docker/LTAP execution with declarative
   validation, compliance evidence, signed preview, retry/resume, and separate
   publication request/activation stages.
+- One authenticated composition root: the cockpit now calls the real catalog,
+  Conductor preview/track/publication APIs, exact-domain claims, signed preview
+  files, Bazaar, Shura, financial sandbox, and relay-ticket adapter. The
+  fail-closed legacy Conductor route is no longer the product path.
+- Browser journey exercised locally: register, sign in, create/select a
+  workspace, inspect the catalog, compose a signed preview, render its
+  sandboxed frame, and create a DNS TXT claim. A verified customer hostname is
+  required before the final publish button becomes available.
+- P1 boundary work: one-use relay tickets bind principal, workspace, artifact,
+  peer/device identifier, exact origin, and expiry in a WebSocket subprotocol;
+  password changes rotate first-party and OAuth sessions; bounded strict JSON,
+  public throttles, OAuth quotas, and expiry cleanup protect public endpoints.
+- Shura invitation acceptance joins the invited principal to WorkspaceService
+  with a bounded role mapping and safe replay behavior. Financial HTTP derives
+  its actor from the authenticated principal and requires a final Shura
+  decision; it never accepts an actor ID from JSON.
+- CIMD grants pin a validated client-metadata snapshot for consent, token,
+  refresh, validation, and revocation. Customer origins remain outside the
+  global API CORS allowlist: published cards are Host-bound signed files, not
+  cross-origin central API clients.
 - Standalone authenticated relay binary and signed AZOA federation envelopes.
 - Canonical Go 1.25 non-root/read-only container, persistent `/data`, corrected
   `/api/health` checks, and hardened SQLite WAL/foreign-key/busy-timeout settings.
@@ -60,7 +80,7 @@ The final integrated checkpoint sweep passed:
 
 ```text
 go test ./src/pkg/... ./src/cmd/...
-node --test src/web/runtime/runtime.test.mjs   # 6 passed, 0 failed
+node --test src/web/index.test.mjs src/web/runtime/runtime.test.mjs
 go build -trimpath -o <temp>/taawun.exe ./src/cmd
 go build -trimpath -o <temp>/taawun-relay.exe ./src/cmd/relay
 git diff --check
@@ -78,58 +98,39 @@ this desktop environment. The Compose health path was corrected by inspection.
 - `docs/screenshots/ethical-finance-cards.png`
 
 The signed-card screenshots were produced by the real artifact builder with all
-eleven catalog primitives. The temporary screenshot helper and data are beneath
-ignored `src/data/` and are not part of the PR.
+eleven catalog primitives. Existing screenshots are retained; the local browser
+QA above exercises the materially changed signed-preview flow without adding a
+synthetic replacement screenshot.
 
 ## Do not claim these are finished
 
-These are the next-session P1/product-wiring items:
+These remain intentionally deferred or operator-owned:
 
-1. `main.go` does not yet construct or mount the new Conductor, Bazaar, Shura, or
-   financial services. The legacy Conductor route intentionally fails closed.
-   The central builder's `/api/templates` and artifact-preview routes are also not
-   wired, so its structured cockpit is present but not yet an end-to-end build UI.
-2. Relay WebSocket tokens still use the URL query and are not yet bound to the
-   current user/device/workspace membership. Move credentials to an allowed
-   WebSocket subprotocol or one-time ticket and bind the signed session claims.
-3. Password updates need the same policy as registration plus session-version
-   revocation. Public login/register/OAuth registration need bounded bodies,
-   throttling, quotas, and cleanup.
-4. Shura invitation acceptance records the Shura invitation but does not yet add
-   the user through WorkspaceService, so accepted invitees cannot receive usable
-   capabilities until the membership flow is joined.
-5. Financial service methods take actor IDs as domain inputs. Only expose them
-   through an authenticated adapter that injects the principal and verifies a
-   Shura decision/approval reference.
-6. Customer card origins are enforced for signing/CSP/public Host delivery, but
-   the central API still uses one process-wide CORS list. Add per-artifact/domain
-   Datastar application adapters without globally granting customer origins API
-   access.
-7. CIMD metadata should be pinned to an issued grant/token family so client-host
-   outages or `Cache-Control: no-store` cannot turn token validation into a live
-   outbound dependency.
-8. The runtime accepts an in-memory workspace key, but member/device E2EE key
-   enrollment and rotation are intentionally deferred. Follow
-   `conductor/e2ee-workspace-keys.md`; do not build a larger key-management product.
-9. Durable relay federation inbox/outbox, configured STUN/TURN credentials, the
-   fuller declarative composition schema, central UI adapters, documentation,
-   and Railway deployment remain next-session work.
+1. Member/device E2EE key enrollment, rotation, and recovery. The runtime keeps
+   an in-memory workspace key only; follow `conductor/e2ee-workspace-keys.md`
+   rather than building a separate key-management product.
+2. Durable relay federation inbox/outbox, multi-node trust, and configured
+   short-lived STUN/TURN credentials. The current relay is one process with
+   process-local one-use-ticket replay tracking, so deployments must use sticky
+   routing until a shared replay store is designed deliberately.
+3. A customer-controlled DNS/TLS hostname is needed to complete a real external
+   verify-and-publish demonstration. The product correctly refuses to publish a
+   preview whose signed origin set omits the verified hostname.
+4. Qualified scholar approval, live settlement-provider credentials, and a real
+   external MCP-client authorization demonstration remain operator work. Sandbox
+   financial flows and compliance evidence must not be described as those
+   authorities.
 
 ## Recommended continuation order
 
-1. Build one composition root in `main.go` and mount the existing services and
-   router helpers. Make register → workspace → catalog → signed preview work in
-   the central cockpit before adding new primitives.
-2. Close review findings 2–7 above and add integration tests at the authenticated
-   adapter boundaries.
-3. Connect generated card events to local-first/Shura/financial/Bazaar/compliance
-   adapters; keep server-owned state out of IndexedDB.
-4. Update the cockpit to render the full dynamic catalog, verified domains,
-   review evidence, publish/rollback, Bazaar test drive, and MCP connection guide.
-5. Add the minimal device-key envelope lifecycle, relay/ICE interoperability, and
-   durable federation inbox/outbox.
-6. Rewrite the stale root/source READMEs and `.env.example`, run browser/security
-   verification, then deploy to the existing Railway Hadith Ontology project.
+1. Deploy this exact checkpoint to the existing Railway project and record the
+   service, deployment, public health route, and browser route in
+   `docs/deployment-live-qa.md`.
+2. Complete one controlled customer-DNS claim, fresh signed preview, activation,
+   and public-host smoke test before onboarding a customer.
+3. Add the deliberately deferred device-key envelopes, relay/ICE
+   interoperability, and durable federation only when their operator model is
+   chosen.
 
 ## Environment and repository notes
 

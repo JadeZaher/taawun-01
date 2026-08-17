@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -20,16 +21,20 @@ import (
 	"github.com/gorilla/mux"
 
 	"taawun/pkg/artifacts"
+	"taawun/pkg/bazaar"
 	"taawun/pkg/conductor"
 	"taawun/pkg/database"
 	"taawun/pkg/domains"
 	"taawun/pkg/ethics"
+	"taawun/pkg/financial"
 	"taawun/pkg/handlers"
 	"taawun/pkg/mcp"
+	"taawun/pkg/models"
 	"taawun/pkg/oauth"
 	"taawun/pkg/primitives"
 	"taawun/pkg/repositories"
 	"taawun/pkg/services"
+	"taawun/pkg/shura"
 	"taawun/web"
 )
 
@@ -85,12 +90,11 @@ func main() {
 	adminHandler := handlers.NewAdminHandler(adminService)
 	dashboardHandler := handlers.NewDashboardHandler(userService, workspaceService, notificationService)
 
-	// Initialize Taawun Engine Primitives & Conductor Track
+	// Initialize Taawun engine primitives and the authenticated composition services.
 	p2pHub, err := configuredRelayHub()
 	if err != nil {
 		log.Fatalf("Failed to configure P2P relay: %v", err)
 	}
-	ltapService := primitives.NewLTAPStorageService("./data")
 	artifactBuilder, err := configuredArtifactBuilder()
 	if err != nil {
 		log.Fatalf("Failed to configure signed artifact builder: %v", err)
@@ -102,6 +106,77 @@ func main() {
 	domainHandler, err := domains.NewHTTPHandler(domainService, handlers.CurrentUser)
 	if err != nil {
 		log.Fatalf("Failed to configure verified-domain HTTP API: %v", err)
+	}
+	ethicsEngine := ethics.NewHaramCheckEngine()
+	complianceCorpus := ethics.NewSeedComplianceCorpus()
+	conductorRepository, err := conductor.NewRepository(db)
+	if err != nil {
+		log.Fatalf("Failed to initialize Conductor storage: %v", err)
+	}
+	complianceAuditor, err := conductor.NewReferenceComplianceAuditor(ethicsEngine, complianceCorpus)
+	if err != nil {
+		log.Fatalf("Failed to configure Conductor compliance audit: %v", err)
+	}
+	conductorService, err := conductor.NewService(conductorRepository, workspaceService, conductor.ActorSubjectResolver{}, conductor.CuratedCompositionValidator{}, complianceAuditor, artifactBuilder, domainService, domainService)
+	if err != nil {
+		log.Fatalf("Failed to configure Conductor composition service: %v", err)
+	}
+	compositionHandler, err := handlers.NewCompositionHTTPHandler(conductorService, artifactBuilder, handlers.CurrentUser, appOrigins)
+	if err != nil {
+		log.Fatalf("Failed to configure central builder API: %v", err)
+	}
+	relayTicketHandler, err := handlers.NewRelayTicketHTTPHandler(p2pHub, artifactBuilder, workspaceService, handlers.CurrentUser)
+	if err != nil {
+		log.Fatalf("Failed to configure relay ticket API: %v", err)
+	}
+	shuraRepository, err := shura.NewRepository(db)
+	if err != nil {
+		log.Fatalf("Failed to initialize Shura storage: %v", err)
+	}
+	shuraIssuer, shuraRegistry, err := configuredShuraSigning(publicBaseURL)
+	if err != nil {
+		log.Fatalf("Failed to configure Shura signing: %v", err)
+	}
+	shuraVerifier, err := shura.NewCapabilityVerifier(shuraRegistry, shuraRepository, workspaceService)
+	if err != nil {
+		log.Fatalf("Failed to configure Shura verification: %v", err)
+	}
+	shuraService, err := shura.NewServiceWithMembership(shuraRepository, shuraIssuer, shuraVerifier, workspaceService)
+	if err != nil {
+		log.Fatalf("Failed to configure Shura service: %v", err)
+	}
+	shuraHandler, err := shura.NewHTTPHandler(shuraService, func(request *http.Request) (*models.User, error) {
+		user, ok := handlers.CurrentUser(request.Context())
+		if !ok {
+			return nil, fmt.Errorf("authentication required")
+		}
+		return user, nil
+	})
+	if err != nil {
+		log.Fatalf("Failed to configure Shura HTTP API: %v", err)
+	}
+	financialPath := configuredFinancialDatabasePath()
+	financialService, err := financial.NewSQLiteAzoaSandbox(financialPath)
+	if err != nil {
+		log.Fatalf("Failed to configure AZOA sandbox: %v", err)
+	}
+	defer financialService.Close()
+	financialHandler, err := handlers.NewFinancialHTTPHandler(financialService, workspaceService, shuraService, handlers.CurrentUser)
+	if err != nil {
+		log.Fatalf("Failed to configure financial HTTP API: %v", err)
+	}
+	bazaarService, err := bazaar.NewService(db, bazaar.Dependencies{
+		Workspaces: workspaceService, Artifacts: artifactBuilder, Publications: domainService,
+		Compliance: referenceBazaarComplianceReviewer{corpus: complianceCorpus},
+		Shura:      bazaarShuraDecisionResolver{service: shuraService},
+		Financial:  financialService, Gharar: ethics.NewAntiGhararValidator(),
+	})
+	if err != nil {
+		log.Fatalf("Failed to configure Bazaar service: %v", err)
+	}
+	bazaarHandler, err := bazaar.NewHTTPHandler(bazaarService, handlers.CurrentUser)
+	if err != nil {
+		log.Fatalf("Failed to configure Bazaar HTTP API: %v", err)
 	}
 	oauthRepository, err := oauth.NewRepository(db)
 	if err != nil {
@@ -118,9 +193,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to configure MCP control plane: %v", err)
 	}
-	ethicsEngine := ethics.NewHaramCheckEngine()
-	conductorTrack := conductor.NewConductorTrack(p2pHub, ltapService)
-
 	// Setup router
 	r := mux.NewRouter()
 
@@ -160,12 +232,28 @@ func main() {
 	r.HandleFunc("/oauth/token", oauthHandler.Token).Methods("POST")
 	r.HandleFunc("/oauth/revoke", oauthHandler.Revoke).Methods("POST")
 
-	adminOnly := func(handler http.Handler) http.Handler {
-		return authHandler.AuthMiddleware(authHandler.RequireAdmin(handler))
-	}
-
 	// Remote MCP accepts standard Streamable HTTP methods and re-authorizes every workspace tool.
 	r.Handle("/mcp", mcp.ProtectExactHTTP(appOrigins, mcpHosts, oauthService.Middleware(oauthService.MCPToolScopeMiddleware(mcp.OAuthScopeRequirements(), mcpServer.Handler()))))
+
+	// Shura uses first-party identity only for invitation and capability issuance; proposal actions use signed Shura capabilities.
+	shuraAPI := http.StripPrefix("/api/shura", shuraHandler)
+	r.Handle("/api/shura/.well-known/jwks.json", shuraAPI).Methods(http.MethodGet)
+	r.Handle("/api/shura/v1/capabilities", authHandler.AuthMiddleware(shuraAPI)).Methods(http.MethodPost)
+	r.Handle("/api/shura/v1/capabilities/revoke", authHandler.AuthMiddleware(shuraAPI)).Methods(http.MethodPost)
+	r.Handle("/api/shura/v1/invitations", authHandler.AuthMiddleware(shuraAPI)).Methods(http.MethodPost)
+	r.Handle("/api/shura/v1/invitations/accept", authHandler.AuthMiddleware(shuraAPI)).Methods(http.MethodPost)
+	r.Handle("/api/shura/v1/invitations/{invitation_id}/revoke", authHandler.AuthMiddleware(shuraAPI)).Methods(http.MethodPost)
+	r.Handle("/api/shura/v1/workspaces/{workspace_id}/proposals", shuraAPI).Methods(http.MethodPost)
+	r.Handle("/api/shura/v1/proposals/{proposal_id}", shuraAPI).Methods(http.MethodGet)
+	r.Handle("/api/shura/v1/proposals/{proposal_id}/deliberation", shuraAPI).Methods(http.MethodPost)
+	r.Handle("/api/shura/v1/proposals/{proposal_id}/votes", shuraAPI).Methods(http.MethodPost)
+	r.Handle("/api/shura/v1/proposals/{proposal_id}/decision", shuraAPI).Methods(http.MethodPost)
+	r.Handle("/api/shura/v1/proposals/{proposal_id}/cancel", shuraAPI).Methods(http.MethodPost)
+	r.Handle("/api/shura/v1/proposals/{proposal_id}/audit", shuraAPI).Methods(http.MethodGet)
+
+	if err := bazaar.RegisterRoutes(r, authHandler.AuthMiddleware, bazaarHandler); err != nil {
+		log.Fatalf("Failed to mount Bazaar HTTP API: %v", err)
+	}
 
 	// P2P WebRTC Signaling & WebSocket Relay endpoint (Local-first browser artifacts)
 	r.HandleFunc("/api/p2p/stream", p2pHub.HandleP2PStream)
@@ -188,35 +276,6 @@ func main() {
 		json.NewEncoder(w).Encode(result)
 	}).Methods("POST")
 
-	// Conductor Track Endpoints
-	r.Handle("/api/conductor/track", adminOnly(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var req conductor.TrackRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid track request body", http.StatusBadRequest)
-			return
-		}
-		res, err := conductorTrack.ExecuteTrack(r.Context(), &req)
-		w.Header().Set("Content-Type", "application/json")
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(res)
-			return
-		}
-		json.NewEncoder(w).Encode(res)
-	}))).Methods("POST")
-
-	r.Handle("/api/conductor/track/{id}", adminOnly(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		trackID := vars["id"]
-		res, ok := conductorTrack.GetTrackResult(trackID)
-		w.Header().Set("Content-Type", "application/json")
-		if !ok {
-			http.Error(w, "Track execution record not found", http.StatusNotFound)
-			return
-		}
-		json.NewEncoder(w).Encode(res)
-	}))).Methods("GET")
-
 	// Conductor Open Platform Specification & Developer Ergonomics Endpoint
 	r.HandleFunc("/api/conductor/spec", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -232,8 +291,9 @@ func main() {
 				{"path": "/mcp", "method": "POST/GET/DELETE", "desc": "Authenticated MCP Streamable HTTP control plane with workspace-scoped tools"},
 				{"path": "/api/p2p/stream", "method": "GET (WebSocket)", "desc": "WebRTC signaling & Web P2P relay hub"},
 				{"path": "/api/ethics/audit", "method": "POST", "desc": "Taqwa ethics & Anti-Gharar audit engine"},
-				{"path": "/api/conductor/track", "method": "POST", "desc": "Execute full end-to-end conductor track"},
-				{"path": "/api/conductor/track/{id}", "method": "GET", "desc": "Retrieve conductor track step trajectory"},
+				{"path": "/api/artifacts/preview", "method": "POST", "desc": "Create an authenticated signed staging preview"},
+				{"path": "/api/conductor/tracks/{track_id}", "method": "GET", "desc": "Inspect a workspace-authorized composition track"},
+				{"path": "/api/conductor/tracks/{track_id}/publication", "method": "POST", "desc": "Request a verified-domain publication"},
 				{"path": "/api/conductor/spec", "method": "GET", "desc": "Platform specification & ergonomics doc"},
 			},
 		})
@@ -267,6 +327,26 @@ func main() {
 	api.HandleFunc("/workspaces/{id}/domains/{claim_id}/publications", domainHandler.Publish).Methods("POST")
 	api.HandleFunc("/workspaces/{id}/domains/{claim_id}/publications", domainHandler.PublicationHistory).Methods("GET")
 	api.HandleFunc("/workspaces/{id}/domains/{claim_id}/publications/{publication_id}/activate", domainHandler.Activate).Methods("POST")
+	api.HandleFunc("/workspaces/{workspace_id}/relay-sessions", relayTicketHandler.Issue).Methods(http.MethodPost)
+
+	// Central builder routes derive the principal from authentication and workspace authority from Conductor.
+	api.HandleFunc("/templates", compositionHandler.Templates).Methods(http.MethodGet)
+	api.HandleFunc("/modules", compositionHandler.Modules).Methods(http.MethodGet)
+	api.HandleFunc("/artifacts/preview", compositionHandler.Preview).Methods(http.MethodPost)
+	api.HandleFunc("/conductor/tracks/{track_id}", compositionHandler.GetTrack).Methods(http.MethodGet)
+	api.HandleFunc("/conductor/tracks/{track_id}/events", compositionHandler.Events).Methods(http.MethodGet)
+	api.HandleFunc("/conductor/tracks/{track_id}/resume", compositionHandler.Resume).Methods(http.MethodPost)
+	api.HandleFunc("/conductor/tracks/{track_id}/publication", compositionHandler.RequestPublication).Methods(http.MethodPost)
+	api.HandleFunc("/conductor/tracks/{track_id}/activate", compositionHandler.ActivatePublication).Methods(http.MethodPost)
+	api.HandleFunc("/conductor/tracks/{track_id}/preview/files/{path:.*}", compositionHandler.PreviewFile).Methods(http.MethodGet, http.MethodHead)
+	api.HandleFunc("/financial/flows", financialHandler.Flows).Methods(http.MethodGet)
+	api.HandleFunc("/financial/quests", financialHandler.CreateQuest).Methods(http.MethodPost)
+	api.HandleFunc("/financial/quests/{quest_id}", financialHandler.GetQuest).Methods(http.MethodGet)
+	api.HandleFunc("/financial/quests/{quest_id}/events", financialHandler.Events).Methods(http.MethodGet)
+	api.HandleFunc("/financial/quests/{quest_id}/approve", financialHandler.Approve).Methods(http.MethodPost)
+	api.HandleFunc("/financial/quests/{quest_id}/execute", financialHandler.Execute).Methods(http.MethodPost)
+	api.HandleFunc("/financial/quests/{quest_id}/reconcile", financialHandler.Reconcile).Methods(http.MethodPost)
+	api.HandleFunc("/financial/quests/{quest_id}/cancel", financialHandler.Cancel).Methods(http.MethodPost)
 
 	// Notification routes
 	api.HandleFunc("/notifications", notificationHandler.GetNotifications).Methods("GET")
@@ -462,6 +542,52 @@ func configuredArtifactBuilder() (*artifacts.Builder, error) {
 		PrivateKey:  privateKey,
 		TrustedKeys: map[string]ed25519.PublicKey{keyID: publicKey},
 	})
+}
+
+func configuredShuraSigning(publicBaseURL string) (*shura.CapabilityIssuer, *shura.StaticKeyRegistry, error) {
+	issuerURL := strings.TrimSpace(os.Getenv("TAWUN_SHURA_ISSUER"))
+	if issuerURL == "" {
+		parsed, err := url.Parse(publicBaseURL)
+		if err == nil && parsed.Scheme == "https" {
+			issuerURL = publicBaseURL
+		} else {
+			issuerURL = "https://taawun.local"
+		}
+	}
+	keyID := strings.TrimSpace(os.Getenv("TAWUN_SHURA_SIGNING_KEY_ID"))
+	if keyID == "" {
+		keyID = strings.TrimSpace(os.Getenv("TAWUN_ARTIFACT_SIGNING_KEY_ID"))
+	}
+	encodedKey := strings.TrimSpace(os.Getenv("TAWUN_SHURA_SIGNING_PRIVATE_KEY"))
+	if encodedKey == "" {
+		encodedKey = strings.TrimSpace(os.Getenv("TAWUN_ARTIFACT_SIGNING_PRIVATE_KEY"))
+	}
+	if keyID == "" || encodedKey == "" {
+		return nil, nil, fmt.Errorf("TAWUN_SHURA_SIGNING_KEY_ID and TAWUN_SHURA_SIGNING_PRIVATE_KEY are required (artifact signing values may supply the development fallback)")
+	}
+	privateKey, err := decodeEd25519PrivateKey(encodedKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid Shura signing key: %w", err)
+	}
+	issuer, err := shura.NewCapabilityIssuer(issuerURL, keyID, privateKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("configure Shura issuer: %w", err)
+	}
+	registry, err := shura.NewStaticKeyRegistry(issuerURL, keyID, issuer.PublicKey())
+	if err != nil {
+		return nil, nil, fmt.Errorf("configure Shura key registry: %w", err)
+	}
+	return issuer, registry, nil
+}
+
+func configuredFinancialDatabasePath() string {
+	if value := strings.TrimSpace(os.Getenv("TAWUN_FINANCIAL_DB_PATH")); value != "" {
+		return value
+	}
+	if databasePath := strings.TrimSpace(os.Getenv("APP_DB_PATH")); databasePath != "" {
+		return filepath.Join(filepath.Dir(databasePath), "taawun-azoa.db")
+	}
+	return filepath.Join("data", "taawun-azoa.db")
 }
 
 func decodeEd25519PrivateKey(value string) (ed25519.PrivateKey, error) {

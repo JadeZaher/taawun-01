@@ -18,10 +18,10 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 
 func (r *UserRepository) Create(user *models.User) error {
 	query := `INSERT INTO users (username, email, password, role, status) 
-		VALUES (?, ?, ?, ?, ?) RETURNING id, created_at, updated_at`
-	
+		VALUES (?, ?, ?, ?, ?) RETURNING id, session_version, created_at, updated_at`
+
 	err := r.db.QueryRow(query, user.Username, user.Email, user.Password, user.Role, user.Status).
-		Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
+		Scan(&user.ID, &user.SessionVersion, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create user: %v", err)
 	}
@@ -29,13 +29,13 @@ func (r *UserRepository) Create(user *models.User) error {
 }
 
 func (r *UserRepository) GetByID(id int) (*models.User, error) {
-	query := `SELECT id, username, email, password, role, status, created_at, updated_at 
+	query := `SELECT id, username, email, password, role, status, session_version, created_at, updated_at
 		FROM users WHERE id = ?`
-	
+
 	var user models.User
 	err := r.db.QueryRow(query, id).Scan(
 		&user.ID, &user.Username, &user.Email, &user.Password,
-		&user.Role, &user.Status, &user.CreatedAt, &user.UpdatedAt,
+		&user.Role, &user.Status, &user.SessionVersion, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -47,13 +47,13 @@ func (r *UserRepository) GetByID(id int) (*models.User, error) {
 }
 
 func (r *UserRepository) GetByEmail(email string) (*models.User, error) {
-	query := `SELECT id, username, email, password, role, status, created_at, updated_at 
+	query := `SELECT id, username, email, password, role, status, session_version, created_at, updated_at
 		FROM users WHERE email = ?`
-	
+
 	var user models.User
 	err := r.db.QueryRow(query, email).Scan(
 		&user.ID, &user.Username, &user.Email, &user.Password,
-		&user.Role, &user.Status, &user.CreatedAt, &user.UpdatedAt,
+		&user.Role, &user.Status, &user.SessionVersion, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -65,13 +65,13 @@ func (r *UserRepository) GetByEmail(email string) (*models.User, error) {
 }
 
 func (r *UserRepository) GetByUsername(username string) (*models.User, error) {
-	query := `SELECT id, username, email, password, role, status, created_at, updated_at 
+	query := `SELECT id, username, email, password, role, status, session_version, created_at, updated_at
 		FROM users WHERE username = ?`
-	
+
 	var user models.User
 	err := r.db.QueryRow(query, username).Scan(
 		&user.ID, &user.Username, &user.Email, &user.Password,
-		&user.Role, &user.Status, &user.CreatedAt, &user.UpdatedAt,
+		&user.Role, &user.Status, &user.SessionVersion, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -83,9 +83,9 @@ func (r *UserRepository) GetByUsername(username string) (*models.User, error) {
 }
 
 func (r *UserRepository) GetAll() ([]*models.User, error) {
-	query := `SELECT id, username, email, password, role, status, created_at, updated_at 
+	query := `SELECT id, username, email, password, role, status, session_version, created_at, updated_at
 		FROM users ORDER BY id DESC`
-	
+
 	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get users: %v", err)
@@ -97,7 +97,7 @@ func (r *UserRepository) GetAll() ([]*models.User, error) {
 		var user models.User
 		err := rows.Scan(
 			&user.ID, &user.Username, &user.Email, &user.Password,
-			&user.Role, &user.Status, &user.CreatedAt, &user.UpdatedAt,
+			&user.Role, &user.Status, &user.SessionVersion, &user.CreatedAt, &user.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan user: %v", err)
@@ -108,14 +108,28 @@ func (r *UserRepository) GetAll() ([]*models.User, error) {
 }
 
 func (r *UserRepository) Update(user *models.User) error {
-	query := `UPDATE users SET username = ?, email = ?, password = ?, role = ?, status = ?, updated_at = ? 
+	return r.update(user, false)
+}
+
+// UpdateAndRotateSessions persists a password replacement and revokes older access tokens.
+func (r *UserRepository) UpdateAndRotateSessions(user *models.User) error {
+	return r.update(user, true)
+}
+
+func (r *UserRepository) update(user *models.User, rotateSessions bool) error {
+	query := `UPDATE users SET username = ?, email = ?, password = ?, role = ?, status = ?,
+		session_version = session_version + ?, updated_at = ?
 		WHERE id = ?`
-	
-	result, err := r.db.Exec(query, user.Username, user.Email, user.Password, user.Role, user.Status, time.Now(), user.ID)
+
+	rotation := 0
+	if rotateSessions {
+		rotation = 1
+	}
+	result, err := r.db.Exec(query, user.Username, user.Email, user.Password, user.Role, user.Status, rotation, time.Now(), user.ID)
 	if err != nil {
 		return fmt.Errorf("failed to update user: %v", err)
 	}
-	
+
 	rows, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %v", err)
@@ -123,17 +137,20 @@ func (r *UserRepository) Update(user *models.User) error {
 	if rows == 0 {
 		return fmt.Errorf("user not found")
 	}
+	if rotateSessions {
+		user.SessionVersion++
+	}
 	return nil
 }
 
 func (r *UserRepository) Delete(id int) error {
 	query := `DELETE FROM users WHERE id = ?`
-	
+
 	result, err := r.db.Exec(query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete user: %v", err)
 	}
-	
+
 	rows, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %v", err)
@@ -146,12 +163,12 @@ func (r *UserRepository) Delete(id int) error {
 
 func (r *UserRepository) UpdateRole(id int, role string) error {
 	query := `UPDATE users SET role = ?, updated_at = ? WHERE id = ?`
-	
+
 	result, err := r.db.Exec(query, role, time.Now(), id)
 	if err != nil {
 		return fmt.Errorf("failed to update user role: %v", err)
 	}
-	
+
 	rows, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %v", err)
@@ -164,12 +181,12 @@ func (r *UserRepository) UpdateRole(id int, role string) error {
 
 func (r *UserRepository) UpdateStatus(id int, status string) error {
 	query := `UPDATE users SET status = ?, updated_at = ? WHERE id = ?`
-	
+
 	result, err := r.db.Exec(query, status, time.Now(), id)
 	if err != nil {
 		return fmt.Errorf("failed to update user status: %v", err)
 	}
-	
+
 	rows, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %v", err)
@@ -208,11 +225,11 @@ func (r *UserRepository) CountByRole(role string) (int, error) {
 }
 
 func (r *UserRepository) GetWorkspaceUsers(workspaceID int) ([]*models.User, error) {
-	query := `SELECT u.id, u.username, u.email, u.password, u.role, u.status, u.created_at, u.updated_at 
+	query := `SELECT u.id, u.username, u.email, u.password, u.role, u.status, u.session_version, u.created_at, u.updated_at
 		FROM users u
 		INNER JOIN workspace_users wu ON u.id = wu.user_id
 		WHERE wu.workspace_id = ?`
-	
+
 	rows, err := r.db.Query(query, workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workspace users: %v", err)
@@ -224,7 +241,7 @@ func (r *UserRepository) GetWorkspaceUsers(workspaceID int) ([]*models.User, err
 		var user models.User
 		err := rows.Scan(
 			&user.ID, &user.Username, &user.Email, &user.Password,
-			&user.Role, &user.Status, &user.CreatedAt, &user.UpdatedAt,
+			&user.Role, &user.Status, &user.SessionVersion, &user.CreatedAt, &user.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan user: %v", err)

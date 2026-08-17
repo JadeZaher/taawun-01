@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -174,6 +175,34 @@ func (s *WorkspaceService) AddUserToWorkspace(actor *models.User, workspaceID, u
 		return fmt.Errorf("failed to add user to workspace: %v", err)
 	}
 
+	return nil
+}
+
+// AcceptWorkspaceInvitation adds the authenticated invitee without granting them self-service authority.
+func (s *WorkspaceService) AcceptWorkspaceInvitation(_ context.Context, actor *models.User, workspaceID int, role string) error {
+	if actor == nil || actor.ID <= 0 || !validAssignableWorkspaceRole(role) {
+		return ErrWorkspaceForbidden
+	}
+	workspace, err := s.workspaceRepo.GetByID(workspaceID)
+	if err != nil {
+		return fmt.Errorf("failed to get workspace: %v", err)
+	}
+	if workspace == nil {
+		return ErrWorkspaceNotFound
+	}
+	if workspace.Status != models.WorkspaceStatusActive {
+		return ErrWorkspaceForbidden
+	}
+	existingRole, err := s.workspaceRepo.GetUserRole(workspaceID, actor.ID)
+	if err != nil {
+		return fmt.Errorf("failed to check user role: %v", err)
+	}
+	if existingRole != "" {
+		return nil
+	}
+	if err := s.workspaceRepo.AddUser(workspaceID, actor.ID, role); err != nil {
+		return fmt.Errorf("failed to accept workspace invitation: %v", err)
+	}
 	return nil
 }
 

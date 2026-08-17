@@ -24,6 +24,7 @@ var (
 	ErrInvalidGrant = errors.New("invalid grant")
 	ErrInvalidToken = errors.New("invalid access token")
 	ErrReplay       = errors.New("refresh token replay detected")
+	ErrCapacity     = errors.New("OAuth capacity reached")
 )
 
 var supportedScopes = []string{ScopeRead, ScopeBuild, ScopePublish}

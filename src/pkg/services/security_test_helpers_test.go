@@ -27,6 +27,7 @@ func newSecurityTestRepositories(t *testing.T) (*sql.DB, *repositories.UserRepos
 			password TEXT NOT NULL,
 			role TEXT NOT NULL,
 			status TEXT NOT NULL,
+			session_version INTEGER NOT NULL DEFAULT 1,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,

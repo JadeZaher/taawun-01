@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"html"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -36,6 +37,7 @@ func TestBuildPublishesCompleteContentAddressedBundle(t *testing.T) {
 
 	wantFiles := []string{
 		"app.css",
+		"assets/datastar-v1.0.2.js",
 		"cards/announcements.html",
 		"cards/donation-campaign.html",
 		"cards/iftar-registration.html",
@@ -65,8 +67,20 @@ func TestBuildPublishesCompleteContentAddressedBundle(t *testing.T) {
 	if result.Manifest.ContractVersion != ManifestContractVersion || result.Manifest.Template.ID != TemplateCommunityIftar {
 		t.Fatalf("manifest contract/template = %#v", result.Manifest)
 	}
-	if result.Manifest.Runtime.Path != datastarRuntimePath || result.Manifest.Runtime.Version != datastarRuntimeVersion || result.Manifest.Runtime.SHA256 != datastarRuntimeSHA256 || result.Manifest.Runtime.Bundled {
+	if result.Manifest.Runtime.Path != datastarRuntimePath || result.Manifest.Runtime.Version != datastarRuntimeVersion || result.Manifest.Runtime.SHA256 != datastarRuntimeSHA256 || !result.Manifest.Runtime.Bundled {
 		t.Fatalf("runtime requirement = %#v", result.Manifest.Runtime)
+	}
+	runtime, err := builder.ReadFile(context.Background(), result.ContentHash, datastarRuntimeBundlePath)
+	if err != nil {
+		t.Fatalf("ReadFile(bundled runtime) returned an error: %v", err)
+	}
+	runtimeDigest := sha256.Sum256(runtime.Contents)
+	if got := hex.EncodeToString(runtimeDigest[:]); got != datastarRuntimeSHA256 {
+		t.Fatalf("bundled runtime digest = %s, want %s", got, datastarRuntimeSHA256)
+	}
+	index := html.UnescapeString(string(readBundleFile(t, result.Directory, "index.html")))
+	if !strings.Contains(index, `src="`+datastarRuntimePath+`" integrity="`+datastarSRI()+`"`) {
+		t.Fatal("standalone preview does not retain the exact bundled runtime SRI")
 	}
 	if err := VerifyManifestSignature(result.Manifest, builder.privateKey.Public().(ed25519.PublicKey)); err != nil {
 		t.Fatalf("VerifyManifestSignature() returned an error: %v", err)

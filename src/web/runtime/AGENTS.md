@@ -36,10 +36,12 @@ frames carry the same encrypted envelope. The relay sees routing identifiers,
 sizes, timing, and ciphertext; it must never receive a workspace key or readable
 operation value.
 
-Relay session tokens are short-lived routing authorization, not workspace keys.
-Browser WebSockets cannot set an Authorization header, so the current Go relay
-contract accepts the token in its connection query. Avoid logging query strings
-at the TLS proxy and rotate sessions aggressively.
+Relay session tickets are short-lived, one-time routing authorization, not
+workspace keys. The runtime sends one only as the second offered WebSocket
+subprotocol after `taawun-relay-v1`; it never appears in the relay URL or an
+`Authorization` header. A host must obtain a new runtime configuration with a
+fresh ticket before reconnecting, and must not log the protocol header at the
+TLS proxy.
 
 ## Authorization boundary
 

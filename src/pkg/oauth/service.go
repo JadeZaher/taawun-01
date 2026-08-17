@@ -154,7 +154,8 @@ func validateClientDefinition(client Client) (Client, error) {
 	return client, nil
 }
 
-func (s *Service) resolveClient(clientID string) (*Client, error) {
+// resolveClientForNewAuthorization is the only service path permitted to fetch CIMD metadata.
+func (s *Service) resolveClientForNewAuthorization(clientID string) (*Client, error) {
 	if isMetadataClientID(clientID) {
 		client, err := s.metadata.resolve(context.Background(), clientID)
 		if err != nil {
@@ -172,8 +173,24 @@ func (s *Service) resolveClient(clientID string) (*Client, error) {
 	return s.repository.getClient(clientID)
 }
 
+func (s *Service) snapshotClient(fingerprint, clientID string) (*Client, error) {
+	snapshot, err := s.repository.getClientSnapshot(fingerprint)
+	if err != nil || snapshot == nil || snapshot.Client.ID != clientID {
+		return nil, ErrInvalidGrant
+	}
+	disabled, err := s.repository.clientDisabled(clientID)
+	if err != nil || disabled {
+		return nil, ErrInvalidGrant
+	}
+	return &snapshot.Client, nil
+}
+
+func validUserSessionVersion(user *models.User, expected int64) bool {
+	return user != nil && expected > 0 && user.SessionVersion == expected
+}
+
 func (s *Service) BeginAuthorization(input AuthorizationInput) (string, error) {
-	client, err := s.resolveClient(input.ClientID)
+	client, err := s.resolveClientForNewAuthorization(input.ClientID)
 	if err != nil || client == nil || client.Disabled {
 		return "", errors.New("unknown client")
 	}
@@ -200,12 +217,17 @@ func (s *Service) BeginAuthorization(input AuthorizationInput) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	request := authorizationRequest{
-		Hash: credentialHash(raw), ClientID: input.ClientID, RedirectURI: input.RedirectURI,
-		Resource: input.Resource, Scopes: scopes, State: input.State, CodeChallenge: input.CodeChallenge,
-		ExpiresAt: s.config.Now().UTC().Add(s.config.RequestTTL),
+	now := s.config.Now().UTC()
+	snapshot, err := s.repository.createClientSnapshot(*client, now)
+	if err != nil {
+		return "", err
 	}
-	if err := s.repository.createAuthorizationRequest(request); err != nil {
+	request := authorizationRequest{
+		Hash: credentialHash(raw), ClientID: input.ClientID, ClientFingerprint: snapshot.Fingerprint, RedirectURI: input.RedirectURI,
+		Resource: input.Resource, Scopes: scopes, State: input.State, CodeChallenge: input.CodeChallenge,
+		ExpiresAt: now.Add(s.config.RequestTTL),
+	}
+	if err := s.repository.createAuthorizationRequest(request, now); err != nil {
 		return "", err
 	}
 	return raw, nil
@@ -228,8 +250,12 @@ func (s *Service) LoginAuthorization(requestID, email, password string) (session
 	if err != nil {
 		return "", "", err
 	}
-	session := browserSession{Hash: credentialHash(sessionToken), UserID: user.ID, CSRFHash: credentialHash(csrfToken), ExpiresAt: s.config.Now().UTC().Add(s.config.SessionTTL)}
-	if err := s.repository.createSession(session); err != nil {
+	if !validUserSessionVersion(user, user.SessionVersion) {
+		return "", "", ErrInvalidGrant
+	}
+	now := s.config.Now().UTC()
+	session := browserSession{Hash: credentialHash(sessionToken), UserID: user.ID, UserSessionVersion: user.SessionVersion, CSRFHash: credentialHash(csrfToken), ExpiresAt: now.Add(s.config.SessionTTL)}
+	if err := s.repository.createSession(session, now); err != nil {
 		return "", "", err
 	}
 	return sessionToken, csrfToken, nil
@@ -255,7 +281,7 @@ func (s *Service) sessionUser(raw string) (*browserSession, *models.User, error)
 		return nil, nil, ErrInvalidGrant
 	}
 	user, err := s.users.GetByID(session.UserID)
-	if err != nil || user == nil || user.Status != models.StatusActive {
+	if err != nil || user == nil || user.Status != models.StatusActive || !validUserSessionVersion(user, session.UserSessionVersion) {
 		return nil, nil, ErrInvalidGrant
 	}
 	return session, user, nil
@@ -282,8 +308,8 @@ func (s *Service) ConsentView(requestID, sessionToken, csrfToken string) (*Conse
 	} else if subtle.ConstantTimeCompare([]byte(session.CSRFHash), []byte(credentialHash(csrfToken))) != 1 {
 		return nil, ErrInvalidGrant
 	}
-	client, err := s.resolveClient(request.ClientID)
-	if err != nil || client == nil || client.Disabled {
+	client, err := s.snapshotClient(request.ClientFingerprint, request.ClientID)
+	if err != nil || client == nil {
 		return nil, ErrInvalidGrant
 	}
 	workspaces, err := s.workspaces.GetWorkspaces(user)
@@ -327,6 +353,9 @@ func (s *Service) Approve(requestID, sessionToken, csrfToken string, workspaceID
 	if subtle.ConstantTimeCompare([]byte(session.CSRFHash), []byte(credentialHash(csrfToken))) != 1 {
 		return "", ErrInvalidGrant
 	}
+	if _, err := s.snapshotClient(request.ClientFingerprint, request.ClientID); err != nil {
+		return "", ErrInvalidGrant
+	}
 	workspaceIDs, err = sortedUniqueInts(workspaceIDs)
 	if err != nil {
 		return "", err
@@ -338,7 +367,7 @@ func (s *Service) Approve(requestID, sessionToken, csrfToken string, workspaceID
 	if err != nil {
 		return "", err
 	}
-	record := consent{UserID: user.ID, ClientID: request.ClientID, Resource: request.Resource, Scopes: request.Scopes, WorkspaceIDs: workspaceIDs}
+	record := consent{UserID: user.ID, UserSessionVersion: user.SessionVersion, ClientID: request.ClientID, ClientFingerprint: request.ClientFingerprint, Resource: request.Resource, Scopes: request.Scopes, WorkspaceIDs: workspaceIDs}
 	code := authorizationCode{Hash: credentialHash(rawCode), UserID: user.ID, ClientID: request.ClientID, RedirectURI: request.RedirectURI, Resource: request.Resource, Scopes: request.Scopes, WorkspaceIDs: workspaceIDs, CodeChallenge: request.CodeChallenge, ExpiresAt: s.config.Now().UTC().Add(s.config.CodeTTL)}
 	if err := s.repository.approve(credentialHash(requestID), record, code, s.config.Now().UTC()); err != nil {
 		return "", err
@@ -385,10 +414,6 @@ func (s *Service) ExchangeCode(codeRaw, clientID, redirectURI, resource, verifie
 	if resource != s.config.Resource {
 		return nil, ErrInvalidGrant
 	}
-	client, err := s.resolveClient(clientID)
-	if err != nil || client == nil || client.Disabled || !containsExact(client.RedirectURIs, redirectURI) {
-		return nil, ErrInvalidGrant
-	}
 	challenge, err := pkceChallenge(verifier)
 	if err != nil {
 		return nil, ErrInvalidGrant
@@ -397,12 +422,16 @@ func (s *Service) ExchangeCode(codeRaw, clientID, redirectURI, resource, verifie
 	if err != nil || pending == nil || pending.Consumed || !pending.ExpiresAt.After(s.config.Now().UTC()) || pending.ClientID != clientID || pending.RedirectURI != redirectURI || pending.Resource != resource || pending.CodeChallenge != challenge {
 		return nil, ErrInvalidGrant
 	}
-	active, err := s.repository.consentActive(pending.ConsentID)
-	if err != nil || !active {
+	consent, err := s.repository.getConsent(pending.ConsentID)
+	if err != nil || consent == nil || consent.Revoked || consent.UserID != pending.UserID || consent.ClientID != clientID || consent.Resource != resource {
+		return nil, ErrInvalidGrant
+	}
+	client, err := s.snapshotClient(consent.ClientFingerprint, clientID)
+	if err != nil || client == nil || !containsExact(client.RedirectURIs, redirectURI) {
 		return nil, ErrInvalidGrant
 	}
 	user, err := s.users.GetByID(pending.UserID)
-	if err != nil || user == nil || user.Status != models.StatusActive || s.authorizeWorkspaceGrants(user, pending.Scopes, pending.WorkspaceIDs) != nil {
+	if err != nil || user == nil || user.Status != models.StatusActive || !validUserSessionVersion(user, consent.UserSessionVersion) || s.authorizeWorkspaceGrants(user, pending.Scopes, pending.WorkspaceIDs) != nil {
 		return nil, ErrInvalidGrant
 	}
 	accessRaw, err := randomCredential("taawun_at_")
@@ -418,7 +447,7 @@ func (s *Service) ExchangeCode(codeRaw, clientID, redirectURI, resource, verifie
 		return nil, err
 	}
 	now := s.config.Now().UTC()
-	tokens := issuedTokens{AccessHash: credentialHash(accessRaw), RefreshHash: credentialHash(refreshRaw), FamilyID: family, ClientID: clientID, Resource: resource, AccessExp: now.Add(s.config.AccessTokenTTL), RefreshExp: now.Add(s.config.RefreshTokenTTL)}
+	tokens := issuedTokens{AccessHash: credentialHash(accessRaw), RefreshHash: credentialHash(refreshRaw), FamilyID: family, UserSessionVersion: consent.UserSessionVersion, ClientID: clientID, ClientFingerprint: consent.ClientFingerprint, Resource: resource, AccessExp: now.Add(s.config.AccessTokenTTL), RefreshExp: now.Add(s.config.RefreshTokenTTL)}
 	expected := authorizationCode{ClientID: clientID, RedirectURI: redirectURI, Resource: resource, CodeChallenge: challenge}
 	if err := s.repository.exchangeCode(credentialHash(codeRaw), expected, tokens, now); err != nil {
 		return nil, ErrInvalidGrant
@@ -434,18 +463,22 @@ func (s *Service) Refresh(refreshRaw, clientID, resource string) (*TokenResponse
 	if resource != s.config.Resource {
 		return nil, ErrInvalidGrant
 	}
-	client, err := s.resolveClient(clientID)
-	if err != nil || client == nil || client.Disabled || !containsExact(client.GrantTypes, "refresh_token") {
-		return nil, ErrInvalidGrant
-	}
 	pending, err := s.repository.getRefreshToken(credentialHash(refreshRaw))
 	if err != nil || pending == nil || pending.ClientID != clientID || pending.Resource != resource {
+		return nil, ErrInvalidGrant
+	}
+	family, err := s.repository.getTokenFamily(pending.FamilyID)
+	if err != nil || family == nil || family.ConsentID != pending.ConsentID || family.UserID != pending.UserID || family.ClientID != clientID || family.UserSessionVersion <= 0 {
+		return nil, ErrInvalidGrant
+	}
+	client, err := s.snapshotClient(family.ClientFingerprint, clientID)
+	if err != nil || client == nil || !containsExact(client.GrantTypes, "refresh_token") {
 		return nil, ErrInvalidGrant
 	}
 	if !pending.Used && !pending.Revoked && pending.ExpiresAt.After(s.config.Now().UTC()) {
 		active, activeErr := s.repository.consentActive(pending.ConsentID)
 		user, userErr := s.users.GetByID(pending.UserID)
-		if activeErr != nil || !active || userErr != nil || user == nil || user.Status != models.StatusActive || s.authorizeWorkspaceGrants(user, pending.Scopes, pending.WorkspaceIDs) != nil {
+		if activeErr != nil || !active || userErr != nil || user == nil || user.Status != models.StatusActive || !validUserSessionVersion(user, family.UserSessionVersion) || s.authorizeWorkspaceGrants(user, pending.Scopes, pending.WorkspaceIDs) != nil {
 			_ = s.repository.revokeToken(credentialHash(refreshRaw), clientID, s.config.Now().UTC())
 			return nil, ErrInvalidGrant
 		}
@@ -459,7 +492,7 @@ func (s *Service) Refresh(refreshRaw, clientID, resource string) (*TokenResponse
 		return nil, err
 	}
 	now := s.config.Now().UTC()
-	next := issuedTokens{AccessHash: credentialHash(accessRaw), RefreshHash: credentialHash(refreshNext), AccessExp: now.Add(s.config.AccessTokenTTL), RefreshExp: now.Add(s.config.RefreshTokenTTL)}
+	next := issuedTokens{AccessHash: credentialHash(accessRaw), RefreshHash: credentialHash(refreshNext), UserSessionVersion: family.UserSessionVersion, ClientFingerprint: family.ClientFingerprint, AccessExp: now.Add(s.config.AccessTokenTTL), RefreshExp: now.Add(s.config.RefreshTokenTTL)}
 	old, err := s.repository.rotateRefresh(credentialHash(refreshRaw), clientID, resource, next, now)
 	if err != nil {
 		return nil, ErrInvalidGrant
@@ -479,12 +512,16 @@ func (s *Service) ValidateAccess(raw string) (*Principal, error) {
 	if err != nil || !active {
 		return nil, ErrInvalidToken
 	}
-	client, err := s.resolveClient(record.ClientID)
-	if err != nil || client == nil || client.Disabled {
+	family, err := s.repository.getTokenFamily(record.FamilyID)
+	if err != nil || family == nil || family.ConsentID != record.ConsentID || family.UserID != record.UserID || family.ClientID != record.ClientID || family.UserSessionVersion <= 0 {
+		return nil, ErrInvalidToken
+	}
+	client, err := s.snapshotClient(family.ClientFingerprint, record.ClientID)
+	if err != nil || client == nil {
 		return nil, ErrInvalidToken
 	}
 	user, err := s.users.GetByID(record.UserID)
-	if err != nil || user == nil || user.Status != models.StatusActive {
+	if err != nil || user == nil || user.Status != models.StatusActive || !validUserSessionVersion(user, family.UserSessionVersion) {
 		return nil, ErrInvalidToken
 	}
 	if err := s.authorizeWorkspaceGrants(user, record.Scopes, record.WorkspaceIDs); err != nil {
@@ -494,8 +531,7 @@ func (s *Service) ValidateAccess(raw string) (*Principal, error) {
 }
 
 func (s *Service) Revoke(raw, clientID string) error {
-	client, err := s.resolveClient(clientID)
-	if err != nil || client == nil || client.Disabled {
+	if raw == "" || len(raw) > 256 || clientID == "" || len(clientID) > 2048 {
 		return nil
 	}
 	return s.repository.revokeToken(credentialHash(raw), clientID, s.config.Now().UTC())

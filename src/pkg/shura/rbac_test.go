@@ -209,6 +209,37 @@ func TestHTTPHandlerPublishesJWKSAndRequiresBearerCapability(t *testing.T) {
 	}
 }
 
+func TestAcceptedInvitationAddsMappedWorkspaceMembershipAndRetriesSafely(t *testing.T) {
+	harness := newShuraHarness(t)
+	delete(harness.workspaces.roles, 3)
+	memberships := &recordingMembershipAccepter{roles: harness.workspaces.roles}
+	service, err := NewServiceWithMembership(harness.repository, harness.service.issuer, harness.verifier, memberships)
+	if err != nil {
+		t.Fatalf("NewServiceWithMembership() error = %v", err)
+	}
+	grant, err := service.CreateInvitation(context.Background(), harness.users[1], 42, harness.users[3].Email, RoleArchitect, time.Hour)
+	if err != nil {
+		t.Fatalf("CreateInvitation() error = %v", err)
+	}
+	accepted, err := service.AcceptInvitation(context.Background(), harness.users[3], grant.Token)
+	if err != nil || accepted.Status != InvitationAccepted {
+		t.Fatalf("AcceptInvitation() = %+v, %v", accepted, err)
+	}
+	if len(memberships.calls) != 1 || memberships.calls[0].workspaceID != 42 || memberships.calls[0].role != models.WorkspaceRoleAdmin || memberships.calls[0].actorID != 3 {
+		t.Fatalf("membership calls = %+v", memberships.calls)
+	}
+	if _, err := service.AcceptInvitation(context.Background(), harness.users[3], grant.Token); err != nil {
+		t.Fatalf("idempotent AcceptInvitation() error = %v", err)
+	}
+	if len(memberships.calls) != 1 {
+		t.Fatalf("idempotent retry re-added membership: %+v", memberships.calls)
+	}
+	delete(harness.workspaces.roles, 3)
+	if _, err := service.AcceptInvitation(context.Background(), harness.users[3], grant.Token); !errors.Is(err, ErrWorkspaceDenied) {
+		t.Fatalf("replayed accepted invitation restored removed membership: %v", err)
+	}
+}
+
 type shuraHarness struct {
 	repository *Repository
 	service    *Service
@@ -266,6 +297,30 @@ func issueTestCapability(t *testing.T, harness *shuraHarness, userID int, role R
 
 type fakeWorkspaceAuthorizer struct {
 	roles map[int]Role
+}
+
+type membershipCall struct {
+	actorID     int
+	workspaceID int
+	role        string
+}
+
+type recordingMembershipAccepter struct {
+	calls []membershipCall
+	roles map[int]Role
+}
+
+func (a *recordingMembershipAccepter) AcceptWorkspaceInvitation(_ context.Context, actor *models.User, workspaceID int, role string) error {
+	a.calls = append(a.calls, membershipCall{actorID: actor.ID, workspaceID: workspaceID, role: role})
+	switch role {
+	case models.WorkspaceRoleAdmin:
+		a.roles[actor.ID] = RoleArchitect
+	case models.WorkspaceRoleMember:
+		a.roles[actor.ID] = RoleMaintainer
+	case models.WorkspaceRoleViewer:
+		a.roles[actor.ID] = RoleViewer
+	}
+	return nil
 }
 
 func (a *fakeWorkspaceAuthorizer) AuthorizeWorkspaceCapability(actor *models.User, workspaceID int, capability models.WorkspaceCapability) (*models.Workspace, error) {

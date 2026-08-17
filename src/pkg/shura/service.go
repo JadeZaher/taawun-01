@@ -160,18 +160,29 @@ type CreateProposalRequest struct {
 }
 
 type Service struct {
-	repository *Repository
-	issuer     *CapabilityIssuer
-	verifier   *CapabilityVerifier
-	workspaces WorkspaceAuthorizer
-	now        func() time.Time
+	repository  *Repository
+	issuer      *CapabilityIssuer
+	verifier    *CapabilityVerifier
+	workspaces  WorkspaceAuthorizer
+	memberships MembershipAccepter
+	now         func() time.Time
+}
+
+// MembershipAccepter joins an accepted invitation to the authoritative workspace membership store.
+type MembershipAccepter interface {
+	AcceptWorkspaceInvitation(context.Context, *models.User, int, string) error
 }
 
 func NewService(repository *Repository, issuer *CapabilityIssuer, verifier *CapabilityVerifier) (*Service, error) {
+	return NewServiceWithMembership(repository, issuer, verifier, nil)
+}
+
+// NewServiceWithMembership adds the production invitation-to-membership bridge.
+func NewServiceWithMembership(repository *Repository, issuer *CapabilityIssuer, verifier *CapabilityVerifier, memberships MembershipAccepter) (*Service, error) {
 	if repository == nil || issuer == nil || verifier == nil || verifier.workspaces == nil {
 		return nil, ErrGovernanceInvalid
 	}
-	return &Service{repository: repository, issuer: issuer, verifier: verifier, workspaces: verifier.workspaces, now: time.Now}, nil
+	return &Service{repository: repository, issuer: issuer, verifier: verifier, workspaces: verifier.workspaces, memberships: memberships, now: time.Now}, nil
 }
 
 func (s *Service) IssueCapability(ctx context.Context, actor *models.User, request IssueCapabilityRequest) (string, *CapabilityClaims, error) {
@@ -329,6 +340,20 @@ func (s *Service) AcceptInvitation(ctx context.Context, actor *models.User, rawT
 	if invitation.Invitee != strings.ToLower(actor.Email) && invitation.Invitee != actorID {
 		return nil, ErrCapabilityForbidden
 	}
+	if invitation.Status == InvitationAccepted {
+		if invitation.AcceptedBy != actorID {
+			return nil, ErrCapabilityForbidden
+		}
+		// An accepted token is idempotent only for an existing membership. Replaying it
+		// must not restore a member whom an administrator later removed.
+		if err := authorizeWorkspaceRole(s.workspaces, actor, invitation.WorkspaceID, RoleViewer); err != nil {
+			return invitation, err
+		}
+		return invitation, nil
+	}
+	if invitation.Status != InvitationPending {
+		return nil, ErrGovernanceTransition
+	}
 	now := s.now().UTC().Truncate(time.Millisecond)
 	status := InvitationAccepted
 	acceptedBy := actorID
@@ -357,7 +382,59 @@ func (s *Service) AcceptInvitation(ctx context.Context, actor *models.User, rawT
 	if status == InvitationExpired {
 		return invitation, ErrCapabilityExpired
 	}
+	if err := s.acceptMembership(ctx, actor, invitation); err != nil {
+		return invitation, err
+	}
 	return invitation, nil
+}
+
+func (s *Service) acceptMembership(ctx context.Context, actor *models.User, invitation *Invitation) error {
+	if s.memberships == nil {
+		return nil
+	}
+	role, err := workspaceRoleForInvitation(invitation.Role)
+	if err != nil {
+		return err
+	}
+	return s.memberships.AcceptWorkspaceInvitation(ctx, actor, invitation.WorkspaceID, role)
+}
+
+func workspaceRoleForInvitation(role Role) (string, error) {
+	switch role {
+	case RoleArchitect:
+		return models.WorkspaceRoleAdmin, nil
+	case RoleMaintainer:
+		return models.WorkspaceRoleMember, nil
+	case RoleViewer:
+		return models.WorkspaceRoleViewer, nil
+	default:
+		return "", ErrGovernanceInvalid
+	}
+}
+
+// ResolveDecision verifies one final decision as internal evidence for another trusted service.
+func (s *Service) ResolveDecision(ctx context.Context, workspaceID int, reference string) (DecisionResolution, error) {
+	if s == nil || s.repository == nil || workspaceID <= 0 || !validIdentifier(reference) {
+		return DecisionResolution{}, ErrGovernanceNotFound
+	}
+	var outcome string
+	err := s.repository.db.QueryRowContext(ctx, `SELECT d.outcome
+		FROM shura_decisions d JOIN shura_proposals p ON p.id = d.proposal_id
+		WHERE d.id = ? AND p.workspace_id = ? AND p.status = 'DECIDED'`, reference, workspaceID).Scan(&outcome)
+	if errors.Is(err, sql.ErrNoRows) {
+		return DecisionResolution{}, ErrGovernanceNotFound
+	}
+	if err != nil {
+		return DecisionResolution{}, err
+	}
+	return DecisionResolution{Reference: reference, WorkspaceID: workspaceID, Approved: DecisionOutcome(outcome) == DecisionApproved}, nil
+}
+
+// DecisionResolution is a narrow, immutable decision verification result.
+type DecisionResolution struct {
+	Reference   string
+	WorkspaceID int
+	Approved    bool
 }
 
 func (s *Service) RevokeInvitation(ctx context.Context, actor *models.User, invitationID string, expectedVersion int64) (*Invitation, error) {

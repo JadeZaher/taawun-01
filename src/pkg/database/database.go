@@ -86,6 +86,7 @@ func createTables() error {
 			password TEXT NOT NULL,
 			role TEXT NOT NULL DEFAULT 'user',
 			status TEXT NOT NULL DEFAULT 'active',
+			session_version INTEGER NOT NULL DEFAULT 1,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
@@ -131,8 +132,38 @@ func createTables() error {
 			return fmt.Errorf("failed to execute query: %v", err)
 		}
 	}
+	if err := ensureUserSessionVersionColumn(); err != nil {
+		return err
+	}
 
 	return bootstrapAdmin()
+}
+
+// ensureUserSessionVersionColumn upgrades databases created before session invalidation existed.
+func ensureUserSessionVersionColumn() error {
+	rows, err := DB.Query(`PRAGMA table_info(users)`)
+	if err != nil {
+		return fmt.Errorf("inspect users schema: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid, notNull, primaryKey int
+		var name, typeName string
+		var defaultValue sql.NullString
+		if err := rows.Scan(&cid, &name, &typeName, &notNull, &defaultValue, &primaryKey); err != nil {
+			return fmt.Errorf("scan users schema: %w", err)
+		}
+		if name == "session_version" {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("read users schema: %w", err)
+	}
+	if _, err := DB.Exec(`ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 1`); err != nil {
+		return fmt.Errorf("add users session version: %w", err)
+	}
+	return nil
 }
 
 func bootstrapAdmin() error {

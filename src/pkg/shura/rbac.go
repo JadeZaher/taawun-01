@@ -261,6 +261,11 @@ func parseCapability(raw string) (capabilityHeader, CapabilityClaims, string, []
 	if err != nil || len(signature) != ed25519.SignatureSize {
 		return capabilityHeader{}, CapabilityClaims{}, "", nil, ErrCapabilityInvalid
 	}
+	if base64.RawURLEncoding.EncodeToString(headerBytes) != parts[0] ||
+		base64.RawURLEncoding.EncodeToString(claimsBytes) != parts[1] ||
+		base64.RawURLEncoding.EncodeToString(signature) != parts[2] {
+		return capabilityHeader{}, CapabilityClaims{}, "", nil, ErrCapabilityInvalid
+	}
 	var header capabilityHeader
 	var claims CapabilityClaims
 	if strictJSON(headerBytes, &header) != nil || strictJSON(claimsBytes, &claims) != nil {

@@ -104,20 +104,29 @@ func (s *UserService) UpdateUser(id int, req *models.UpdateUserRequest) (*models
 	}
 
 	if req.Username != "" {
-		user.Username = req.Username
+		user.Username = strings.TrimSpace(req.Username)
 	}
 	if req.Email != "" {
-		user.Email = req.Email
+		user.Email = strings.ToLower(strings.TrimSpace(req.Email))
 	}
+	rotateSessions := false
 	if req.Password != "" {
+		if err := validatePassword(req.Password); err != nil {
+			return nil, err
+		}
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
 			return nil, fmt.Errorf("failed to hash password: %v", err)
 		}
 		user.Password = string(hashedPassword)
+		rotateSessions = true
 	}
 
-	if err := s.repo.Update(user); err != nil {
+	if rotateSessions {
+		if err := s.repo.UpdateAndRotateSessions(user); err != nil {
+			return nil, fmt.Errorf("failed to update user: %v", err)
+		}
+	} else if err := s.repo.Update(user); err != nil {
 		return nil, fmt.Errorf("failed to update user: %v", err)
 	}
 
@@ -147,12 +156,15 @@ func (s *UserService) validateRegisterRequest(req *models.RegisterRequest) error
 		return fmt.Errorf("invalid email format")
 	}
 
-	if req.Password == "" {
+	return validatePassword(req.Password)
+}
+
+func validatePassword(password string) error {
+	if password == "" {
 		return fmt.Errorf("password is required")
 	}
-	if len(req.Password) < 12 {
+	if len(password) < 12 {
 		return fmt.Errorf("password must be at least 12 characters")
 	}
-
 	return nil
 }

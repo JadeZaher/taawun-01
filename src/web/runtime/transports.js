@@ -9,6 +9,7 @@ import {
 
 const RELAY_MESSAGE_TYPES = new Set(['join', 'offer', 'answer', 'ice-candidate', 'crdt-sync', 'leave']);
 const DATA_CHANNEL_LABEL = 'taawun-crdt-v1';
+export const RELAY_WEBSOCKET_SUBPROTOCOL = 'taawun-relay-v1';
 
 export class BroadcastSync {
   #artifactId;
@@ -81,6 +82,7 @@ export class RelayPeerNetwork {
   #peers = new Map();
   #knownPeers = new Set();
   #closedByUser = false;
+  #ticketConsumed = false;
   #reconnectAttempts = 0;
   #reconnectTimer = 0;
 
@@ -104,14 +106,15 @@ export class RelayPeerNetwork {
   }
 
   async #openSocket() {
+    if (this.#ticketConsumed) throw new Error('relay session ticket was consumed; request a fresh runtime config before reconnecting');
     const relayURL = new URL(this.#config.relay.url);
     relayURL.searchParams.set('artifactId', this.#config.artifactId);
     relayURL.searchParams.set('peerId', this.#config.peerId);
-    relayURL.searchParams.set('token', this.#config.relay.token);
     this.#onState({ state: 'connecting', transport: 'relay' });
 
     await new Promise((resolve, reject) => {
-      const socket = new WebSocket(relayURL.href);
+      this.#ticketConsumed = true;
+      const socket = new WebSocket(relayURL.href, [RELAY_WEBSOCKET_SUBPROTOCOL, this.#config.relay.token]);
       this.#socket = socket;
       let opened = false;
       socket.onopen = () => {
@@ -136,6 +139,10 @@ export class RelayPeerNetwork {
   }
 
   #scheduleReconnect() {
+    if (this.#ticketConsumed) {
+      this.#onError(new Error('relay session ticket was consumed; request a fresh runtime config before reconnecting'));
+      return;
+    }
     clearTimeout(this.#reconnectTimer);
     const delay = Math.min(30_000, 750 * (2 ** this.#reconnectAttempts));
     this.#reconnectAttempts += 1;

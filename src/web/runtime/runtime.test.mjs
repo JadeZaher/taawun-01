@@ -21,6 +21,8 @@ const {
   validateRuntimeConfig,
 } = await import('./core.js');
 
+const { RelayPeerNetwork, RELAY_WEBSOCKET_SUBPROTOCOL } = await import('./transports.js');
+
 function config(overrides = {}) {
   return {
     contractVersion: RUNTIME_CONTRACT,
@@ -104,9 +106,57 @@ test('runtime config validates sessions, relay security, and role policies', () 
   assert.throws(() => validateRuntimeConfig(config({
     relay: { enabled: true, url: 'ws://relay.example/api/p2p/stream', token: '0123456789abcdef', iceServers: [] },
   })), /wss/u);
+  assert.throws(() => validateRuntimeConfig(config({
+    relay: { enabled: true, url: 'ws://localhost:8080/api/p2p/stream', iceServers: [] },
+  })), /relay\.token/u);
   assert.doesNotThrow(() => validateRuntimeConfig(config({
     relay: { enabled: true, url: 'ws://localhost:8080/api/p2p/stream', token: '0123456789abcdef', iceServers: [{ urls: 'stun:stun.example.test:3478' }] },
   })));
+});
+
+test('relay sends its ticket only as a WebSocket subprotocol', async (t) => {
+  const originalWebSocket = globalThis.WebSocket;
+  let connection;
+  class FakeWebSocket {
+    static CONNECTING = 0;
+    static OPEN = 1;
+
+    constructor(url, protocols) {
+      connection = { url, protocols };
+      this.readyState = FakeWebSocket.OPEN;
+      queueMicrotask(() => this.onopen?.());
+    }
+
+    send() {}
+
+    close() {
+      this.readyState = 3;
+      this.onclose?.();
+    }
+  }
+  globalThis.WebSocket = FakeWebSocket;
+  t.after(() => {
+    if (originalWebSocket === undefined) delete globalThis.WebSocket;
+    else globalThis.WebSocket = originalWebSocket;
+  });
+
+  const runtimeConfig = validateRuntimeConfig(config({
+    relay: { enabled: true, url: 'ws://localhost:8080/api/p2p/stream', token: '0123456789abcdef', iceServers: [] },
+  }));
+  const network = new RelayPeerNetwork({
+    config: runtimeConfig,
+    workspaceKey: generateWorkspaceKeyMaterial(),
+    getOperations: async () => [],
+    onOperations: async () => {},
+  });
+  await network.connect();
+
+  const relayURL = new URL(connection.url);
+  assert.equal(relayURL.searchParams.get('artifactId'), 'iftar-demo-v1');
+  assert.equal(relayURL.searchParams.get('peerId'), 'browser-a');
+  assert.equal(relayURL.searchParams.has('token'), false);
+  assert.deepEqual(connection.protocols, [RELAY_WEBSOCKET_SUBPROTOCOL, '0123456789abcdef']);
+  network.close();
 });
 
 test('remote operation policy binds relay peer, actor, role, and collection', () => {

@@ -544,8 +544,21 @@
             </div>
 
             <section class="deploy-strip" aria-labelledby="deployTitle">
-              <div><strong id="deployTitle">Deployment state: <span id="deployStateText">Not ready</span></strong><p id="deployStateHelp">Create and review a staging preview first. Production deployment remains review-gated during private beta.</p></div>
-              <button id="deployButton" class="button secondary" type="button" disabled>Deploy unavailable</button>
+              <div>
+                <strong id="deployTitle">Deployment state: <span id="deployStateText">Not ready</span></strong>
+                <p id="deployStateHelp">Create and review a staging preview first. Production deployment remains review-gated during private beta.</p>
+                <details class="create-workspace">
+                  <summary>Verify a delivery domain</summary>
+                  <div class="create-fields">
+                    <div class="field"><label for="domainOrigin">Exact HTTPS origin</label><input id="domainOrigin" type="url" placeholder="https://app.community.example"></div>
+                    <button id="claimDomainButton" class="button tertiary" type="button">Create DNS proof</button>
+                    <div id="domainProof" class="field-help" hidden></div>
+                    <button id="verifyDomainButton" class="button tertiary" type="button" disabled>Verify DNS proof</button>
+                    <div id="domainStatus" class="notice" role="status" hidden></div>
+                  </div>
+                </details>
+              </div>
+              <button id="deployButton" class="button secondary" type="button" disabled>Publish verified domain</button>
             </section>
           </div>
         </div>
@@ -564,6 +577,10 @@
       workspaces: [],
       previewReady: false,
       building: false,
+      publishing: false,
+      track: null,
+      domainClaim: null,
+      domainOrigin: '',
     };
 
     const element = (id) => document.getElementById(id);
@@ -597,7 +614,7 @@
       }
       if (!response.ok) {
         const message = typeof data === 'object' && data && (data.error || data.message)
-          ? String(data.error || data.message)
+          ? String((data.error && typeof data.error === 'object' && data.error.message) || data.error || data.message)
           : (typeof data === 'string' && data.trim() ? data.trim() : `Request failed (${response.status})`);
         if (response.status === 401 && options.auth !== false) showAuth('Your session expired. Please sign in again.');
         throw new ApiError(message, response.status);
@@ -634,8 +651,12 @@
       state.templateReady = false;
       state.workspacesReady = false;
       state.workspaces = [];
+      state.track = null;
+      state.domainClaim = null;
+      state.domainOrigin = '';
       const frame = element('previewFrame');
       frame.removeAttribute('src');
+      frame.removeAttribute('srcdoc');
       frame.hidden = true;
       element('previewEmpty').hidden = false;
       element('previewLoading').hidden = true;
@@ -651,6 +672,12 @@
         element(id).dispatchEvent(new Event('input', { bubbles: true }));
       });
       element('previewButton').textContent = 'Create staging preview';
+      element('domainOrigin').value = '';
+      element('domainProof').textContent = '';
+      element('domainProof').hidden = true;
+      element('verifyDomainButton').disabled = true;
+      setNotice(element('domainStatus'), '');
+      element('deployButton').disabled = true;
       element('buildStateText').textContent = 'Draft · not yet previewed';
       element('deployStateText').textContent = 'Not ready';
       element('deployStateHelp').textContent = 'Create and review a staging preview first. Production deployment remains review-gated during private beta.';
@@ -804,6 +831,44 @@
       element('previewButton').disabled = state.building || !state.templateReady || !hasWorkspace;
     }
 
+    function currentWorkspaceID() {
+      const workspaceID = Number(element('workspaceSelect').value);
+      return Number.isInteger(workspaceID) && workspaceID > 0 ? workspaceID : 0;
+    }
+
+    function claimIsVerified() {
+      return Boolean(state.domainClaim && String(state.domainClaim.status).toLowerCase() === 'verified');
+    }
+
+    function currentPreviewIncludesDomain() {
+      const surfaces = state.track && state.track.preview && state.track.preview.allowedOrigins && state.track.preview.allowedOrigins.surfaces;
+      return Array.isArray(surfaces) && surfaces.includes(state.domainOrigin);
+    }
+
+    function updateDeploymentAvailability() {
+      if (state.track && String(state.track.status).toLowerCase() === 'published') {
+        element('deployButton').disabled = true;
+        return;
+      }
+      const canPublish = state.previewReady && claimIsVerified() && currentPreviewIncludesDomain() && !state.building && !state.publishing;
+      element('deployButton').disabled = !canPublish;
+      if (state.previewReady && claimIsVerified() && !currentPreviewIncludesDomain()) {
+        element('deployStateText').textContent = 'Refresh preview required';
+        element('deployStateHelp').textContent = 'The verified origin must be included in a fresh signed staging preview before publication can be requested.';
+      }
+    }
+
+    function resetDomainClaim(clearOrigin = false) {
+      state.domainClaim = null;
+      state.domainOrigin = '';
+      if (clearOrigin) element('domainOrigin').value = '';
+      element('domainProof').textContent = '';
+      element('domainProof').hidden = true;
+      element('verifyDomainButton').disabled = true;
+      setNotice(element('domainStatus'), '');
+      updateDeploymentAvailability();
+    }
+
     function selectedModules() {
       return MODULE_IDS.filter((id) => {
         if (id === 'iftar-registration') return element('moduleRegistration').checked;
@@ -824,7 +889,10 @@
         templateId: TEMPLATE_ID,
         theme: { accentColor: element('accentColor').value.toUpperCase() },
         modules: selectedModules(),
-        allowedOrigins: { embedders: [], connections: [], resources: [] },
+        requestedOrigins: {
+          surfaces: state.domainOrigin ? [window.location.origin, state.domainOrigin] : [],
+          embedders: [], connections: [], resources: [],
+        },
       };
     }
 
@@ -850,27 +918,35 @@
       return url.href;
     }
 
-    function loadPreviewFrame(frame, url) {
-      return new Promise((resolve, reject) => {
-        const timeout = window.setTimeout(() => {
-          frame.onload = null;
-          frame.onerror = null;
-          reject(new Error('The staging artifact was built, but its preview did not finish loading.'));
-        }, 12000);
-        frame.onload = () => {
-          window.clearTimeout(timeout);
-          frame.onload = null;
-          frame.onerror = null;
-          resolve();
-        };
-        frame.onerror = () => {
-          window.clearTimeout(timeout);
-          frame.onload = null;
-          frame.onerror = null;
-          reject(new Error('The staging artifact was built, but its preview could not be loaded.'));
-        };
-        frame.src = url;
+    async function readPreviewFile(url) {
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${state.token}` },
+        credentials: 'same-origin',
       });
+      const body = await response.text();
+      if (!response.ok) throw new Error(body || 'The preview file could not be loaded.');
+      return body;
+    }
+
+    async function loadPreviewFrame(frame, preview) {
+      const [document, theme, styles] = await Promise.all([
+        readPreviewFile(preview.documentUrl),
+        readPreviewFile(preview.themeUrl),
+        readPreviewFile(preview.stylesUrl),
+      ]);
+      const runtimeTag = document.match(/<script type="module" src="([^"]+)"[^>]*><\/script>/);
+      if (!runtimeTag) throw new Error('The preview does not declare its approved runtime.');
+      const runtimeResponse = await fetch(runtimeTag[1], { credentials: 'same-origin' });
+      if (!runtimeResponse.ok) throw new Error('The approved preview runtime could not be loaded.');
+      const runtime = await runtimeResponse.text();
+      const inlineStyles = `<style>${theme}\n${styles}</style>`;
+      const source = document
+        .replace(/<meta http-equiv="Content-Security-Policy"[^>]*>\s*/, '')
+        .replace(/<link rel="stylesheet" href="\.\/theme\.css">/, '')
+        .replace(/<link rel="stylesheet" href="\.\/app\.css">/, inlineStyles)
+        .replace(runtimeTag[0], `<script type="module">${runtime}<${'/script>'}`);
+      frame.removeAttribute('src');
+      frame.srcdoc = source;
     }
 
     function setPreviewState(kind, text) {
@@ -928,7 +1004,9 @@
       setNotice(element('builderAlert'), '');
       if (!validateBuilder()) return;
       state.building = true;
+      state.previewReady = false;
       updatePreviewAvailability();
+      updateDeploymentAvailability();
       element('previewLoading').hidden = false;
       setPreviewState('loading', 'Building preview');
       element('buildStateText').textContent = 'Build in progress';
@@ -938,14 +1016,22 @@
         const result = await api('/artifacts/preview', { method: 'POST', body: buildPayload() });
         if (!result || !result.manifest || typeof result.manifest !== 'object') throw new Error('The build did not return an artifact manifest.');
         const previewURL = safePreviewURL(result && result.previewUrl);
+        const preview = result && result.preview && typeof result.preview === 'object'
+          ? result.preview
+          : { documentUrl: previewURL, themeUrl: '', stylesUrl: '' };
+        preview.documentUrl = safePreviewURL(preview.documentUrl || previewURL);
+        preview.themeUrl = safePreviewURL(preview.themeUrl);
+        preview.stylesUrl = safePreviewURL(preview.stylesUrl);
         renderManifest(result.manifest);
+        state.track = result.track || null;
+        if (!state.track || !state.track.id) throw new Error('The build did not return a composition track.');
         artifactBuilt = true;
         const frame = element('previewFrame');
         frame.title = `${element('appName').value.trim()} staging preview`;
         frame.hidden = false;
         element('previewEmpty').hidden = true;
         setPreviewState('loading', 'Loading staging app');
-        await loadPreviewFrame(frame, previewURL);
+        await loadPreviewFrame(frame, preview);
         state.previewReady = true;
         setPreviewState('ready', 'Staging ready');
         element('buildStateText').textContent = 'Preview ready · review required';
@@ -965,17 +1051,114 @@
         state.building = false;
         element('previewLoading').hidden = true;
         updatePreviewAvailability();
+        updateDeploymentAvailability();
       }
     }
 
     function markPreviewDirty() {
       if (!state.previewReady || state.building) return;
+      state.previewReady = false;
       setPreviewState('', 'Changes not previewed');
       element('buildStateText').textContent = 'Draft changed · refresh preview';
       element('deployStateText').textContent = 'Preview out of date';
       element('deployStateHelp').textContent = 'Create a fresh staging preview so its immutable manifest matches these settings.';
       element('previewButton').textContent = 'Refresh staging preview';
       setLifecycle(0);
+      updateDeploymentAvailability();
+    }
+
+    async function claimDomain() {
+      const workspaceID = currentWorkspaceID();
+      const origin = element('domainOrigin').value.trim();
+      if (!workspaceID) {
+        setNotice(element('domainStatus'), 'Select a workspace before claiming a domain.', 'error');
+        return;
+      }
+      if (!origin) {
+        setNotice(element('domainStatus'), 'Enter one exact public HTTPS origin.', 'error');
+        element('domainOrigin').focus();
+        return;
+      }
+      const button = element('claimDomainButton');
+      setBusy(button, true, 'Creating…', 'Create DNS proof');
+      setNotice(element('domainStatus'), '');
+      try {
+        const result = await api(`/workspaces/${workspaceID}/domains`, { method: 'POST', body: { origin } });
+        if (!result || !result.claim || !result.verification) throw new Error('The domain claim response was incomplete.');
+        state.domainClaim = result.claim;
+        state.domainOrigin = String(result.claim.origin || origin);
+        element('domainOrigin').value = state.domainOrigin;
+        element('domainProof').textContent = `Create DNS TXT ${result.verification.recordName}: ${result.verification.value}`;
+        element('domainProof').hidden = false;
+        element('verifyDomainButton').disabled = false;
+        setNotice(element('domainStatus'), 'DNS proof created. Publish the TXT record, then verify it here.', 'success');
+        updateDeploymentAvailability();
+      } catch (error) {
+        setNotice(element('domainStatus'), error.message || 'Could not create the DNS proof.', 'error');
+      } finally {
+        setBusy(button, false, 'Creating…', 'Create DNS proof');
+      }
+    }
+
+    async function verifyDomain() {
+      const workspaceID = currentWorkspaceID();
+      if (!workspaceID || !state.domainClaim || !state.domainClaim.id) {
+        setNotice(element('domainStatus'), 'Create a DNS proof before verifying it.', 'error');
+        return;
+      }
+      const button = element('verifyDomainButton');
+      setBusy(button, true, 'Verifying…', 'Verify DNS proof');
+      try {
+        const path = `/workspaces/${workspaceID}/domains/${encodeURIComponent(state.domainClaim.id)}`;
+        const inspected = await api(path);
+        const claim = String(inspected.status).toLowerCase() === 'verified'
+          ? inspected
+          : await api(`${path}/verify`, { method: 'POST' });
+        state.domainClaim = claim;
+        state.domainOrigin = String(claim.origin || state.domainOrigin);
+        element('domainOrigin').value = state.domainOrigin;
+        element('domainProof').hidden = true;
+        const message = currentPreviewIncludesDomain()
+          ? 'Domain verified. This signed preview includes the delivery origin and can be published.'
+          : 'Domain verified. Refresh the staging preview so its signed origin policy includes this delivery domain.';
+        setNotice(element('domainStatus'), message, 'success');
+        updateDeploymentAvailability();
+      } catch (error) {
+        setNotice(element('domainStatus'), error.message || 'The DNS proof could not be verified yet.', 'error');
+      } finally {
+        setBusy(button, false, 'Verifying…', 'Verify DNS proof');
+      }
+    }
+
+    async function publishVerifiedDomain() {
+      if (!state.track || !state.track.id || !claimIsVerified() || !currentPreviewIncludesDomain()) {
+        setNotice(element('domainStatus'), 'Verify the domain and create a fresh preview that includes it before publishing.', 'error');
+        return;
+      }
+      const button = element('deployButton');
+      state.publishing = true;
+      updateDeploymentAvailability();
+      setBusy(button, true, 'Publishing…', 'Publish verified domain');
+      try {
+        const requested = await api(`/conductor/tracks/${encodeURIComponent(state.track.id)}/publication`, {
+          method: 'POST', body: { expectedVersion: state.track.version, claimId: state.domainClaim.id },
+        });
+        const activated = await api(`/conductor/tracks/${encodeURIComponent(requested.id)}/activate`, {
+          method: 'POST', body: { expectedVersion: requested.version },
+        });
+        state.track = activated;
+        const origin = activated.publication && activated.publication.origin ? activated.publication.origin : state.domainOrigin;
+        element('deployStateText').textContent = 'Published';
+        element('deployStateHelp').textContent = `The signed card is active at ${origin}.`;
+        setNotice(element('domainStatus'), `Published and active at ${origin}.`, 'success');
+        setLifecycle(4);
+      } catch (error) {
+        setNotice(element('domainStatus'), error.message || 'Publication could not be activated.', 'error');
+      } finally {
+        state.publishing = false;
+        setBusy(button, false, 'Publishing…', 'Publish verified domain');
+        updateDeploymentAvailability();
+      }
     }
 
     function syncAccent(source) {
@@ -1036,9 +1219,17 @@
     element('retryWorkspaces').addEventListener('click', () => loadWorkspaces());
     element('retryTemplate').addEventListener('click', loadTemplate);
     element('createWorkspaceButton').addEventListener('click', createWorkspace);
-    element('workspaceSelect').addEventListener('change', seedOrganizationFromWorkspace);
+    element('workspaceSelect').addEventListener('change', () => {
+      seedOrganizationFromWorkspace();
+      resetDomainClaim();
+      markPreviewDirty();
+    });
     element('builderForm').addEventListener('submit', createPreview);
     element('builderForm').addEventListener('input', markPreviewDirty);
+    element('domainOrigin').addEventListener('input', () => resetDomainClaim());
+    element('claimDomainButton').addEventListener('click', claimDomain);
+    element('verifyDomainButton').addEventListener('click', verifyDomain);
+    element('deployButton').addEventListener('click', publishVerifiedDomain);
     element('accentColor').addEventListener('input', () => syncAccent(element('accentColor')));
     element('accentHex').addEventListener('input', () => syncAccent(element('accentHex')));
 
