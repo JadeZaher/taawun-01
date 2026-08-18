@@ -24,7 +24,6 @@ USER taawun
 ENV PORT=8080 \
     APP_DB_PATH=/data/taawun.db \
     TAWUN_ARTIFACT_ROOT=/data/artifacts
-VOLUME ["/data"]
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
