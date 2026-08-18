@@ -221,6 +221,27 @@
     .module-option strong { display: block; font-size: 12px; }
     .module-option small { display: block; margin-top: 2px; color: var(--parchment-dim); font-size: 10px; line-height: 1.35; }
     .module-option code { margin-top: 2px; color: var(--emerald-bright); font: 500 9px/1.2 var(--mono); }
+    .component-editor { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); background: rgba(17, 22, 26, 0.54); }
+    .component-editor[aria-disabled="true"] { border-style: dashed; }
+    .component-head { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+    .component-head input[type="checkbox"] { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--emerald-bright); }
+    .component-head strong, .component-head small { display: block; }
+    .component-head small { margin-top: 3px; color: var(--parchment-dim); font-size: 10px; line-height: 1.4; }
+    .component-head code { color: var(--emerald-bright); font: 500 9px/1.2 var(--mono); overflow-wrap: anywhere; }
+    .component-fields { display: grid; gap: 9px; padding: 10px 0 0 28px; border-top: 1px solid var(--line); }
+    .component-fields textarea { min-height: 74px; }
+    .custom-field-list { display: grid; gap: 7px; }
+    .custom-field { display: grid; grid-template-columns: minmax(90px, .7fr) minmax(86px, .45fr) minmax(120px, 1.5fr) auto; gap: 7px; align-items: start; }
+    .custom-field input, .custom-field select, .custom-field textarea { min-width: 0; }
+    .custom-field textarea { min-height: 44px; }
+    .component-tools { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+    .component-error { margin: 0; color: #f0b39a; font-size: 11px; }
+    .advanced-document { border-top: 1px dashed var(--line); padding-top: 8px; }
+    .advanced-document summary { cursor: pointer; color: var(--gold); font: 600 10px/1.3 var(--mono); text-transform: uppercase; letter-spacing: .06em; }
+    .advanced-document textarea { width: 100%; min-height: 150px; margin-top: 8px; font: 11px/1.45 var(--mono); }
+    .reconcile-panel { display: grid; gap: 8px; padding: 11px; border: 1px solid var(--gold); background: rgba(199, 162, 74, .08); }
+    .reconcile-panel p { color: var(--parchment-dim); font-size: 11px; }
+    .track-recovery { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
 
     .color-control { display: grid; grid-template-columns: 46px 1fr; gap: 10px; }
     input[type="color"] { width: 46px; height: 42px; padding: 4px; cursor: pointer; }
@@ -239,6 +260,7 @@
     .status-pill.error::before { background: var(--danger); }
     .preview-frame-wrap { position: relative; min-height: 540px; background: #0b0f12; }
     .preview-frame { width: 100%; height: 610px; display: block; border: 0; background: #f5f0e5; }
+    .preview-frame[data-stale="true"] { opacity: .82; outline: 2px dashed var(--gold); outline-offset: -2px; }
     .preview-empty { min-height: 540px; display: grid; place-items: center; padding: 50px; text-align: center; }
     .empty-star { width: 86px; height: 86px; position: relative; margin: 0 auto 26px; transform: rotate(45deg); border: 1px solid rgba(87, 166, 142, 0.35); }
     .empty-star::before, .empty-star::after { content: ""; position: absolute; inset: 18px -19px; border: 1px solid rgba(87, 166, 142, 0.3); }
@@ -328,6 +350,10 @@
       .composition-contract { grid-template-columns: 1fr; }
       .module-option { grid-template-columns: 18px 1fr; }
       .module-option code { grid-column: 2; }
+      .component-head { grid-template-columns: 18px minmax(0, 1fr); }
+      .component-head code { grid-column: 2; }
+      .component-fields { padding-left: 0; }
+      .custom-field, .track-recovery { grid-template-columns: 1fr; }
       .preview-frame, .preview-frame-wrap, .preview-empty { min-height: 410px; height: 410px; }
       .preview-empty { padding: 28px; }
     }
@@ -351,7 +377,7 @@
       .rail-boundary p { overflow-wrap: anywhere; }
       .workspace { padding: 18px 8px; }
       .workspace * { min-width: 0; overflow-wrap: anywhere; }
-      .workspace, .workspace-header, .builder-grid, .panel, .panel-head, .panel-body, .builder-form, .subhead, .workspace-picker, .workspace-state, .template-card, .template-card-top, .composition-contract, .module-list, .module-option, .color-control, .build-actions, .preview-column, .preview-toolbar, .contract-grid, .contract-section, .contract-body, .deploy-strip { min-width: 0; }
+      .workspace, .workspace-header, .builder-grid, .panel, .panel-head, .panel-body, .builder-form, .subhead, .workspace-picker, .workspace-state, .template-card, .template-card-top, .composition-contract, .module-list, .module-option, .component-editor, .component-head, .component-fields, .custom-field, .track-recovery, .color-control, .build-actions, .preview-column, .preview-toolbar, .contract-grid, .contract-section, .contract-body, .deploy-strip { min-width: 0; }
       .workspace-header h1 { font-size: 26px; overflow-wrap: anywhere; }
       .build-state { min-width: 0; }
       .panel-head, .subhead, .template-card-top, .preview-toolbar, .boundary strong { flex-wrap: wrap; }
@@ -471,9 +497,9 @@
       <main id="mainContent" class="workspace" tabindex="-1">
         <header class="workspace-header">
           <div>
-            <div class="eyebrow">Builder cockpit · Community Iftar</div>
+            <div class="eyebrow">Component builder cockpit</div>
             <h1>Shape one deployable community app.</h1>
-            <p>Compose the approved modules, set a jurisprudence reference baseline, and inspect the exact artifact contract before deployment.</p>
+            <p>Choose a real curated template, edit bounded component documents, and inspect the exact signed artifact contract before deployment.</p>
           </div>
           <div class="build-state" aria-live="polite">
             <span>Build state</span>
@@ -531,30 +557,35 @@
                 </div>
                 <div class="field">
                   <label for="templateSelect">Approved template</label>
-                  <select id="templateSelect" aria-describedby="templateCatalogCount" disabled></select>
+                  <select id="templateSelect" aria-describedby="templateCatalogCount templateDescription" disabled><option value="">Choose a real template…</option></select>
                   <div id="templateCatalogCount" class="field-help">Loading the real template and module catalog…</div>
                 </div>
                 <article class="template-card" aria-labelledby="templateTitle">
                   <div class="template-card-top">
-                    <div><div class="eyebrow">Selected template</div><h3 id="templateTitle">Community Iftar</h3></div>
+                    <div><div class="eyebrow">Selected template</div><h3 id="templateTitle">Choose a template</h3></div>
                     <span id="templateBadge" class="template-badge">Loading</span>
                   </div>
                   <p id="templateDescription">Checking the approved template catalog…</p>
-                  <div id="templateMeta" class="template-meta"><span>community-iftar</span><span>Fixed server template</span><span>3 adapters</span></div>
+                  <div id="templateMeta" class="template-meta"><span>Real server catalog</span><span>No implicit selection</span></div>
                   <button id="retryTemplate" class="button tertiary" type="button" hidden>Retry template catalog</button>
                 </article>
+                <div id="templateReconcile" class="reconcile-panel" role="alertdialog" aria-labelledby="templateReconcileTitle" aria-describedby="templateReconcileMessage" hidden>
+                  <strong id="templateReconcileTitle">Reconcile this template switch</strong>
+                  <p id="templateReconcileMessage"></p>
+                  <div class="component-tools"><button id="applyTemplateSwitch" class="button secondary" type="button">Apply switch</button><button id="cancelTemplateSwitch" class="button tertiary" type="button">Keep current template</button></div>
+                </div>
 
                 <div class="section-rule" aria-hidden="true"></div>
-                <div class="subhead"><h3>Composition</h3><span id="moduleCount">3 approved modules</span></div>
+                <div class="subhead"><h3>Component documents</h3><span id="moduleCount">Choose a template</span></div>
                 <div class="composition-contract" aria-label="Included composition modes">
                   <div class="composition-mode"><span>Included</span><strong>Monolithic shell</strong><small>One cohesive standalone community app.</small></div>
                   <div class="composition-mode"><span>Included</span><strong>Isolated modules</strong><small>Stable routes for embed and MCP adapters.</small></div>
                 </div>
-                <div id="moduleList" class="module-list" aria-label="Included modules"></div>
+                <div id="moduleList" class="module-list" aria-label="Curated component instances"></div>
 
                 <div class="section-rule" aria-hidden="true"></div>
                 <div class="subhead"><h3>Identity &amp; theme</h3><span>Template slots</span></div>
-                <div class="field"><label class="required" for="appName">App name</label><input id="appName" maxlength="80" value="Community Iftar" data-bind:_app-name required></div>
+                <div class="field"><label class="required" for="appName">App name</label><input id="appName" maxlength="80" value="Community app" data-bind:_app-name required></div>
                 <div class="field"><label class="required" for="organizationName">Organization</label><input id="organizationName" maxlength="120" data-bind:_organization-name placeholder="Wasatch Community Mosque" required></div>
                 <div class="field-row">
                   <div class="field"><label class="required" for="city">City</label><input id="city" maxlength="80" data-bind:_city placeholder="Salt Lake City" required></div>
@@ -572,7 +603,12 @@
                 <div id="builderAlert" class="notice" role="alert" aria-live="polite" hidden></div>
                 <div class="build-actions">
                   <button id="previewButton" class="button" type="submit" disabled>Create staging preview</button>
-                  <p class="privacy-copy">Explicit build action sends only workspace ID, curated slots, selected module IDs, theme token, and an empty origin policy. No member, donor, or event records are uploaded.</p>
+                  <div class="track-recovery">
+                    <div class="field"><label for="trackLookup">Reload a verified signed track</label><input id="trackLookup" autocomplete="off" placeholder="track_…" aria-describedby="trackRecoveryHelp"></div>
+                    <button id="loadTrackButton" class="button tertiary" type="button">Reload verified preview</button>
+                  </div>
+                  <div id="trackRecoveryHelp" class="field-help">Workspace authorization is rechecked. A verified track restores the exact signed component documents; a stale or tampered receipt is not loaded.</div>
+                  <p class="privacy-copy">Explicit build action sends workspace identity, curated component IDs, their bounded JSON content documents, theme token, and approved origins. JSON never becomes code, routes, permissions, authority, custody, or settlement.</p>
                 </div>
               </form>
             </div>
@@ -758,8 +794,6 @@
   </div>
 
   <script type="module">
-    const DEFAULT_TEMPLATE_ID = 'community-iftar';
-    const DEFAULT_MODULE_IDS = ['iftar-registration', 'announcements', 'donation-campaign'];
     const SHURA_ROLE_SCOPES = {
       Viewer: ['shura:read'],
       Maintainer: ['shura:read', 'shura:deliberate', 'shura:vote', 'shura:propose'],
@@ -769,11 +803,19 @@
       token: '',
       user: null,
       templateReady: false,
+      catalogHealthy: false,
       workspacesReady: false,
       workspaces: [],
       templates: [],
       modules: [],
-      selectedTemplateId: DEFAULT_TEMPLATE_ID,
+      componentPolicy: null,
+      selectedTemplateId: '',
+      componentDocuments: {},
+      selectedComponentIds: [],
+      pendingTemplateId: '',
+      catalogEpoch: 0,
+      previewEpoch: 0,
+      draftRevision: 0,
       members: [],
       workspaceRole: '',
       productRole: '',
@@ -880,12 +922,22 @@
       state.token = '';
       state.user = null;
       state.previewReady = false;
+      state.building = false;
+      state.publishing = false;
       state.templateReady = false;
+      state.catalogHealthy = false;
       state.workspacesReady = false;
       state.workspaces = [];
       state.templates = [];
       state.modules = [];
-      state.selectedTemplateId = DEFAULT_TEMPLATE_ID;
+      state.componentPolicy = null;
+      state.selectedTemplateId = '';
+      state.componentDocuments = {};
+      state.selectedComponentIds = [];
+      state.pendingTemplateId = '';
+      state.catalogEpoch += 1;
+      state.previewEpoch += 1;
+      state.draftRevision += 1;
       state.members = [];
       state.workspaceRole = '';
       state.productRole = '';
@@ -909,6 +961,7 @@
       frame.hidden = true;
       element('previewEmpty').hidden = false;
       element('previewLoading').hidden = true;
+      setBusy(element('loadTrackButton'), false, 'Verifying…', 'Reload verified preview');
       element('manifestList').replaceChildren();
       element('manifestList').hidden = true;
       element('manifestEmpty').hidden = false;
@@ -920,8 +973,10 @@
       ['appName', 'organizationName', 'city', 'madhhab', 'accentColor', 'buildBrief'].forEach((id) => {
         element(id)?.dispatchEvent(new Event('input', { bubbles: true }));
       });
-      element('templateSelect').replaceChildren();
+      element('templateSelect').replaceChildren(new Option('Choose a real template…', ''));
       element('moduleList').replaceChildren();
+      element('templateReconcile').hidden = true;
+      element('trackLookup').value = '';
       element('peopleList').replaceChildren();
       element('invitationList').replaceChildren();
       element('proposalList').replaceChildren();
@@ -1069,6 +1124,8 @@
       element('workspaceRole').textContent = roleLabel;
       const buildAllowed = workspaceID > 0 && canBuildWorkspace();
       const publishAllowed = workspaceID > 0 && canPublishWorkspace();
+      element('templateSelect').disabled = !workspaceID || !state.templates.length || !state.catalogHealthy;
+      if (element('loadTrackButton').getAttribute('aria-busy') !== 'true') element('loadTrackButton').disabled = !workspaceID;
       element('createInviteButton').disabled = !publishAllowed;
       element('createInviteButton').title = publishAllowed ? '' : 'Only an Architect may invite workspace members.';
       element('createProposalButton').disabled = !workspaceID || !['Architect', 'Maintainer'].includes(state.productRole);
@@ -1104,6 +1161,7 @@
         element('workspaceHelp').textContent = 'The artifact is scoped to this workspace.';
       }
       if (state.listings.length) renderBazaar();
+      if (state.templates.length) renderComponentEditors();
       updatePreviewAvailability();
     }
 
@@ -1211,6 +1269,7 @@
         }
         state.workspacesReady = true;
         await loadWorkspaceContext();
+        if (currentSession(sessionEpoch) && requestEpoch === state.workspacesEpoch && state.templates.length) restoreDraftForCurrentScope();
       } catch (error) {
         if (!currentSession(sessionEpoch) || requestEpoch !== state.workspacesEpoch) return;
         setNotice(element('workspaceError'), error.message || 'Could not load workspaces.', 'error');
@@ -1261,63 +1320,621 @@
       return state.templates.find((template) => String(template.id || template.template?.id || '') === state.selectedTemplateId) || null;
     }
 
-    function renderSelectedTemplate() {
+    function moduleByID(id) {
+      return state.modules.find((entry) => String(entry.id || '') === String(id || '')) || null;
+    }
+
+    function cloneDocument(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function draftStorageKey(templateID = state.selectedTemplateId) {
+      const principal = state.user && (state.user.id || state.user.userId);
+      const workspace = currentWorkspaceID();
+      if (!principal || !workspace || !templateID) return '';
+      return `taawun.component-draft.v1:${principal}:${workspace}:${templateID}`;
+    }
+
+    function draftSelectionKey() {
+      const principal = state.user && (state.user.id || state.user.userId);
+      const workspace = currentWorkspaceID();
+      return principal && workspace ? `taawun.component-template.v1:${principal}:${workspace}` : '';
+    }
+
+    function saveComponentDraft() {
+      const key = draftStorageKey();
+      if (!key) return;
+      try {
+        const selectionKey = draftSelectionKey();
+        if (selectionKey) sessionStorage.setItem(selectionKey, state.selectedTemplateId);
+        sessionStorage.setItem(key, JSON.stringify({
+          templateId: state.selectedTemplateId,
+          selected: [...state.selectedComponentIds],
+          documents: state.componentDocuments,
+        }));
+      } catch {
+        setNotice(element('builderAlert'), 'This browser could not persist the draft for session recovery. The current in-memory draft is still available.', 'gold');
+      }
+    }
+
+    function readComponentDraft(templateID) {
+      const key = draftStorageKey(templateID);
+      if (!key) return null;
+      try {
+        const value = JSON.parse(sessionStorage.getItem(key) || 'null');
+        return value && value.templateId === templateID && Array.isArray(value.selected) && value.documents && typeof value.documents === 'object' ? value : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function defaultComponentDocument(id) {
+      const module = moduleByID(id);
+      if (!module || !module.defaultDocument) throw new Error(`The catalog has no validated default document for ${id}.`);
+      return validateComponentDocumentAgainst(id, module.defaultDocument, module, state.componentPolicy);
+    }
+
+    function componentKeyReason(key, policy = state.componentPolicy) {
+      if (!policy || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(key) || new TextEncoder().encode(key).length > policy.maxKeyBytes) return 'invalid key';
+      const normalized = key.toLowerCase().replaceAll('-', '').replaceAll('_', '');
+      if (normalized.startsWith('on')) return 'reserved security key';
+      return policy.reservedKeyParts.some((word) => normalized.includes(String(word).toLowerCase().replaceAll('-', '').replaceAll('_', ''))) ? 'reserved security key' : '';
+    }
+
+    function jsonValueType(value) {
+      if (value === null) return 'null';
+      if (Array.isArray(value)) return 'array';
+      return typeof value;
+    }
+
+    function hasUnpairedSurrogate(value) {
+      for (let index = 0; index < value.length; index += 1) {
+        const code = value.charCodeAt(index);
+        if (code >= 0xD800 && code <= 0xDBFF) {
+          const next = value.charCodeAt(index + 1);
+          if (!(next >= 0xDC00 && next <= 0xDFFF)) return true;
+          index += 1;
+        } else if (code >= 0xDC00 && code <= 0xDFFF) return true;
+      }
+      return false;
+    }
+
+    function assertJSONUnicodeScalars(value, path = '(root)') {
+      if (typeof value === 'string') {
+        if (hasUnpairedSurrogate(value)) throw new Error(`invalid Unicode scalar value at ${path}`);
+        return;
+      }
+      if (Array.isArray(value)) {
+        value.forEach((entry, index) => assertJSONUnicodeScalars(entry, `${path}[${index}]`));
+        return;
+      }
+      if (!value || typeof value !== 'object') return;
+      for (const [key, entry] of Object.entries(value)) {
+        if (hasUnpairedSurrogate(key)) throw new Error(`invalid Unicode scalar key at ${path}`);
+        assertJSONUnicodeScalars(entry, path === '(root)' ? key : `${path}.${key}`);
+      }
+    }
+
+    function validateComponentDocumentAgainst(componentID, documentValue, module, policy) {
+      if (!policy || !module) throw new Error(`Component ${componentID}: its catalog contract is unavailable.`);
+      if (!documentValue || Array.isArray(documentValue) || typeof documentValue !== 'object') throw new Error(`Component ${componentID}: the document root must be an object.`);
+      let totalKeys = 0;
+      const visit = (value, depth, path) => {
+        if (depth > policy.maxDepth) throw new Error(`Component ${componentID}, key ${path || '(root)'}: maximum depth exceeded.`);
+        if (typeof value === 'string') {
+          if (hasUnpairedSurrogate(value)) throw new Error(`Component ${componentID}, key ${path || '(root)'}: invalid Unicode scalar text.`);
+          if ([...value].length > policy.maxStringRunes || /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/.test(value)) throw new Error(`Component ${componentID}, key ${path}: invalid or oversized text.`);
+          return;
+        }
+        if (typeof value === 'number') {
+          if (!Number.isFinite(value) || String(value).length > policy.maxNumberBytes || (Number.isInteger(value) && !Number.isSafeInteger(value))) throw new Error(`Component ${componentID}, key ${path}: invalid or precision-losing number.`);
+          return;
+        }
+        if (value === null || typeof value === 'boolean') return;
+        if (Array.isArray(value)) {
+          if (value.length > policy.maxArrayItems) throw new Error(`Component ${componentID}, key ${path}: too many array items.`);
+          value.forEach((item) => visit(item, depth + 1, path));
+          return;
+        }
+        if (typeof value !== 'object') throw new Error(`Component ${componentID}, key ${path}: unsupported JSON value.`);
+        const entries = Object.entries(value);
+        if (entries.length > policy.maxObjectFields) throw new Error(`Component ${componentID}, key ${path || '(root)'}: too many fields.`);
+        for (const [key, child] of entries) {
+          const childPath = path ? `${path}.${key}` : key;
+          const reason = componentKeyReason(key, policy);
+          if (reason) throw new Error(`Component ${componentID}, key ${childPath}: ${reason}.`);
+          totalKeys += 1;
+          if (totalKeys > policy.maxTotalKeys) throw new Error(`Component ${componentID}, key ${childPath}: total key limit exceeded.`);
+          visit(child, depth + 1, childPath);
+        }
+      };
+      visit(documentValue, 1, '');
+      for (const descriptor of module.documentFields) {
+        const exists = Object.hasOwn(documentValue, descriptor.key);
+        const value = documentValue[descriptor.key];
+        if (descriptor.required && (!exists || (descriptor.valueType === 'string' && !String(value).trim()))) throw new Error(`Component ${componentID}, key ${descriptor.key}: required declared field is missing.`);
+        if (!exists) continue;
+        if (jsonValueType(value) !== descriptor.valueType) throw new Error(`Component ${componentID}, key ${descriptor.key}: expected ${descriptor.valueType}.`);
+        if (descriptor.valueType === 'string' && descriptor.maxLength > 0 && [...value].length > descriptor.maxLength) throw new Error(`Component ${componentID}, key ${descriptor.key}: declared field exceeds ${descriptor.maxLength} characters.`);
+      }
+      const json = JSON.stringify(documentValue);
+      if (new TextEncoder().encode(json).length > policy.maxComponentBytes) throw new Error(`Component ${componentID}: document exceeds ${policy.maxComponentBytes} bytes.`);
+      return cloneDocument(documentValue);
+    }
+
+    function validateComponentDocument(componentID, documentValue) {
+      return validateComponentDocumentAgainst(componentID, documentValue, moduleByID(componentID), state.componentPolicy);
+    }
+
+    function setComponentDocument(componentID, candidate, errorTarget) {
+      try {
+        state.componentDocuments[componentID] = validateComponentDocument(componentID, candidate);
+        if (errorTarget) {
+          errorTarget.textContent = '';
+          errorTarget.hidden = true;
+        }
+        saveComponentDraft();
+        markPreviewDirty();
+        return true;
+      } catch (error) {
+        if (errorTarget) {
+          errorTarget.textContent = `${error.message || 'Invalid component document'} The last valid document is retained.`;
+          errorTarget.hidden = false;
+        }
+        return false;
+      }
+    }
+
+    function fieldValueType(value) {
+      if (value === null) return 'null';
+      if (Array.isArray(value)) return 'array';
+      return typeof value === 'boolean' ? 'boolean' : typeof value === 'number' ? 'number' : typeof value === 'object' ? 'object' : 'string';
+    }
+
+    function fieldText(value, type) {
+      return type === 'string' ? String(value ?? '') : JSON.stringify(value);
+    }
+
+    function parseFieldText(type, text) {
+      if (type === 'string') return text;
+      if (type === 'null') return null;
+      if (type === 'boolean') {
+        if (!['true', 'false'].includes(text)) throw new Error('Enter true or false.');
+        return text === 'true';
+      }
+      const value = parseCanonicalJSONText(text);
+      if (type === 'number' && (typeof value !== 'number' || !Number.isFinite(value))) throw new Error('Enter one JSON number.');
+      if (type === 'array' && !Array.isArray(value)) throw new Error('Enter one JSON array.');
+      if (type === 'object' && (!value || Array.isArray(value) || typeof value !== 'object')) throw new Error('Enter one JSON object.');
+      return value;
+    }
+
+    function parseCanonicalJSONText(source) {
+      const duplicateKey = findDuplicateJSONKey(source);
+      if (duplicateKey) throw new Error(`duplicate key ${duplicateKey}`);
+      const nonCanonicalNumber = findNonCanonicalNumber(source);
+      if (nonCanonicalNumber) throw new Error(`number ${nonCanonicalNumber} is not in the catalog's canonical number format`);
+      const value = JSON.parse(source);
+      assertJSONUnicodeScalars(value);
+      return value;
+    }
+
+    function browserNumberReason(text) {
+      if (!/^-?(?:0|[1-9][0-9]*)(?:\.[0-9]*[1-9])?$/u.test(text) || text === '-0') return 'Enter a base-10 JSON integer or minimal decimal without exponent, negative zero, or trailing fractional zero.';
+      const value = Number(text);
+      if (!Number.isFinite(value) || (Number.isInteger(value) && !Number.isSafeInteger(value)) || JSON.stringify(value) !== text) return 'This JSON number would lose precision in the browser; enter an exactly representable value.';
+      return '';
+    }
+
+    function findNonCanonicalNumber(source) {
+      let quoted = false;
+      let escaped = false;
+      for (let index = 0; index < source.length; index += 1) {
+        const character = source[index];
+        if (quoted) {
+          if (escaped) escaped = false;
+          else if (character === '\\') escaped = true;
+          else if (character === '"') quoted = false;
+          continue;
+        }
+        if (character === '"') {
+          quoted = true;
+          continue;
+        }
+        if ((character === '-' && /[0-9]/u.test(source[index + 1] || '')) || /[0-9]/u.test(character)) {
+          let end = index + 1;
+          while (/[0-9eE+.-]/u.test(source[end] || '')) end += 1;
+          const token = source.slice(index, end);
+          if (browserNumberReason(token)) return token;
+          index = end - 1;
+        }
+      }
+      return '';
+    }
+
+    function findDuplicateJSONKey(source) {
+      let index = 0;
+      let duplicate = '';
+      const whitespace = () => { while (/\s/u.test(source[index] || '')) index += 1; };
+      const stringValue = () => {
+        const start = index;
+        index += 1;
+        let escaped = false;
+        while (index < source.length) {
+          const character = source[index++];
+          if (escaped) escaped = false;
+          else if (character === '\\') escaped = true;
+          else if (character === '"') return JSON.parse(source.slice(start, index));
+        }
+        throw new Error('unterminated string');
+      };
+      const value = (path = '') => {
+        whitespace();
+        if (source[index] === '{') {
+          index += 1;
+          const keys = new Set();
+          whitespace();
+          while (source[index] !== '}') {
+            if (source[index] !== '"') throw new Error('object key required');
+            const key = stringValue();
+            const keyPath = path ? `${path}.${key}` : key;
+            if (keys.has(key) && !duplicate) duplicate = keyPath;
+            keys.add(key);
+            whitespace();
+            if (source[index++] !== ':') throw new Error('colon required');
+            value(keyPath);
+            whitespace();
+            if (source[index] === ',') { index += 1; whitespace(); continue; }
+            if (source[index] !== '}') throw new Error('object delimiter required');
+          }
+          index += 1;
+          return;
+        }
+        if (source[index] === '[') {
+          index += 1;
+          whitespace();
+          while (source[index] !== ']') {
+            value(path);
+            whitespace();
+            if (source[index] === ',') { index += 1; whitespace(); continue; }
+            if (source[index] !== ']') throw new Error('array delimiter required');
+          }
+          index += 1;
+          return;
+        }
+        if (source[index] === '"') { stringValue(); return; }
+        while (index < source.length && !/[\s,}\]]/u.test(source[index])) index += 1;
+      };
+      try {
+        value();
+        whitespace();
+        return index === source.length ? duplicate : '';
+      } catch {
+        return '';
+      }
+    }
+
+    function renderCustomFieldRow(componentID, key, value, list, errorTarget, readOnly) {
+      const row = document.createElement('div');
+      row.className = 'custom-field';
+      const keyInput = document.createElement('input');
+      keyInput.value = key;
+      keyInput.placeholder = 'field_name';
+      keyInput.setAttribute('aria-label', `${componentID} custom field name`);
+      const type = document.createElement('select');
+      type.setAttribute('aria-label', `${componentID} ${key} JSON value type`);
+      for (const name of ['string', 'number', 'boolean', 'null', 'array', 'object']) type.append(new Option(name, name));
+      type.value = fieldValueType(value);
+      let valueInput = type.value === 'array' || type.value === 'object' ? document.createElement('textarea') : document.createElement('input');
+      const setValueControl = () => {
+        const next = type.value === 'array' || type.value === 'object' ? document.createElement('textarea') : document.createElement('input');
+        next.setAttribute('aria-label', `${componentID} ${keyInput.value || 'custom field'} value`);
+        if (type.value === 'boolean') {
+          next.setAttribute('list', 'booleanValues');
+          next.value = 'false';
+        } else if (type.value === 'null') {
+          next.value = 'null';
+          next.readOnly = true;
+        } else next.value = type.value === 'string' ? '' : type.value === 'number' ? '0' : type.value === 'array' ? '[]' : '{}';
+        next.disabled = readOnly;
+        valueInput.replaceWith(next);
+        valueInput = next;
+        valueInput.addEventListener('change', apply);
+      };
+      valueInput.setAttribute('aria-label', `${componentID} ${key} value`);
+      valueInput.value = fieldText(value, type.value);
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'button tertiary';
+      remove.textContent = 'Remove';
+      remove.setAttribute('aria-label', `Remove ${key} from ${componentID}`);
+      const apply = () => {
+        try {
+          const nextKey = keyInput.value.trim();
+          const keyReason = componentKeyReason(nextKey);
+          if (keyReason) throw new Error(keyReason);
+          const candidate = cloneDocument(state.componentDocuments[componentID]);
+          if (nextKey !== key && Object.hasOwn(candidate, nextKey)) throw new Error('That field name already exists.');
+          if (nextKey !== key) delete candidate[key];
+          candidate[nextKey] = parseFieldText(type.value, valueInput.value);
+          if (setComponentDocument(componentID, candidate, errorTarget)) {
+            key = nextKey;
+            renderComponentEditors();
+          }
+        } catch (error) {
+          errorTarget.textContent = `Component ${componentID}, key ${keyInput.value.trim() || '(empty)'}: ${error.message} The last valid document is retained.`;
+          errorTarget.hidden = false;
+        }
+      };
+      keyInput.addEventListener('change', apply);
+      type.addEventListener('change', () => { setValueControl(); apply(); });
+      valueInput.addEventListener('change', apply);
+      remove.addEventListener('click', () => {
+        const candidate = cloneDocument(state.componentDocuments[componentID]);
+        delete candidate[key];
+        if (setComponentDocument(componentID, candidate, errorTarget)) renderComponentEditors();
+      });
+      for (const control of [keyInput, type, valueInput, remove]) control.disabled = readOnly;
+      row.append(keyInput, type, valueInput, remove);
+      list.append(row);
+    }
+
+    function renderComponentEditor(id, allowed) {
+      const module = moduleByID(id);
+      if (!module) throw new Error(`The catalog component ${id} is unavailable.`);
+      if (!state.componentDocuments[id]) state.componentDocuments[id] = defaultComponentDocument(id);
+      const selected = state.selectedComponentIds.includes(id);
+      const readOnly = !canBuildWorkspace();
+      const card = document.createElement('article');
+      card.className = 'component-editor';
+      card.dataset.componentId = id;
+      card.setAttribute('aria-disabled', String(readOnly));
+      const head = document.createElement('div');
+      head.className = 'component-head';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.name = 'selectedModule';
+      checkbox.value = id;
+      checkbox.checked = selected;
+      checkbox.disabled = readOnly;
+      checkbox.setAttribute('aria-label', `Include ${String(module.title || id)} component`);
+      const copy = document.createElement('div');
+      const strong = document.createElement('strong');
+      strong.textContent = String(module.title || id);
+      const small = document.createElement('small');
+      small.textContent = `One curated instance · ${id}. JSON supplies escaped content only.`;
+      copy.append(strong, small);
+      const code = document.createElement('code');
+      code.textContent = `id = type = ${id}`;
+      head.append(checkbox, copy, code);
+      const fields = document.createElement('div');
+      fields.className = 'component-fields';
+      fields.hidden = !selected;
+      const error = document.createElement('p');
+      error.className = 'component-error';
+      error.id = `component-error-${id}`;
+      error.setAttribute('role', 'alert');
+      error.hidden = true;
+      const declared = Array.isArray(module.documentFields) ? module.documentFields : [];
+      for (const descriptor of declared) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'field';
+        const label = document.createElement('label');
+        label.textContent = String(descriptor.label || descriptor.key);
+        const control = descriptor.key === 'summary' ? document.createElement('textarea') : document.createElement('input');
+        control.value = String(state.componentDocuments[id][descriptor.key] ?? '');
+        control.maxLength = Number(descriptor.maxLength || 2048);
+        control.required = Boolean(descriptor.required);
+        control.disabled = readOnly;
+        control.setAttribute('aria-describedby', `${error.id}`);
+        label.append(control);
+        const help = document.createElement('div');
+        help.className = 'field-help';
+        help.textContent = String(descriptor.description || 'Plain text rendered through the curated component slot.');
+        wrapper.append(label, help);
+        control.addEventListener('input', () => {
+          const candidate = cloneDocument(state.componentDocuments[id]);
+          candidate[descriptor.key] = control.value;
+          setComponentDocument(id, candidate, error);
+        });
+        fields.append(wrapper);
+      }
+      const customTitle = document.createElement('strong');
+      customTitle.textContent = 'Custom reference fields';
+      const customHelp = document.createElement('div');
+      customHelp.className = 'field-help';
+      customHelp.textContent = 'Add bounded JSON values. Unknown keys render as escaped reference data; security and authority names are rejected.';
+      const customList = document.createElement('div');
+      customList.className = 'custom-field-list';
+      const declaredKeys = new Set(declared.map((field) => field.key));
+      for (const [key, value] of Object.entries(state.componentDocuments[id]).filter(([key]) => !declaredKeys.has(key))) renderCustomFieldRow(id, key, value, customList, error, readOnly);
+      const tools = document.createElement('div');
+      tools.className = 'component-tools';
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'button tertiary';
+      add.textContent = 'Add custom field';
+      add.disabled = readOnly;
+      add.addEventListener('click', () => {
+        const candidate = cloneDocument(state.componentDocuments[id]);
+        let index = 1;
+        while (Object.hasOwn(candidate, `custom_${index}`)) index += 1;
+        candidate[`custom_${index}`] = '';
+        if (setComponentDocument(id, candidate, error)) renderComponentEditors();
+      });
+      tools.append(add);
+      const advanced = document.createElement('details');
+      advanced.className = 'advanced-document';
+      const summary = document.createElement('summary');
+      summary.textContent = 'Advanced JSON document';
+      const jsonInput = document.createElement('textarea');
+      jsonInput.value = JSON.stringify(state.componentDocuments[id], null, 2);
+      jsonInput.disabled = readOnly;
+      jsonInput.setAttribute('aria-label', `${id} advanced JSON document`);
+      const applyJSON = document.createElement('button');
+      applyJSON.type = 'button';
+      applyJSON.className = 'button tertiary';
+      applyJSON.textContent = 'Apply valid JSON';
+      applyJSON.disabled = readOnly;
+      applyJSON.addEventListener('click', () => {
+        try {
+          const candidate = parseCanonicalJSONText(jsonInput.value);
+          if (setComponentDocument(id, candidate, error)) renderComponentEditors();
+        } catch (parseError) {
+          error.textContent = `Component ${id}: invalid JSON (${parseError.message}). The last valid document is retained.`;
+          error.hidden = false;
+        }
+      });
+      advanced.append(summary, jsonInput, applyJSON);
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          if (!state.selectedComponentIds.includes(id)) state.selectedComponentIds.push(id);
+        } else state.selectedComponentIds = state.selectedComponentIds.filter((entry) => entry !== id);
+        saveComponentDraft();
+        renderComponentEditors();
+        markPreviewDirty();
+      });
+      fields.append(error, customTitle, customHelp, customList, tools, advanced);
+      card.append(head, fields);
+      return card;
+    }
+
+    function renderComponentEditors() {
       const template = selectedTemplate();
       const moduleList = element('moduleList');
       moduleList.replaceChildren();
-      if (!template) return;
-      const version = String(template.version || template.template?.version || '1.0.0');
+      if (!template) {
+        element('templateTitle').textContent = 'Choose a template';
+        element('templateDescription').textContent = 'Select one approved server catalog template before choosing components.';
+        element('templateBadge').textContent = state.templates.length ? 'Selection required' : 'Loading';
+        element('templateMeta').replaceChildren();
+        element('moduleCount').textContent = 'Choose a template';
+        state.templateReady = false;
+        updatePreviewAvailability();
+        return;
+      }
+      const version = String(template.version || template.template?.version);
       const allowed = Array.isArray(template.allowedModules) ? template.allowedModules : [];
-      const defaults = state.selectedTemplateId === DEFAULT_TEMPLATE_ID ? DEFAULT_MODULE_IDS : allowed;
-      element('templateTitle').textContent = String(template.title || state.selectedTemplateId);
-      element('templateDescription').textContent = String(template.description || 'Curated Taawun template.');
-      element('templateBadge').textContent = `Ready · v${version}`;
+      element('templateTitle').textContent = String(template.title);
+      element('templateDescription').textContent = String(template.description);
+      if (state.catalogHealthy) element('templateBadge').textContent = `Ready · v${version}`;
       element('templateMeta').replaceChildren();
-      for (const value of [state.selectedTemplateId, 'Fixed server template', `${allowed.length} approved modules`]) {
+      for (const value of [state.selectedTemplateId, 'Curated server template', `${allowed.length} allowed components`]) {
         const span = document.createElement('span');
         span.textContent = value;
         element('templateMeta').append(span);
       }
-      element('moduleCount').textContent = `${allowed.length} approved modules`;
-      for (const id of allowed) {
-        const module = state.modules.find((entry) => entry.id === id) || { id, title: id };
-        const label = document.createElement('label');
-        label.className = 'module-option';
-        const input = document.createElement('input');
-        input.type = 'checkbox';
-        input.name = 'selectedModule';
-        input.value = id;
-        input.checked = defaults.includes(id);
-        const copy = document.createElement('span');
-        const strong = document.createElement('strong');
-        strong.textContent = String(module.title || id);
-        const small = document.createElement('small');
-        const classifications = Array.isArray(module.dataClassifications) ? module.dataClassifications.join(', ') : 'curated module';
-        small.textContent = classifications;
-        copy.append(strong, small);
-        const code = document.createElement('code');
-        code.textContent = Array.isArray(module.allowedServerSignals) && module.allowedServerSignals.length ? 'server adapter' : 'browser';
-        label.append(input, copy, code);
-        moduleList.append(label);
-      }
-      state.templateReady = true;
-      markPreviewDirty();
+      state.selectedComponentIds = state.selectedComponentIds.filter((id) => allowed.includes(id));
+      element('moduleCount').textContent = `${state.selectedComponentIds.length} selected · ${allowed.length} allowed`;
+      for (const id of allowed) moduleList.append(renderComponentEditor(id, allowed));
+      state.templateReady = state.catalogHealthy;
       updatePreviewAvailability();
     }
 
+    function applyTemplateSelection(templateID, { markDirty = true } = {}) {
+      const priorTemplateID = state.selectedTemplateId;
+      const priorSelected = [...state.selectedComponentIds];
+      const priorDocuments = cloneDocument(state.componentDocuments);
+      if (priorTemplateID) saveComponentDraft();
+      state.selectedTemplateId = templateID;
+      const template = selectedTemplate();
+      const allowed = new Set(Array.isArray(template && template.allowedModules) ? template.allowedModules : []);
+      const saved = readComponentDraft(templateID);
+      state.selectedComponentIds = saved ? saved.selected.filter((id) => allowed.has(id)) : priorSelected.filter((id) => allowed.has(id));
+      state.componentDocuments = saved ? cloneDocument(saved.documents) : Object.fromEntries(Object.entries(priorDocuments).filter(([id]) => allowed.has(id)));
+      state.pendingTemplateId = '';
+      element('templateSelect').value = templateID;
+      element('templateReconcile').hidden = true;
+      renderComponentEditors();
+      saveComponentDraft();
+      if (markDirty) markPreviewDirty();
+    }
+
+    function requestTemplateSelection(templateID) {
+      if (!templateID || templateID === state.selectedTemplateId) {
+        element('templateSelect').value = state.selectedTemplateId;
+        return;
+      }
+      if (!state.selectedTemplateId) {
+        applyTemplateSelection(templateID);
+        return;
+      }
+      const next = state.templates.find((template) => String(template.id || template.template?.id || '') === templateID);
+      const allowed = new Set(Array.isArray(next && next.allowedModules) ? next.allowedModules : []);
+      const incompatible = state.selectedComponentIds.filter((id) => !allowed.has(id));
+      if (!incompatible.length) {
+        applyTemplateSelection(templateID);
+        return;
+      }
+      state.pendingTemplateId = templateID;
+      element('templateSelect').value = state.selectedTemplateId;
+      element('templateReconcileMessage').textContent = `${incompatible.join(', ')} cannot run in ${String(next && next.title || templateID)}. Apply keeps their documents in the current template's session draft and carries only compatible components; cancel changes nothing.`;
+      element('templateReconcile').hidden = false;
+      element('applyTemplateSwitch').focus();
+    }
+
+    function validateCatalogContract(templates, modules, policy) {
+      const numericFields = ['maxComponentBytes', 'maxTotalBytes', 'maxDepth', 'maxKeyBytes', 'maxObjectFields', 'maxArrayItems', 'maxTotalKeys', 'maxStringRunes', 'maxNumberBytes'];
+      if (!policy || policy.rootType !== 'object' || !String(policy.contractVersion || '') || !String(policy.stableIdRule || '')
+        || !String(policy.keyGrammar || '') || !String(policy.numberFormat || '')
+        || !Array.isArray(policy.allowedValueTypes) || !['null', 'boolean', 'number', 'string', 'array', 'object'].every((type) => policy.allowedValueTypes.includes(type))
+        || !Array.isArray(policy.reservedKeyParts) || !policy.reservedKeyParts.length
+        || numericFields.some((field) => !Number.isInteger(policy[field]) || policy[field] <= 0)) {
+        throw new Error('The component document policy is incomplete. Retry the real catalog before editing or building.');
+      }
+      const moduleMap = new Map();
+      for (const module of modules) {
+        if (!module || !/^[a-z][a-z0-9-]*$/u.test(String(module.id || '')) || !String(module.title || '').trim() || moduleMap.has(module.id)
+          || !Array.isArray(module.documentFields) || !module.documentFields.length || !module.defaultDocument || Array.isArray(module.defaultDocument) || typeof module.defaultDocument !== 'object') {
+          throw new Error('The component module catalog is incomplete or duplicated.');
+        }
+        const fieldKeys = new Set();
+        for (const descriptor of module.documentFields) {
+          if (!descriptor || componentKeyReason(String(descriptor.key || ''), policy) || fieldKeys.has(descriptor.key)
+            || !String(descriptor.label || '').trim() || !String(descriptor.description || '').trim() || !policy.allowedValueTypes.includes(descriptor.valueType)
+            || typeof descriptor.required !== 'boolean' || (descriptor.valueType === 'string' && (!Number.isInteger(descriptor.maxLength) || descriptor.maxLength <= 0))) {
+            throw new Error(`The declared component fields for ${module.id} are incomplete.`);
+          }
+          fieldKeys.add(descriptor.key);
+        }
+        validateComponentDocumentAgainst(module.id, module.defaultDocument, module, policy);
+        moduleMap.set(module.id, module);
+      }
+      const templateIDs = new Set();
+      for (const template of templates) {
+        const id = String(template && (template.id || template.template?.id) || '');
+        if (!id || templateIDs.has(id) || !String(template.title || '').trim() || !String(template.description || '').trim()
+          || !String(template.version || template.template?.version || '').trim()
+          || !Array.isArray(template.allowedModules) || !template.allowedModules.length || template.allowedModules.some((moduleID) => !moduleMap.has(moduleID))) {
+          throw new Error('A template references an incomplete or unknown component contract.');
+        }
+        templateIDs.add(id);
+      }
+    }
+
     async function loadCatalog() {
+      const catalogEpoch = ++state.catalogEpoch;
+      const sessionEpoch = state.sessionEpoch;
       state.templateReady = false;
+      state.catalogHealthy = false;
       element('templateBadge').textContent = 'Loading';
       element('templateDescription').textContent = 'Checking the approved template catalog…';
       element('retryTemplate').hidden = true;
       element('templateSelect').disabled = true;
       try {
         const [templatePayload, modulePayload] = await Promise.all([api('/templates'), api('/modules')]);
-        state.templates = normalizeCollection(templatePayload, 'templates');
-        state.modules = normalizeCollection(modulePayload, 'modules');
-        if (!state.templates.length || !state.modules.length) throw new Error('The approved catalog is empty.');
+        if (!currentSession(sessionEpoch) || catalogEpoch !== state.catalogEpoch) return;
+        const templates = normalizeCollection(templatePayload, 'templates');
+        const modules = normalizeCollection(modulePayload, 'modules');
+        const policy = modulePayload && typeof modulePayload === 'object' ? modulePayload.componentDocumentPolicy || null : null;
+        if (!templates.length || !modules.length) throw new Error('The approved catalog is empty.');
+        validateCatalogContract(templates, modules, policy);
+        state.templates = templates;
+        state.modules = modules;
+        state.componentPolicy = policy;
+        state.catalogHealthy = true;
         const select = element('templateSelect');
-        select.replaceChildren();
+        select.replaceChildren(new Option('Choose a real template…', ''));
         for (const template of state.templates) {
           const id = String(template.id || template.template?.id || '');
           if (!id) continue;
@@ -1326,15 +1943,26 @@
           option.textContent = String(template.title || id);
           select.append(option);
         }
-        if (![...select.options].some((option) => option.value === state.selectedTemplateId)) state.selectedTemplateId = select.options[0]?.value || '';
+        if (!state.selectedTemplateId) {
+          try { state.selectedTemplateId = sessionStorage.getItem(draftSelectionKey()) || ''; } catch {}
+        }
+        if (state.selectedTemplateId && ![...select.options].some((option) => option.value === state.selectedTemplateId)) state.selectedTemplateId = '';
         select.value = state.selectedTemplateId;
-        select.disabled = false;
+        select.disabled = !currentWorkspaceID();
         element('templateCatalogCount').textContent = `${state.templates.length} real templates · ${state.modules.length} real modules from the approved catalog.`;
-        renderSelectedTemplate();
+        if (state.selectedTemplateId) {
+          const saved = readComponentDraft(state.selectedTemplateId);
+          if (saved) {
+            state.selectedComponentIds = [...saved.selected];
+            state.componentDocuments = cloneDocument(saved.documents);
+          }
+        }
+        renderComponentEditors();
       } catch (error) {
-        element('templateBadge').textContent = 'Unavailable';
+        if (!currentSession(sessionEpoch) || catalogEpoch !== state.catalogEpoch) return;
+        element('templateBadge').textContent = state.templates.length ? 'Refresh failed · draft preserved' : 'Unavailable';
         element('templateDescription').textContent = error.message || 'Could not load the template catalog.';
-        element('templateCatalogCount').textContent = 'Catalog unavailable. Retry without losing the workspace selection.';
+        element('templateCatalogCount').textContent = 'Catalog unavailable or incomplete. Retry without losing the last valid workspace-scoped draft.';
         element('retryTemplate').hidden = false;
       } finally {
         updatePreviewAvailability();
@@ -1344,7 +1972,7 @@
     function updatePreviewAvailability() {
       const hasWorkspace = state.workspacesReady && element('workspaceSelect').options.length > 0;
       const allowed = hasWorkspace && canBuildWorkspace();
-      element('previewButton').disabled = state.building || !state.templateReady || !allowed;
+      element('previewButton').disabled = state.building || !state.templateReady || !selectedModules().length || !allowed;
       element('previewButton').title = hasWorkspace && !canBuildWorkspace() ? 'Viewer access is read-only. Ask an Architect for Maintainer access.' : '';
     }
 
@@ -1387,7 +2015,31 @@
     }
 
     function selectedModules() {
-      return [...document.querySelectorAll('#moduleList input[name="selectedModule"]:checked')].map((input) => input.value);
+      const template = selectedTemplate();
+      const allowed = Array.isArray(template && template.allowedModules) ? template.allowedModules : [];
+      return allowed.filter((id) => state.selectedComponentIds.includes(id));
+    }
+
+    function selectedComponents() {
+      return selectedModules().map((id) => ({ id, type: id, data: validateComponentDocument(id, state.componentDocuments[id]) }));
+    }
+
+    function canonicalClientValue(value) {
+      if (Array.isArray(value)) return value.map(canonicalClientValue);
+      if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalClientValue(value[key])]));
+      return value;
+    }
+
+    function currentDraftFingerprint(payload = null) {
+      try { return JSON.stringify(canonicalClientValue(payload || buildPayload())); } catch { return `invalid:${state.draftRevision}`; }
+    }
+
+    function draftMarker(payload = null) {
+      return { revision: state.draftRevision, fingerprint: currentDraftFingerprint(payload) };
+    }
+
+    function currentDraft(marker) {
+      return marker && marker.revision === state.draftRevision && marker.fingerprint === currentDraftFingerprint();
     }
 
     function buildPayload() {
@@ -1402,6 +2054,7 @@
         templateId: state.selectedTemplateId,
         theme: { accentColor: element('accentColor').value.toUpperCase() },
         modules: selectedModules(),
+        components: selectedComponents(),
         requestedOrigins: {
           surfaces: state.domainOrigin ? [window.location.origin, state.domainOrigin] : [],
           embedders: [], connections: [], resources: [],
@@ -1412,8 +2065,17 @@
     function validateBuilder() {
       if (!element('builderForm').reportValidity()) return false;
       if (!selectedModules().length) {
-        setNotice(element('builderAlert'), 'Choose at least one approved module.', 'error');
+        setNotice(element('builderAlert'), 'Choose at least one approved component.', 'error');
         document.querySelector('#moduleList input[name="selectedModule"]')?.focus();
+        return false;
+      }
+      try {
+        const components = selectedComponents();
+        const totalBytes = components.reduce((sum, component) => sum + new TextEncoder().encode(JSON.stringify(component.data)).length, 0);
+        if (!state.componentPolicy || !Number.isInteger(state.componentPolicy.maxTotalBytes)) throw new Error('The component document policy is unavailable. Retry the real catalog.');
+        if (totalBytes > state.componentPolicy.maxTotalBytes) throw new Error(`Selected component documents exceed ${state.componentPolicy.maxTotalBytes} bytes.`);
+      } catch (error) {
+        setNotice(element('builderAlert'), `${error.message || 'A component document is invalid'} The last valid component documents remain available.`, 'error');
         return false;
       }
       if (!Number.isInteger(Number(element('workspaceSelect').value)) || Number(element('workspaceSelect').value) <= 0) {
@@ -1431,33 +2093,48 @@
       return url.href;
     }
 
-    async function readPreviewFile(url) {
+    function requirePreviewGuard(requestGuard) {
+      if (!requestGuard()) throw new StaleWorkspaceView();
+    }
+
+    async function readPreviewFile(url, requestGuard) {
+      requirePreviewGuard(requestGuard);
       const response = await fetch(url, {
         headers: { Authorization: `Bearer ${state.token}` },
         credentials: 'same-origin',
       });
+      requirePreviewGuard(requestGuard);
       const body = await response.text();
+      requirePreviewGuard(requestGuard);
       if (!response.ok) throw new Error(body || 'The preview file could not be loaded.');
       return body;
     }
 
-    async function loadPreviewFrame(frame, preview) {
+    async function loadPreviewFrame(frame, preview, requestGuard, beforeCommit) {
+      requirePreviewGuard(requestGuard);
       const [document, theme, styles] = await Promise.all([
-        readPreviewFile(preview.documentUrl),
-        readPreviewFile(preview.themeUrl),
-        readPreviewFile(preview.stylesUrl),
+        readPreviewFile(preview.documentUrl, requestGuard),
+        readPreviewFile(preview.themeUrl, requestGuard),
+        readPreviewFile(preview.stylesUrl, requestGuard),
       ]);
+      requirePreviewGuard(requestGuard);
       const runtimeTag = document.match(/<script type="module" src="([^"]+)"[^>]*><\/script>/);
       if (!runtimeTag) throw new Error('The preview does not declare its approved runtime.');
+      requirePreviewGuard(requestGuard);
       const runtimeResponse = await fetch(runtimeTag[1], { credentials: 'same-origin' });
+      requirePreviewGuard(requestGuard);
       if (!runtimeResponse.ok) throw new Error('The approved preview runtime could not be loaded.');
       const runtime = await runtimeResponse.text();
+      requirePreviewGuard(requestGuard);
       const inlineStyles = `<style>${theme}\n${styles}</style>`;
       const source = document
         .replace(/<meta http-equiv="Content-Security-Policy"[^>]*>\s*/, '')
         .replace(/<link rel="stylesheet" href="\.\/theme\.css">/, '')
         .replace(/<link rel="stylesheet" href="\.\/app\.css">/, () => inlineStyles)
         .replace(runtimeTag[0], () => `<script type="module">${runtime}<${'/script>'}`);
+      requirePreviewGuard(requestGuard);
+      beforeCommit();
+      requirePreviewGuard(requestGuard);
       frame.removeAttribute('src');
       frame.srcdoc = source;
     }
@@ -1500,7 +2177,18 @@
       return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
     }
 
-    async function verifiedManifestReceipt(source, verification) {
+    function exactSubmittedComponentsMatch(components, expectedComponents) {
+      if (expectedComponents === undefined) return true;
+      if (!Array.isArray(components) || !Array.isArray(expectedComponents) || components.length !== expectedComponents.length) return false;
+      const project = (entries) => entries.map((component) => ({
+        id: String(component && component.id || ''),
+        type: String(component && component.type || ''),
+        data: canonicalClientValue(component && component.data),
+      })).sort((left, right) => left.id.localeCompare(right.id));
+      return JSON.stringify(project(components)) === JSON.stringify(project(expectedComponents));
+    }
+
+    async function verifiedManifestReceipt(source, verification, expectedComponents) {
       if (!verification || verification.verified !== true || verification.status !== 'verified'
         || typeof verification.manifestJson !== 'string' || !/^[0-9a-f]{64}$/.test(verification.manifestDigest || '')) {
         return { active: false, attested: false, expired: false };
@@ -1526,8 +2214,24 @@
         && verification.signerKeyId === signature.keyId
         && verification.signatureValue === signature.value
         && Boolean(signature.value);
+      let componentsMatch = true;
+      if (source.contractVersion === 'taawun.artifact/v2') {
+        const components = Array.isArray(source.components) ? source.components : [];
+        const moduleIDs = Array.isArray(source.modules) ? source.modules.map((module) => String(module && module.id || module)).sort() : [];
+        const componentIDs = components.map((component) => String(component && component.id || '')).sort();
+        componentsMatch = components.length > 0 && JSON.stringify(moduleIDs) === JSON.stringify(componentIDs);
+        for (const component of components) {
+          if (!componentsMatch || !component || component.id !== component.type || !component.data || Array.isArray(component.data) || typeof component.data !== 'object'
+            || component.documentPath !== `components/${component.id}.json` || !/^[0-9a-f]{64}$/.test(component.documentSha256 || '')
+            || await sha256Hex(JSON.stringify(component.data)) !== component.documentSha256) {
+            componentsMatch = false;
+            break;
+          }
+        }
+        if (componentsMatch && !exactSubmittedComponentsMatch(components, expectedComponents)) componentsMatch = false;
+      } else if (expectedComponents !== undefined) componentsMatch = false;
       const expiry = Date.parse(authorization.expiresAt || '');
-      if (!fieldsMatch || !Number.isFinite(expiry)) return { active: false, attested: false, expired: false };
+      if (!fieldsMatch || !componentsMatch || !Number.isFinite(expiry)) return { active: false, attested: false, expired: false };
       const expired = expiry <= Date.now();
       return { active: !expired, attested: true, expired };
     }
@@ -1559,14 +2263,13 @@
       return `${summary} · Reference-only; not scholar approval`;
     }
 
-    async function renderManifest(manifest, verification) {
-      const list = element('manifestList');
-      list.replaceChildren();
+    async function prepareManifest(manifest, verification, expectedComponents) {
+      const list = document.createDocumentFragment();
       const source = manifest && typeof manifest === 'object' ? manifest : { manifest };
       const authorization = source.authorization && typeof source.authorization === 'object' ? source.authorization : {};
       const subject = authorization.subject && typeof authorization.subject === 'object' ? authorization.subject : {};
       const signature = source.signature && typeof source.signature === 'object' ? source.signature : {};
-      const receipt = await verifiedManifestReceipt(source, verification);
+      const receipt = await verifiedManifestReceipt(source, verification, expectedComponents);
       appendManifestRow(list, 'Contract', source.contractVersion);
       appendManifestRow(list, 'Artifact', source.artifactId);
       appendManifestRow(list, 'Content hash', source.contentHash);
@@ -1583,22 +2286,143 @@
       appendManifestRow(list, 'Exact allowed origins', manifestOrigins(authorization.allowedOrigins));
       appendManifestRow(list, 'Template', source.template && (source.template.id ? `${source.template.id} · v${source.template.version || '?'}` : source.template));
       appendManifestRow(list, 'Modules', source.modules);
+      const components = Array.isArray(source.components) ? source.components : [];
+      appendManifestRow(list, 'Component documents', components.length
+        ? components.map((component) => `${component.id} · ${component.documentSha256 || 'digest unavailable'}`).join(', ')
+        : 'Legacy artifact · component documents not listed');
       appendManifestRow(list, 'Render modes', source.renderModes);
       appendManifestRow(list, 'Compliance', source.compliance && (source.compliance.status || source.compliance));
       appendManifestRow(list, 'Review references', manifestReviewReferences(source.compliance));
       appendManifestRow(list, 'Financial', source.financial && (source.financial.status || source.financial));
+      return { list, raw: JSON.stringify(source, null, 2) };
+    }
+
+    function commitPreparedManifest(prepared) {
+      element('manifestList').replaceChildren(prepared.list);
       element('manifestEmpty').hidden = true;
-      list.hidden = false;
-      element('rawManifest').textContent = JSON.stringify(source, null, 2);
+      element('manifestList').hidden = false;
+      element('rawManifest').textContent = prepared.raw;
       element('rawManifestDetails').hidden = false;
+    }
+
+    function previewFiles(result) {
+      const previewURL = safePreviewURL(result && result.previewUrl);
+      const preview = result && result.preview && typeof result.preview === 'object'
+        ? { ...result.preview }
+        : { documentUrl: previewURL, themeUrl: '', stylesUrl: '' };
+      preview.documentUrl = safePreviewURL(preview.documentUrl || previewURL);
+      preview.themeUrl = safePreviewURL(preview.themeUrl);
+      preview.stylesUrl = safePreviewURL(preview.stylesUrl);
+      return preview;
+    }
+
+    function manifestComponentDocuments(manifest) {
+      const components = Array.isArray(manifest && manifest.components) ? manifest.components : [];
+      if (!components.length) throw new Error('This legacy track has no signed component documents to restore.');
+      const documents = {};
+      for (const component of components) {
+        if (!component || component.id !== component.type || !component.data || typeof component.data !== 'object' || Array.isArray(component.data)) throw new Error('The signed component document relationship is incomplete.');
+        documents[component.id] = validateComponentDocument(component.id, component.data);
+      }
+      return { ids: components.map((component) => component.id), documents };
+    }
+
+    async function applyVerifiedPreview(result, requestGuard, { restoreDraft = false, requireActive = true, expectedComponents } = {}) {
+      if (!result || !result.manifest || typeof result.manifest !== 'object') throw new Error('The build did not return an artifact manifest.');
+      const receipt = await verifiedManifestReceipt(result.manifest, result.verification, expectedComponents);
+      requirePreviewGuard(requestGuard);
+      if (!receipt.active && requireActive) throw new Error(receipt.expired ? 'The signed track authorization has expired.' : 'The signed track receipt could not be verified.');
+      if (!receipt.active) {
+        state.previewReady = false;
+        state.track = null;
+        const retained = Boolean(element('previewFrame').srcdoc);
+        if (retained) element('previewFrame').dataset.stale = 'true';
+        setPreviewState('error', receipt.expired ? 'Signed authorization expired' : 'Verification unavailable');
+        element('buildStateText').textContent = retained ? 'Unverified result · trusted preview and receipt retained' : 'Artifact evidence is not verified';
+        element('deployStateText').textContent = 'Not ready · active verification required';
+        updateDeploymentAvailability();
+        return false;
+      }
+      if (Number(result.manifest.workspaceId) !== currentWorkspaceID()) throw new Error('The signed track belongs to another workspace.');
+      const templateID = String(result.manifest.template && result.manifest.template.id || '');
+      if (!state.templates.some((template) => String(template.id || template.template?.id || '') === templateID)) throw new Error('The signed track template is not in the current approved catalog.');
+      const restored = restoreDraft ? manifestComponentDocuments(result.manifest) : null;
+      const preview = previewFiles(result);
+      const frame = element('previewFrame');
+      const preparedManifest = await prepareManifest(result.manifest, result.verification, expectedComponents);
+      requirePreviewGuard(requestGuard);
+      await loadPreviewFrame(frame, preview, requestGuard, () => commitPreparedManifest(preparedManifest));
+      requirePreviewGuard(requestGuard);
+      state.track = result.track || null;
+      if (!state.track || !state.track.id) throw new Error('The build did not return a composition track.');
+      if (restoreDraft) {
+        state.selectedTemplateId = templateID;
+        state.selectedComponentIds = restored.ids;
+        state.componentDocuments = restored.documents;
+        state.draftRevision += 1;
+        element('templateSelect').value = templateID;
+        renderComponentEditors();
+        saveComponentDraft();
+      }
+      frame.title = `${element('appName').value.trim() || 'Taawun'} verified staging preview`;
+      frame.hidden = false;
+      frame.dataset.stale = 'false';
+      element('previewEmpty').hidden = true;
+      state.previewReady = true;
+      setPreviewState('ready', 'Verified staging ready');
+      element('buildStateText').textContent = 'Preview ready · review required';
+      element('deployStateText').textContent = 'Ready for review';
+      element('deployStateHelp').textContent = 'Inspect the staging app, exact signed component documents, references, and trust boundary. Publication remains review-gated.';
+      element('previewButton').textContent = 'Refresh staging preview';
+      setLifecycle(2);
+    }
+
+    async function loadVerifiedTrack() {
+      const trackID = element('trackLookup').value.trim();
+      if (!/^track_[A-Za-z0-9_-]+$/.test(trackID)) {
+        setNotice(element('builderAlert'), 'Enter a valid track ID before reloading.', 'error');
+        element('trackLookup').focus();
+        return;
+      }
+      const sessionEpoch = state.sessionEpoch;
+      const workspaceEpoch = state.workspaceEpoch;
+      const workspaceID = currentWorkspaceID();
+      const previewEpoch = ++state.previewEpoch;
+      const marker = draftMarker();
+      const operationCurrent = () => currentSession(sessionEpoch) && workspaceEpoch === state.workspaceEpoch && workspaceID === currentWorkspaceID() && previewEpoch === state.previewEpoch;
+      const guard = () => operationCurrent() && currentDraft(marker);
+      setBusy(element('loadTrackButton'), true, 'Verifying…', 'Reload verified preview');
+      setNotice(element('builderAlert'), 'Loading and verifying the signed track without replacing your current draft…', 'gold');
+      try {
+        const result = await api(`/conductor/tracks/${encodeURIComponent(trackID)}?includeVerifiedPreview=true`);
+        if (!guard()) return;
+        await applyVerifiedPreview(result, guard, { restoreDraft: true });
+        setNotice(element('builderAlert'), 'Verified track restored with its exact signed component documents. Viewer access remains read-only.', 'success');
+      } catch (error) {
+        if (!operationCurrent()) return;
+        const frame = element('previewFrame');
+        if (!frame.srcdoc) element('previewEmpty').hidden = false;
+        setPreviewState('error', frame.srcdoc ? 'Last verified preview retained' : 'Track unavailable');
+        setNotice(element('builderAlert'), `${error.message || 'The verified track could not be restored'} Your last valid draft and last verified preview were not replaced.`, 'error');
+      } finally {
+        if (operationCurrent()) setBusy(element('loadTrackButton'), false, 'Verifying…', 'Reload verified preview');
+      }
     }
 
     async function createPreview(event) {
       event.preventDefault();
       setNotice(element('builderAlert'), '');
       if (!validateBuilder()) return;
+      saveComponentDraft();
+      const payload = buildPayload();
+      const sessionEpoch = state.sessionEpoch;
+      const workspaceEpoch = state.workspaceEpoch;
+      const workspaceID = currentWorkspaceID();
+      const previewEpoch = ++state.previewEpoch;
+      const marker = draftMarker(payload);
+      const operationCurrent = () => currentSession(sessionEpoch) && workspaceEpoch === state.workspaceEpoch && workspaceID === currentWorkspaceID() && previewEpoch === state.previewEpoch;
+      const guard = () => operationCurrent() && currentDraft(marker);
       state.building = true;
-      state.previewReady = false;
       updatePreviewAvailability();
       updateDeploymentAvailability();
       element('previewLoading').hidden = false;
@@ -1607,58 +2431,90 @@
       setLifecycle(1);
       let artifactBuilt = false;
       try {
-        const result = await api('/artifacts/preview', { method: 'POST', body: buildPayload() });
-        if (!result || !result.manifest || typeof result.manifest !== 'object') throw new Error('The build did not return an artifact manifest.');
-        const previewURL = safePreviewURL(result && result.previewUrl);
-        const preview = result && result.preview && typeof result.preview === 'object'
-          ? result.preview
-          : { documentUrl: previewURL, themeUrl: '', stylesUrl: '' };
-        preview.documentUrl = safePreviewURL(preview.documentUrl || previewURL);
-        preview.themeUrl = safePreviewURL(preview.themeUrl);
-        preview.stylesUrl = safePreviewURL(preview.stylesUrl);
-        await renderManifest(result.manifest, result.verification);
-        state.track = result.track || null;
-        if (!state.track || !state.track.id) throw new Error('The build did not return a composition track.');
+        const result = await api('/artifacts/preview', { method: 'POST', body: payload });
+        if (!guard()) return;
         artifactBuilt = true;
-        const frame = element('previewFrame');
-        frame.title = `${element('appName').value.trim()} staging preview`;
-        frame.hidden = false;
-        element('previewEmpty').hidden = true;
         setPreviewState('loading', 'Loading staging app');
-        await loadPreviewFrame(frame, preview);
-        state.previewReady = true;
-        setPreviewState('ready', 'Staging ready');
-        element('buildStateText').textContent = 'Preview ready · review required';
-        element('deployStateText').textContent = 'Ready for review';
-        element('deployStateHelp').textContent = 'Inspect the staging app, manifest, compliance references, and trust boundary. Production deploy is intentionally review-gated in this beta.';
-        setNotice(element('builderAlert'), 'Staging artifact created. Review the preview and manifest before deployment.', 'success');
-        setLifecycle(2);
+        const active = await applyVerifiedPreview(result, guard, { requireActive: false, expectedComponents: payload.components });
+        setNotice(element('builderAlert'), active
+          ? 'Staging artifact created. Review the preview and manifest before deployment.'
+          : 'The returned evidence is not actively verified. Your last verified preview was retained and publication is disabled.', active ? 'success' : 'error');
       } catch (error) {
-        element('previewFrame').hidden = true;
-        element('previewEmpty').hidden = false;
-        setPreviewState('error', artifactBuilt ? 'Preview unavailable' : 'Build failed');
-        element('buildStateText').textContent = artifactBuilt ? 'Artifact built · preview unavailable' : 'Draft · build failed';
-        element('deployStateText').textContent = artifactBuilt ? 'Preview required' : 'Not ready';
-        setNotice(element('builderAlert'), error.message || 'The preview could not be created.', 'error');
-        setLifecycle(artifactBuilt ? 2 : 0);
+        if (!operationCurrent()) return;
+        const frame = element('previewFrame');
+        state.previewReady = false;
+        if (!frame.srcdoc) {
+          frame.hidden = true;
+          element('previewEmpty').hidden = false;
+        } else frame.dataset.stale = 'true';
+        setPreviewState('error', frame.srcdoc ? 'Last verified preview retained' : (artifactBuilt ? 'Preview unavailable' : 'Build failed'));
+        element('buildStateText').textContent = frame.srcdoc ? 'Draft not verified · last preview retained' : (artifactBuilt ? 'Artifact built · preview unavailable' : 'Draft · build failed');
+        element('deployStateText').textContent = 'Not ready · verified refresh required';
+        setNotice(element('builderAlert'), `${error.message || 'The preview could not be created.'} Your last valid draft and last verified preview were not replaced.`, 'error');
+        setLifecycle(frame.srcdoc ? 2 : (artifactBuilt ? 2 : 0));
       } finally {
-        state.building = false;
-        element('previewLoading').hidden = true;
-        updatePreviewAvailability();
-        updateDeploymentAvailability();
+        if (operationCurrent()) {
+          state.building = false;
+          element('previewLoading').hidden = true;
+          updatePreviewAvailability();
+          updateDeploymentAvailability();
+        }
       }
     }
 
     function markPreviewDirty() {
-      if (!state.previewReady || state.building) return;
+      state.draftRevision += 1;
+      if (!state.previewReady && !state.building) {
+        updatePreviewAvailability();
+        return;
+      }
       state.previewReady = false;
-      setPreviewState('', 'Changes not previewed');
-      element('buildStateText').textContent = 'Draft changed · refresh preview';
+      if (element('previewFrame').srcdoc) element('previewFrame').dataset.stale = 'true';
+      setPreviewState('', state.building ? 'Draft changed during build' : 'Changes not previewed');
+      element('buildStateText').textContent = state.building ? 'Build result pending · draft changed' : 'Draft changed · refresh preview';
       element('deployStateText').textContent = 'Preview out of date';
       element('deployStateHelp').textContent = 'Create a fresh staging preview so its immutable manifest matches these settings.';
       element('previewButton').textContent = 'Refresh staging preview';
       setLifecycle(0);
       updateDeploymentAvailability();
+    }
+
+    function clearVerifiedPreviewForScope() {
+      state.previewEpoch += 1;
+      state.draftRevision += 1;
+      state.building = false;
+      state.previewReady = false;
+      state.track = null;
+      const frame = element('previewFrame');
+      frame.removeAttribute('src');
+      frame.removeAttribute('srcdoc');
+      delete frame.dataset.stale;
+      frame.hidden = true;
+      element('previewEmpty').hidden = false;
+      element('previewLoading').hidden = true;
+      setBusy(element('loadTrackButton'), false, 'Verifying…', 'Reload verified preview');
+      element('manifestList').replaceChildren();
+      element('manifestList').hidden = true;
+      element('manifestEmpty').hidden = false;
+      element('rawManifest').textContent = '';
+      element('rawManifestDetails').hidden = true;
+      setPreviewState('', 'Waiting for build');
+      element('buildStateText').textContent = 'Draft · not yet previewed';
+      element('deployStateText').textContent = 'Not ready';
+      element('deployStateHelp').textContent = 'Create and review a workspace-bound staging preview first.';
+      setLifecycle(0);
+      updateDeploymentAvailability();
+    }
+
+    function restoreDraftForCurrentScope() {
+      if (!state.selectedTemplateId) {
+        try { state.selectedTemplateId = sessionStorage.getItem(draftSelectionKey()) || ''; } catch {}
+        if (state.selectedTemplateId) element('templateSelect').value = state.selectedTemplateId;
+      }
+      const saved = readComponentDraft(state.selectedTemplateId);
+      state.selectedComponentIds = saved ? [...saved.selected] : [];
+      state.componentDocuments = saved ? cloneDocument(saved.documents) : {};
+      renderComponentEditors();
     }
 
     async function claimDomain() {
@@ -2372,18 +3228,32 @@
     element('retryWorkspaces').addEventListener('click', () => loadWorkspaces());
     element('retryTemplate').addEventListener('click', loadCatalog);
     element('templateSelect').addEventListener('change', () => {
-      state.selectedTemplateId = element('templateSelect').value;
-      renderSelectedTemplate();
+      requestTemplateSelection(element('templateSelect').value);
+    });
+    element('applyTemplateSwitch').addEventListener('click', () => applyTemplateSelection(state.pendingTemplateId));
+    element('cancelTemplateSwitch').addEventListener('click', () => {
+      state.pendingTemplateId = '';
+      element('templateSelect').value = state.selectedTemplateId;
+      element('templateReconcile').hidden = true;
+      element('templateSelect').focus();
     });
     element('createWorkspaceButton').addEventListener('click', createWorkspace);
     element('workspaceSelect').addEventListener('change', async () => {
       seedOrganizationFromWorkspace();
       resetDomainClaim();
-      markPreviewDirty();
+      clearVerifiedPreviewForScope();
+      state.selectedTemplateId = '';
+      state.selectedComponentIds = [];
+      state.componentDocuments = {};
+      element('templateSelect').value = '';
+      restoreDraftForCurrentScope();
       await loadWorkspaceContext();
     });
     element('builderForm').addEventListener('submit', createPreview);
-    element('builderForm').addEventListener('input', markPreviewDirty);
+    element('builderForm').addEventListener('input', (event) => {
+      if (!event.target.closest('#moduleList') && event.target !== element('trackLookup')) markPreviewDirty();
+    });
+    element('loadTrackButton').addEventListener('click', loadVerifiedTrack);
     element('domainOrigin').addEventListener('input', () => resetDomainClaim());
     element('claimDomainButton').addEventListener('click', claimDomain);
     element('verifyDomainButton').addEventListener('click', verifyDomain);

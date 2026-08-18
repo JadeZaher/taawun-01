@@ -368,6 +368,13 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
   assert.match(runtime, /\$&/u, 'the exact pinned runtime fixture must retain its literal $&');
 
   const token = 'browser-signed-preview-token';
+  const secondToken = 'browser-second-principal-token';
+  const documentFields = [
+    { key: 'title', label: 'Card heading', valueType: 'string', description: 'Curated heading.', required: true, maxLength: 120 },
+    { key: 'summary', label: 'Summary', valueType: 'string', description: 'Curated plain-text summary.', required: true, maxLength: 600 },
+  ];
+  const reservedKeyParts = ['proto', 'prototype', 'constructor', 'script', 'html', 'css', 'style', 'endpoint', 'url', 'uri', 'origin', 'surface', 'embedder', 'connection', 'resource', 'authority', 'permission', 'capability', 'workspace', 'principal', 'subject', 'user', 'actor', 'signer', 'signature', 'auth', 'lifecycle', 'expiry', 'expires', 'shura', 'finance', 'payment', 'settlement', 'escrow', 'artifactid', 'contenthash', 'manifestdigest', 'contractversion', 'templateid', 'moduleid', 'componentid', 'token', 'password', 'credential', 'secret', 'cookie', 'apikey'];
+  const componentPolicy = { contractVersion: 'taawun.artifact/v2', rootType: 'object', stableIdRule: 'one instance per allowed module; id equals type', keyGrammar: 'ASCII letter first', numberFormat: 'canonical base-10 JSON', allowedValueTypes: ['null', 'boolean', 'number', 'string', 'array', 'object'], reservedKeyParts, maxComponentBytes: 8192, maxTotalBytes: 32768, maxDepth: 6, maxKeyBytes: 64, maxObjectFields: 32, maxArrayItems: 32, maxTotalKeys: 128, maxStringRunes: 2048, maxNumberBytes: 64 };
   const previewPrefix = '/api/conductor/tracks/browser-track/preview/files/';
   const previewDocument = `<!doctype html>
 <html lang="en"><head>
@@ -409,9 +416,20 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     'embedders',
     'connections',
     'resources',
+    'component-data',
+    'component-digest',
+    'component-substitution-attested',
+    'component-missing',
     'missing-fields',
   ];
   let previewBuilds = 0;
+  let activeTrackResponse = null;
+  let failNextPreview = false;
+  let delayTrackResponse = false;
+  let incompleteCatalogNext = false;
+  let delayPreviewResponse = false;
+  let delayPreviewFiles = false;
+  let delayRuntimeResponse = false;
   const server = createServer(async (request, response) => {
     const chunks = [];
     for await (const chunk of request) chunks.push(chunk);
@@ -430,47 +448,95 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     const json = (status, body) => send(status, 'application/json; charset=utf-8', JSON.stringify(body));
 
     if (record.method === 'GET' && record.path === '/') return send(200, 'text/html; charset=utf-8', cockpitHTML);
-    if (record.method === 'GET' && record.path === '/assets/datastar-v1.0.2.js') return send(200, 'text/javascript; charset=utf-8', runtime);
+    if (record.method === 'GET' && record.path === '/assets/datastar-v1.0.2.js') {
+      if (delayRuntimeResponse) {
+        delayRuntimeResponse = false;
+        await wait(180);
+      }
+      return send(200, 'text/javascript; charset=utf-8', runtime);
+    }
     if (record.method === 'POST' && record.path === '/api/login') {
-      return json(200, { token, user: { id: 7, username: 'QA Architect', email: 'qa@example.test' } });
+      const second = record.body?.email === 'second@example.test';
+      return json(200, { token: second ? secondToken : token, user: { id: second ? 8 : 7, username: second ? 'Second Architect' : 'QA Architect', email: record.body?.email } });
     }
     if (previewFiles.has(record.path)) {
-      if (record.authorization !== `Bearer ${token}`) return json(401, { error: { code: 'unauthorized', message: 'Authentication required.' } });
+      if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(401, { error: { code: 'unauthorized', message: 'Authentication required.' } });
+      if (delayPreviewFiles) {
+        delayPreviewFiles = false;
+        await wait(180);
+      }
       const [contentType, body] = previewFiles.get(record.path);
       return send(200, contentType, body);
     }
     const authenticated = ['/api/profile', '/api/workspaces', '/api/workspaces/41/people', '/api/templates', '/api/modules', '/api/artifacts/preview'];
-    if (authenticated.includes(record.path) && record.authorization !== `Bearer ${token}`) {
+    if (authenticated.includes(record.path) && ![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) {
       return json(401, { error: { code: 'unauthorized', message: 'Authentication required.' } });
     }
     if (record.method === 'GET' && record.path === '/api/profile') {
-      return json(200, { id: 7, username: 'QA Architect', email: 'qa@example.test' });
+      const second = record.authorization === `Bearer ${secondToken}`;
+      return json(200, { id: second ? 8 : 7, username: second ? 'Second Architect' : 'QA Architect', email: second ? 'second@example.test' : 'qa@example.test' });
     }
     if (record.method === 'GET' && record.path === '/api/workspaces') {
-      return json(200, { workspaces: [{ id: 41, name: 'QA Community' }] });
+      return json(200, { workspaces: [{ id: 41, name: 'QA Community' }, { id: 42, name: 'QA Other Workspace' }] });
     }
     if (record.method === 'GET' && record.path === '/api/workspaces/41/people') {
-      return json(200, { members: [{ user_id: 7, username: 'QA Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' }] });
-    }
-    if (record.method === 'GET' && record.path === '/api/templates') {
-      return json(200, { templates: [{ id: 'community-iftar', title: 'Community Iftar', version: '1.0.0', description: 'Signed private-beta card.', allowedModules: ['iftar-registration', 'announcements', 'donation-campaign'] }] });
-    }
-    if (record.method === 'GET' && record.path === '/api/modules') {
-      return json(200, { modules: [
-        { id: 'iftar-registration', title: 'Iftar registration', dataClassifications: ['community-registrations'] },
-        { id: 'announcements', title: 'Community announcements', dataClassifications: ['community-announcements'] },
-        { id: 'donation-campaign', title: 'Donation campaign', dataClassifications: ['donation-intents'], allowedServerSignals: ['taawun_donation_status'] },
+      return json(200, { members: [
+        { user_id: 7, username: 'QA Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
+        { user_id: 8, username: 'Second Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
       ] });
     }
+    if (record.method === 'GET' && record.path === '/api/workspaces/42/people') {
+      return json(200, { members: [
+        { user_id: 7, username: 'QA Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
+        { user_id: 8, username: 'Second Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
+      ] });
+    }
+    if (record.method === 'GET' && record.path === '/api/templates') {
+      return json(200, { templates: [
+        { id: 'community-iftar', title: 'Community Iftar', version: '1.0.0', description: 'Signed private-beta card.', allowedModules: ['iftar-registration', 'announcements', 'donation-campaign'] },
+        { id: 'bazaar-cooperative', title: 'Bazaar cooperative', version: '1.0.0', description: 'Curated cooperative market card.', allowedModules: ['announcements', 'donation-campaign'] },
+      ] });
+    }
+    if (record.method === 'GET' && record.path === '/api/modules') {
+      if (incompleteCatalogNext) {
+        incompleteCatalogNext = false;
+        return json(200, { modules: [{ id: 'announcements', title: 'Incomplete', defaultDocument: {} }], componentDocumentPolicy: {} });
+      }
+      return json(200, { componentDocumentPolicy: componentPolicy, modules: [
+        { id: 'iftar-registration', title: 'Iftar registration', dataClassifications: ['community-registrations'], documentFields, defaultDocument: { title: 'Iftar registration', summary: 'Register locally.' } },
+        { id: 'announcements', title: 'Community announcements', dataClassifications: ['community-announcements'], documentFields, defaultDocument: { title: 'Community announcements', summary: 'Share community updates.' } },
+        { id: 'donation-campaign', title: 'Donation campaign', dataClassifications: ['donation-intents'], allowedServerSignals: ['taawun_donation_status'], documentFields, defaultDocument: { title: 'Donation campaign', summary: 'Sandbox intent only.' } },
+      ] });
+    }
+    if (record.method === 'GET' && record.path === '/api/conductor/tracks/track_browser' && activeTrackResponse) {
+      if (delayTrackResponse) {
+        delayTrackResponse = false;
+        await wait(180);
+      }
+      return json(200, activeTrackResponse);
+    }
     if (record.method === 'POST' && record.path === '/api/artifacts/preview') {
+      if (failNextPreview) {
+        failNextPreview = false;
+        return json(503, { error: { code: 'composition_unavailable', message: 'Synthetic network interruption.' } });
+      }
       const variant = receiptVariants[previewBuilds] || 'active';
+      if (delayPreviewResponse) {
+        delayPreviewResponse = false;
+        await wait(180);
+      }
       const attestedManifest = {
-        contractVersion: 'taawun.artifact-manifest/v1',
+        contractVersion: 'taawun.artifact/v2',
         artifactId: 'browser-signed-artifact',
         contentHash: 'a'.repeat(64),
-        workspaceId: 41,
-        template: { id: 'community-iftar', version: '1.0.0' },
-        modules: ['iftar-registration', 'announcements', 'donation-campaign'],
+        workspaceId: record.body.workspaceId,
+        template: { id: record.body.templateId, version: '1.0.0' },
+        modules: record.body.modules,
+        components: record.body.components.map((component) => ({
+          ...component,
+          documentPath: `components/${component.id}.json`,
+          documentSha256: createHash('sha256').update(JSON.stringify(component.data)).digest('hex'),
+        })),
         renderModes: ['standalone'],
         compliance: {
           status: 'reference-only-pending-qualified-review',
@@ -478,7 +544,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
         },
         financial: { status: 'sandbox' },
         authorization: {
-          subject: { id: 'user:7', userId: 7, workspaceId: 41 },
+          subject: { id: record.authorization === `Bearer ${secondToken}` ? 'user:8' : 'user:7', userId: record.authorization === `Bearer ${secondToken}` ? 8 : 7, workspaceId: record.body.workspaceId },
           allowedOrigins: {
             surfaces: [origin],
             embedders: ['https://community.example'],
@@ -498,6 +564,12 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       if (variant === 'elapsed-expiry') attestedManifest.authorization.expiresAt = '2000-08-18T04:23:28Z';
       if (variant === 'subject-workspace') attestedManifest.authorization.subject.workspaceId = 42;
       if (variant === 'authorization-key') attestedManifest.authorization.signerKeyId = 'tampered-key';
+      if (variant === 'component-digest') attestedManifest.components[0].documentSha256 = '0'.repeat(64);
+      if (variant === 'component-substitution-attested') {
+        attestedManifest.components[0].data.summary = 'Server-substituted component copy';
+        attestedManifest.components[0].documentSha256 = createHash('sha256').update(JSON.stringify(attestedManifest.components[0].data)).digest('hex');
+      }
+      if (variant === 'component-missing') delete attestedManifest.components;
       let responseManifest = structuredClone(attestedManifest);
       if (variant === 'lifecycle') responseManifest.authorization.lifecycle = 'published';
       if (variant === 'expiry') responseManifest.authorization.expiresAt = '2098-08-18T04:23:28Z';
@@ -505,6 +577,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       if (variant === 'embedders') responseManifest.authorization.allowedOrigins.embedders = ['https://tampered-embedder.example'];
       if (variant === 'connections') responseManifest.authorization.allowedOrigins.connections = ['https://tampered-connection.example'];
       if (variant === 'resources') responseManifest.authorization.allowedOrigins.resources = ['https://tampered-resource.example'];
+      if (variant === 'component-data') responseManifest.components[0].data.summary = 'Tampered component copy';
       if (variant === 'missing-fields') responseManifest = { artifactId: 'missing-optional-fields' };
       const manifestJson = JSON.stringify(attestedManifest);
       const verification = {
@@ -512,7 +585,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
         verified: true,
         artifactId: 'browser-signed-artifact',
         contentHash: 'a'.repeat(64),
-        workspaceId: 41,
+        workspaceId: record.body.workspaceId,
         signatureAlgorithm: 'Ed25519',
         signerKeyId: 'railway-artifact-v1',
         signatureValue: 'browser-signature-value',
@@ -528,7 +601,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       if (variant === 'key') verification.signerKeyId = 'tampered-key';
       if (variant === 'algorithm') verification.signatureAlgorithm = 'tampered-algorithm';
       previewBuilds += 1;
-      return json(200, {
+      const result = {
         manifest: responseManifest,
         verification: variant === 'missing-attestation' ? undefined : verification,
         previewUrl: `${previewPrefix}index.html`,
@@ -537,8 +610,10 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
           themeUrl: `${previewPrefix}theme.css`,
           stylesUrl: `${previewPrefix}app.css`,
         },
-        track: { id: 'browser-track', preview: { allowedOrigins: { surfaces: [] } } },
-      });
+        track: { id: 'track_browser', preview: { allowedOrigins: { surfaces: [] } } },
+      };
+      if (variant === 'active') activeTrackResponse = structuredClone(result);
+      return json(200, result);
     }
     return json(404, { error: { code: 'not_found', message: 'Not found.' } });
   });
@@ -575,8 +650,143 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     })()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#appView').hidden
       && document.querySelector('#workspaceSelect').value === '41'
-      && document.querySelector('#templateBadge').textContent.startsWith('Ready')
-      && !document.querySelector('#previewButton').disabled`), 'workspace and template load');
+      && document.querySelector('#templateSelect').options.length === 3
+      && document.querySelector('#templateSelect').value === ''
+      && document.querySelector('#previewButton').disabled`), 'workspace and explicit catalog choice');
+
+    await evaluate(client, `(() => {
+      const select = document.querySelector('#templateSelect');
+      select.value = 'community-iftar';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      while (document.querySelector('#moduleList input[name="selectedModule"]:not(:checked)')) {
+        document.querySelector('#moduleList input[name="selectedModule"]:not(:checked)').click();
+      }
+    })()`);
+    await waitFor(() => evaluate(client, `document.querySelectorAll('#moduleList input[name="selectedModule"]:checked').length === 3 && !document.querySelector('#previewButton').disabled`), 'explicit component selection');
+
+    await evaluate(client, `document.querySelector('[data-component-id="announcements"] .component-tools button').click()`);
+    await waitFor(() => evaluate(client, `Boolean(document.querySelector('[data-component-id="announcements"] .custom-field'))`), 'custom field add');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .custom-field input[aria-label$="field name"]'); input.value = 'audience'; input.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('[data-component-id="announcements"] .custom-field input[aria-label$="field name"]')?.value === 'audience'`), 'custom field rename');
+    await evaluate(client, `(() => { const select = document.querySelector('[data-component-id="announcements"] .custom-field select'); select.value = 'array'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await evaluate(client, `(() => { const value = document.querySelector('[data-component-id="announcements"] .custom-field textarea'); value.value = '["families","students"]'; value.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value.includes('students')`), 'custom array edit');
+
+    await evaluate(client, `document.querySelector('[data-component-id="announcements"] .component-tools button').click()`);
+    await waitFor(() => evaluate(client, `document.querySelectorAll('[data-component-id="announcements"] .custom-field').length === 2`), 'custom object field add');
+    await evaluate(client, `(() => {
+      const row = [...document.querySelectorAll('[data-component-id="announcements"] .custom-field')].find((candidate) => candidate.querySelector('input[aria-label$="field name"]').value === 'custom_1');
+      const key = row.querySelector('input[aria-label$="field name"]');
+      key.value = 'details';
+      key.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await waitFor(() => evaluate(client, `[...document.querySelectorAll('[data-component-id="announcements"] .custom-field')].some((row) => row.querySelector('input[aria-label$="field name"]').value === 'details')`), 'custom object field rename');
+    await evaluate(client, `(() => {
+      const row = [...document.querySelectorAll('[data-component-id="announcements"] .custom-field')].find((candidate) => candidate.querySelector('input[aria-label$="field name"]').value === 'details');
+      const type = row.querySelector('select');
+      type.value = 'object';
+      type.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await waitFor(() => evaluate(client, `Boolean([...document.querySelectorAll('[data-component-id="announcements"] .custom-field')].find((row) => row.querySelector('input[aria-label$="field name"]').value === 'details')?.querySelector('textarea'))`), 'custom object editor');
+
+    await evaluate(client, `(() => {
+      const row = [...document.querySelectorAll('[data-component-id="announcements"] .custom-field')].find((candidate) => candidate.querySelector('input[aria-label$="field name"]').value === 'details');
+      const value = row.querySelector('textarea');
+      value.value = '{"nested":{"note":1,"note":2}}';
+      value.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('duplicate key nested.note')`), 'custom object nested duplicate rejection');
+    await evaluate(client, `(() => {
+      const row = [...document.querySelectorAll('[data-component-id="announcements"] .custom-field')].find((candidate) => candidate.querySelector('input[aria-label$="field name"]').value === 'details');
+      const value = row.querySelector('textarea');
+      value.value = JSON.stringify({ nested: String.fromCharCode(0xDC00) });
+      value.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('invalid Unicode scalar')`), 'custom object nested lone low surrogate rejection');
+    await evaluate(client, `(() => {
+      const row = [...document.querySelectorAll('[data-component-id="announcements"] .custom-field')].find((candidate) => candidate.querySelector('input[aria-label$="field name"]').value === 'details');
+      const value = row.querySelector('textarea');
+      value.value = JSON.stringify({ symbol: String.fromCodePoint(0x1F319) });
+      value.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value.includes('🌙')`), 'valid custom object Unicode scalar pair');
+
+    for (const [source, expected] of [
+      ['[{"note":1,"note":2}]', 'duplicate key note'],
+      ['[1e0]', 'canonical number format'],
+      ['[-0]', 'canonical number format'],
+      ['[1.20]', 'canonical number format'],
+      ['["families"] true', 'Unexpected non-whitespace character'],
+    ]) {
+      await evaluate(client, `(() => {
+        const row = [...document.querySelectorAll('[data-component-id="announcements"] .custom-field')].find((candidate) => candidate.querySelector('input[aria-label$="field name"]').value === 'audience');
+        const value = row.querySelector('textarea');
+        value.value = ${JSON.stringify(source)};
+        value.dispatchEvent(new Event('change', { bubbles: true }));
+      })()`);
+      assert.match(await evaluate(client, `document.querySelector('#component-error-announcements').textContent`), new RegExp(expected, 'iu'), `custom array raw JSON must reject ${source}`);
+    }
+
+    await evaluate(client, `(() => {
+      const input = document.querySelector('[data-component-id="announcements"] .advanced-document textarea');
+      input.value = JSON.stringify({ title: 'Unicode component', summary: 'Evening ' + String.fromCodePoint(0x1F319), audience: ['families', 'students'], details: { symbol: String.fromCodePoint(0x1F319) } });
+      input.parentElement.querySelector('button').click();
+    })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value.includes('Evening 🌙')`), 'valid surrogate pair and emoji draft');
+
+    await evaluate(client, `document.querySelector('[data-component-id="donation-campaign"] .component-tools button').click()`);
+    await waitFor(() => evaluate(client, `Boolean(document.querySelector('[data-component-id="donation-campaign"] .custom-field'))`), 'removable custom field add');
+    await evaluate(client, `document.querySelector('[data-component-id="donation-campaign"] .custom-field button').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('[data-component-id="donation-campaign"] .custom-field')`), 'custom field remove');
+
+    const lastValidAnnouncement = await evaluate(client, `document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value`);
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .advanced-document textarea'); input.value = JSON.stringify({title:'Unicode',summary:String.fromCharCode(0xD800)}); input.parentElement.querySelector('button').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('invalid Unicode scalar')`), 'root declared lone high surrogate rejection');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .advanced-document textarea'); input.value = JSON.stringify({title:'Unicode',summary:'C1 ' + String.fromCharCode(0x85)}); input.parentElement.querySelector('button').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('invalid or oversized text')`), 'C1 control text rejection');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .advanced-document textarea'); input.value = '{"title":"Unsafe","summary":"No","origin":"https://evil.example"}'; input.parentElement.querySelector('button').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('reserved security key')`), 'reserved component key rejection');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .advanced-document textarea'); input.value = '{"title":"Number","summary":"No","amount":1e0}'; input.parentElement.querySelector('button').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('canonical number format')`), 'non-canonical number rejection');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .advanced-document textarea'); input.value = '{"title":"Duplicate","summary":"No","meta":{"note":1,"note":2}}'; input.parentElement.querySelector('button').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('duplicate key meta.note')`), 'duplicate JSON key rejection');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .advanced-document textarea'); input.value = '{"title":"Precision","summary":"No","amount":9007199254740993}'; input.parentElement.querySelector('button').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('canonical number format')`), 'precision-losing number rejection');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .advanced-document textarea'); input.value = '{"title":"Missing","summary":""}'; input.parentElement.querySelector('button').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('required declared field')`), 'declared required field rejection');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .advanced-document textarea'); input.value = '{"title":7,"summary":"Wrong type"}'; input.parentElement.querySelector('button').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('expected string')`), 'declared field type rejection');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .advanced-document textarea'); input.value = JSON.stringify({title:'x'.repeat(121),summary:'Too long'}); input.parentElement.querySelector('button').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('exceeds 120')`), 'declared max length rejection');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .advanced-document textarea'); input.value = '{"title":"Nested","summary":"No","meta":{"prototype":{"value":"unsafe"}}}'; input.parentElement.querySelector('button').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('reserved security key')`), 'recursive reserved key rejection');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .advanced-document textarea'); input.value = '{"title":"Depth","summary":"No","meta":{"a":{"b":{"c":{"d":{"e":{"f":"too deep"}}}}}}}'; input.parentElement.querySelector('button').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('maximum depth exceeded')`), 'component depth rejection');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .custom-field input[aria-label$="field name"]'); input.value = '__proto__'; input.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('invalid key') || document.querySelector('#component-error-announcements').textContent.includes('reserved security key')`), 'prototype-like custom rename rejection');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .advanced-document textarea'); input.value = JSON.stringify({title:'Large',summary:'x'.repeat(9000)}); input.parentElement.querySelector('button').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('oversized') || document.querySelector('#component-error-announcements').textContent.includes('exceeds')`), 'oversized component rejection');
+    await evaluate(client, `(() => { const select = document.querySelector('#templateSelect'); select.value = 'bazaar-cooperative'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#templateReconcile').hidden && document.querySelector('#templateReconcileMessage').textContent.includes('iftar-registration')`), 'incompatible template reconciliation');
+    await evaluate(client, `document.querySelector('#cancelTemplateSwitch').click()`);
+    assert.equal(await evaluate(client, `document.querySelector('#templateSelect').value`), 'community-iftar', 'cancel keeps the current template');
+    assert.match(await evaluate(client, `document.querySelector('#component-error-announcements').textContent`), /last valid document is retained/iu, 'invalid input explains last-valid recovery');
+    await evaluate(client, `(() => { const select = document.querySelector('#templateSelect'); select.value = 'bazaar-cooperative'; select.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('#applyTemplateSwitch').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#templateSelect').value === 'bazaar-cooperative' && document.querySelectorAll('#moduleList input:checked').length === 2`), 'template reconciliation apply');
+    await evaluate(client, `(() => { const select = document.querySelector('#templateSelect'); select.value = 'community-iftar'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#templateSelect').value === 'community-iftar' && document.querySelectorAll('#moduleList input:checked').length === 3 && document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value.includes('students')`), 'template draft restoration');
+    assert.equal(await evaluate(client, `document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value`), lastValidAnnouncement, 'template return restores the exact last-valid document, not invalid input');
+
+    incompleteCatalogNext = true;
+    await evaluate(client, `document.querySelector('#retryTemplate').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#retryTemplate').hidden && document.querySelector('#templateBadge').textContent.includes('Refresh failed') && document.querySelector('#previewButton').disabled`), 'incomplete catalog fail-closed state');
+    assert.equal(await evaluate(client, `document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value`), lastValidAnnouncement, 'an incomplete catalog refresh preserves the exact last-valid draft');
+    await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#templateBadge').textContent.includes('Refresh failed') && document.querySelector('#templateSelect').disabled && document.querySelector('#previewButton').disabled`), 'catalog failure survives workspace access rerender');
+    assert.equal(await evaluate(client, `document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value`), lastValidAnnouncement, 'fail-closed access rerender retains the exact draft');
+    await evaluate(client, `document.querySelector('#retryTemplate').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#templateBadge').textContent.includes('Ready') && document.querySelector('#templateSelect').value === 'community-iftar' && !document.querySelector('#previewButton').disabled`), 'catalog retry recovery');
+    assert.equal(await evaluate(client, `document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value`), lastValidAnnouncement, 'a successful catalog retry restores the exact scoped draft');
 
     await evaluate(client, `(() => {
       const set = (id, value) => {
@@ -589,7 +799,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       document.getElementById('builderForm').requestSubmit();
       return true;
     })()`);
-    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Staging ready'
+    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Verified staging ready'
       && Boolean(document.querySelector('#previewFrame').getAttribute('srcdoc'))`), 'signed staging preview');
 
     const cockpitState = await evaluate(client, `(() => {
@@ -610,6 +820,33 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.equal(receipt['Lifecycle / expiry'], 'preview · expires 2099-08-18T04:23:28.000Z');
     assert.equal(receipt['Exact allowed origins'], `Surface: ${origin} · Embedder: https://community.example · Connection: https://relay.example · Resource: https://assets.example`);
     assert.equal(receipt['Review references'], 'ref-iftar-1 (pending-qualified-review) · Reference-only; not scholar approval');
+    assert.match(receipt['Component documents'], /announcements · [0-9a-f]{64}/u);
+
+    const trustedUnicodeBoundary = await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').srcdoc, raw: document.querySelector('#rawManifest').textContent })`);
+    await evaluate(client, `(() => {
+      const input = document.querySelector('[data-component-id="announcements"] .advanced-document textarea');
+      input.value = JSON.stringify({ title: 'Unicode', summary: String.fromCharCode(0xD800) });
+      input.parentElement.querySelector('button').click();
+    })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#component-error-announcements').textContent.includes('invalid Unicode scalar')`), 'verified-preview lone surrogate rejection');
+    assert.deepEqual(await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').srcdoc, raw: document.querySelector('#rawManifest').textContent, status: document.querySelector('#previewStatus').textContent, stale: document.querySelector('#previewFrame').dataset.stale })`), {
+      ...trustedUnicodeBoundary,
+      status: 'Verified staging ready',
+      stale: 'false',
+    }, 'invalid Unicode input retains the exact last valid draft, receipt, and verified preview');
+
+    await evaluate(client, `(() => {
+      const input = document.querySelector('#trackLookup');
+      input.value = 'not-a-track';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector('#loadTrackButton').click();
+    })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#builderAlert').textContent.includes('Enter a valid track ID')`), 'invalid track recovery input');
+    assert.deepEqual(await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').srcdoc, raw: document.querySelector('#rawManifest').textContent, status: document.querySelector('#previewStatus').textContent, stale: document.querySelector('#previewFrame').dataset.stale })`), {
+      ...trustedUnicodeBoundary,
+      status: 'Verified staging ready',
+      stale: 'false',
+    }, 'recovery-only track input cannot stale an otherwise verified draft and receipt');
 
     const runtimeStartTag = '<script type="module">';
     const runtimeEndTag = '</script>';
@@ -666,6 +903,46 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.equal(artifactRequest.body.workspaceId, 41);
     assert.equal(artifactRequest.body.templateId, 'community-iftar');
     assert.deepEqual(artifactRequest.body.modules, ['iftar-registration', 'announcements', 'donation-campaign']);
+    assert.deepEqual(artifactRequest.body.components.map(({ id, type }) => ({ id, type })), [
+      { id: 'iftar-registration', type: 'iftar-registration' },
+      { id: 'announcements', type: 'announcements' },
+      { id: 'donation-campaign', type: 'donation-campaign' },
+    ]);
+    assert.deepEqual(artifactRequest.body.components[1].data.audience, ['families', 'students'], 'exact custom JSON arrays must reach the composition request');
+    assert.equal(artifactRequest.body.components[1].data.summary, 'Evening 🌙', 'valid Unicode scalar pairs must reach the composition request exactly');
+    assert.deepEqual(artifactRequest.body.components[1].data.details, { symbol: '🌙' }, 'nested valid Unicode must reach the composition request exactly');
+    assert.equal(JSON.stringify(activeTrackResponse.manifest.components[1].data), JSON.stringify(artifactRequest.body.components[1].data), 'the signed manifest must preserve the exact submitted Unicode component document bytes');
+
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] input'); const heading = [...document.querySelectorAll('[data-component-id="announcements"] .field input')][0]; heading.value = 'Unsaved replacement'; heading.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#previewFrame').dataset.stale === 'true' && document.querySelector('#deployButton').disabled`), 'dirty verified preview state');
+    await evaluate(client, `(() => { document.querySelector('#trackLookup').value = 'track_browser'; document.querySelector('#loadTrackButton').click(); })()`);
+    await wait(500);
+    const trackRestore = await evaluate(client, `({ status: document.querySelector('#previewStatus').textContent, stale: document.querySelector('#previewFrame').dataset.stale, alert: document.querySelector('#builderAlert').textContent, document: document.querySelector('[data-component-id="announcements"] .advanced-document textarea')?.value || '' })`);
+    assert.equal(trackRestore.status, 'Verified staging ready', `track restore status: ${JSON.stringify(trackRestore)}`);
+    assert.equal(trackRestore.stale, 'false');
+    assert.match(trackRestore.document, /students/u, 'verified track restores exact component document');
+    const trackRequest = requests.find((item) => item.path === '/api/conductor/tracks/track_browser');
+    assert.equal(trackRequest.authorization, `Bearer ${token}`, 'verified track reload must remain authenticated');
+    const verifiedSourceBeforeFailure = await evaluate(client, `document.querySelector('#previewFrame').srcdoc`);
+    failNextPreview = true;
+    await evaluate(client, `document.querySelector('#builderForm').requestSubmit()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#builderAlert').textContent.includes('last valid draft and last verified preview were not replaced') && document.querySelector('#previewFrame').dataset.stale === 'true' && document.querySelector('#deployButton').disabled`), 'network failure recovery');
+    assert.equal(await evaluate(client, `document.querySelector('#previewFrame').srcdoc`), verifiedSourceBeforeFailure, 'network failure must retain the last verified iframe bytes');
+    await evaluate(client, `document.querySelector('#loadTrackButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#previewFrame').dataset.stale === 'false'`), 'verified track recovery after network failure');
+    delayTrackResponse = true;
+    await evaluate(client, `(() => { document.querySelector('#loadTrackButton').click(); const select = document.querySelector('#workspaceSelect'); select.value = '42'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '42' && document.querySelector('#workspaceRole').textContent === 'Architect'`), 'component track workspace switch');
+    await wait(240);
+    const staleTrackBoundary = await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').getAttribute('srcdoc'), manifestHidden: document.querySelector('#manifestList').hidden, template: document.querySelector('#templateSelect').value, selected: document.querySelectorAll('#moduleList input:checked').length })`);
+    assert.deepEqual(staleTrackBoundary, { srcdoc: null, manifestHidden: true, template: '', selected: 0 }, 'a delayed prior-workspace track must not restore preview or documents into another workspace');
+    await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '41'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '41' && document.querySelector('#templateSelect').value === 'community-iftar' && document.querySelectorAll('#moduleList input:checked').length === 3`), 'component draft workspace recovery');
+    await evaluate(client, `document.querySelector('#loadTrackButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#previewFrame').dataset.stale === 'false'`), 'verified track after workspace return');
+    const trustedReceiptBeforeNegatives = await evaluate(client, `Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent]))`);
+    const trustedRawBeforeNegatives = await evaluate(client, `document.querySelector('#rawManifest').textContent`);
+    const trustedSourceBeforeNegatives = await evaluate(client, `document.querySelector('#previewFrame').srcdoc`);
     for (const runtimeRequest of requests.filter((item) => item.path === '/assets/datastar-v1.0.2.js')) {
       assert.equal(runtimeRequest.authorization, '', 'the bearer token must not leak to the public pinned runtime');
     }
@@ -674,23 +951,82 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       const variant = receiptVariants[index];
       await evaluate(client, `document.querySelector('#builderForm').requestSubmit()`);
       await waitFor(async () => previewBuilds === index + 1
-        && await evaluate(client, `document.querySelector('#previewStatus').textContent === 'Staging ready'`), `${variant} receipt response`);
-      const changedReceipt = await evaluate(client, `Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent]))`);
-      if (variant === 'elapsed-expiry') {
-        assert.equal(changedReceipt['Signature verification'], 'Signature attested by Taawun build service · authorization expired');
-        assert.match(changedReceipt['Lifecycle / expiry'], /expired$/u);
-      } else {
-        assert.equal(changedReceipt['Signature verification'], 'Verification unavailable — do not rely on this receipt', `${variant} must fail active verification`);
-        assert.doesNotMatch(changedReceipt['Signature verification'], /^Verified\b/u, `${variant} must not retain the positive state`);
-      }
-      if (variant === 'missing-fields') {
-        assert.equal(changedReceipt['Signing key'], 'Signing key not provided');
-        assert.equal(changedReceipt['Workspace binding'], 'Workspace binding not provided');
-        assert.equal(changedReceipt['Lifecycle / expiry'], 'Lifecycle not provided · expiry not provided');
-        assert.equal(changedReceipt['Exact allowed origins'], 'No exact origins listed');
-        assert.equal(changedReceipt['Review references'], 'No review references supplied · Reference-only; not scholar approval');
-      }
+        && await evaluate(client, `document.querySelector('#previewLoading').hidden && ['Verification unavailable', 'Signed authorization expired'].includes(document.querySelector('#previewStatus').textContent)`), `${variant} receipt response`);
+      const retainedEvidence = await evaluate(client, `({
+        receipt: Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent])),
+        raw: document.querySelector('#rawManifest').textContent,
+        srcdoc: document.querySelector('#previewFrame').srcdoc,
+        stale: document.querySelector('#previewFrame').dataset.stale,
+        publishDisabled: document.querySelector('#deployButton').disabled,
+        alert: document.querySelector('#builderAlert').textContent,
+      })`);
+      assert.deepEqual(retainedEvidence.receipt, trustedReceiptBeforeNegatives, `${variant} must not replace the last trusted receipt with untrusted fields`);
+      assert.equal(retainedEvidence.raw, trustedRawBeforeNegatives, `${variant} must retain the trusted raw manifest`);
+      assert.equal(retainedEvidence.srcdoc, trustedSourceBeforeNegatives, `${variant} must retain the last verified iframe bytes`);
+      assert.equal(retainedEvidence.stale, 'true');
+      assert.equal(retainedEvidence.publishDisabled, true);
+      assert.match(retainedEvidence.alert, /returned evidence is not actively verified|last verified preview was retained/iu);
     }
+
+    const delayedBuildRequests = requests.filter((item) => item.path === '/api/artifacts/preview').length;
+    delayPreviewResponse = true;
+    await evaluate(client, `document.querySelector('#builderForm').requestSubmit()`);
+    await waitFor(() => requests.filter((item) => item.path === '/api/artifacts/preview').length === delayedBuildRequests + 1, 'delayed component build start');
+    await evaluate(client, `(() => {
+      const heading = document.querySelector('[data-component-id="announcements"] .field input');
+      heading.value = 'Changed while build was pending';
+      heading.dispatchEvent(new Event('input', { bubbles: true }));
+      const select = document.querySelector('#templateSelect');
+      select.value = 'bazaar-cooperative';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      document.querySelector('#applyTemplateSwitch').click();
+    })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#previewLoading').hidden && document.querySelector('#templateSelect').value === 'bazaar-cooperative'`), 'stale delayed build completion');
+    const delayedBuildBoundary = await evaluate(client, `({
+      srcdoc: document.querySelector('#previewFrame').srcdoc,
+      stale: document.querySelector('#previewFrame').dataset.stale,
+      publishDisabled: document.querySelector('#deployButton').disabled,
+      selected: document.querySelectorAll('#moduleList input:checked').length,
+    })`);
+    assert.equal(delayedBuildBoundary.srcdoc, trustedSourceBeforeNegatives, 'a delayed build cannot replace the trusted iframe after its draft changes');
+    assert.equal(delayedBuildBoundary.stale, 'true');
+    assert.equal(delayedBuildBoundary.publishDisabled, true);
+    assert.equal(delayedBuildBoundary.selected, 2, 'the explicitly reconciled next-template draft remains selected');
+
+    const delayedFileRequests = requests.filter((item) => previewFiles.has(item.path)).length;
+    delayPreviewFiles = true;
+    await evaluate(client, `document.querySelector('#builderForm').requestSubmit()`);
+    await waitFor(() => requests.filter((item) => previewFiles.has(item.path)).length > delayedFileRequests, 'delayed signed preview file request');
+    await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '42'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '42' && document.querySelector('#workspaceRole').textContent === 'Architect'`), 'workspace switch during preview file load');
+    await wait(240);
+    assert.deepEqual(await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').getAttribute('srcdoc'), manifestHidden: document.querySelector('#manifestList').hidden, template: document.querySelector('#templateSelect').value })`), { srcdoc: null, manifestHidden: true, template: '' }, 'a delayed preview-file response cannot repopulate a cleared workspace scope');
+
+    await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '41'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '41' && document.querySelector('#templateSelect').value === 'bazaar-cooperative' && document.querySelectorAll('#moduleList input:checked').length === 2`), 'second template scoped draft recovery');
+    const secondTemplateRequestIndex = requests.filter((item) => item.path === '/api/artifacts/preview').length;
+    await evaluate(client, `document.querySelector('#builderForm').requestSubmit()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Verified staging ready' && document.querySelector('#previewFrame').dataset.stale === 'false'`), 'second real template signed build');
+    const secondTemplateRequest = requests.filter((item) => item.path === '/api/artifacts/preview')[secondTemplateRequestIndex];
+    assert.equal(secondTemplateRequest.body.templateId, 'bazaar-cooperative');
+    assert.deepEqual(secondTemplateRequest.body.modules, ['announcements', 'donation-campaign']);
+    assert.equal(await evaluate(client, `[...document.querySelectorAll('#manifestList .manifest-row')].find((row) => row.querySelector('dt').textContent === 'Template').querySelector('dd').textContent`), 'bazaar-cooperative · v1.0.0', 'the receipt must bind the second real template');
+
+    const runtimeRequestsBeforeScopeSwitch = requests.filter((item) => item.path === '/assets/datastar-v1.0.2.js').length;
+    delayRuntimeResponse = true;
+    await evaluate(client, `(() => { document.querySelector('#trackLookup').value = 'track_browser'; document.querySelector('#loadTrackButton').click(); })()`);
+    await waitFor(() => requests.filter((item) => item.path === '/assets/datastar-v1.0.2.js').length > runtimeRequestsBeforeScopeSwitch, 'delayed runtime reload request');
+    await evaluate(client, `document.querySelector('#logoutButton').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#authView').hidden`), 'principal switch sign-out');
+    await evaluate(client, `(() => {
+      const set = (id, value) => { const input = document.getElementById(id); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); };
+      set('loginEmail', 'second@example.test');
+      set('loginPassword', 'correct horse battery staple');
+      document.getElementById('loginForm').requestSubmit();
+    })()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#appView').hidden && document.querySelector('#profileName').textContent === 'Second Architect' && document.querySelector('#workspaceSelect').value === '41'`), 'second principal workspace');
+    await wait(240);
+    assert.deepEqual(await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').getAttribute('srcdoc'), manifestHidden: document.querySelector('#manifestList').hidden, template: document.querySelector('#templateSelect').value, selected: document.querySelectorAll('#moduleList input:checked').length })`), { srcdoc: null, manifestHidden: true, template: '', selected: 0 }, 'a delayed runtime response cannot restore another principal\'s preview, receipt, or component draft');
   } finally {
     if (chromium) {
       try { await chromium.client.send('Browser.close'); } catch {}
@@ -741,7 +1077,12 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     { id: 'community-workspace', title: 'Community workspace', version: '1.0.0', description: 'Complete cooperative workspace.', allowedModules: ['iftar-registration', 'announcements', 'donation-campaign', 'shura-governance', 'compliance-source-review', 'bazaar-template-lifecycle', 'zakat', 'qard-hasan', 'volunteer-stipend', 'sandbox-escrow', 'revenue-split'] },
   ];
   const moduleIDs = ['announcements', 'bazaar-template-lifecycle', 'compliance-source-review', 'donation-campaign', 'iftar-registration', 'qard-hasan', 'revenue-split', 'sandbox-escrow', 'shura-governance', 'volunteer-stipend', 'zakat'];
-  const modules = moduleIDs.map((id) => ({ id, title: id.replaceAll('-', ' '), dataClassifications: [`${id}-records`] }));
+  const roleDocumentFields = [
+    { key: 'title', label: 'Card heading', valueType: 'string', description: 'Curated heading.', required: true, maxLength: 120 },
+    { key: 'summary', label: 'Summary', valueType: 'string', description: 'Curated summary.', required: true, maxLength: 600 },
+  ];
+  const roleComponentPolicy = { contractVersion: 'taawun.artifact/v2', rootType: 'object', stableIdRule: 'one instance per allowed module; id equals type', keyGrammar: 'ASCII letter first', numberFormat: 'canonical base-10 JSON', allowedValueTypes: ['null', 'boolean', 'number', 'string', 'array', 'object'], reservedKeyParts: ['proto', 'script', 'html', 'origin', 'workspace', 'auth', 'finance', 'token', 'password'], maxComponentBytes: 8192, maxTotalBytes: 32768, maxDepth: 6, maxKeyBytes: 64, maxObjectFields: 32, maxArrayItems: 32, maxTotalKeys: 128, maxStringRunes: 2048, maxNumberBytes: 64 };
+  const modules = moduleIDs.map((id) => ({ id, title: id.replaceAll('-', ' '), dataClassifications: [`${id}-records`], documentFields: roleDocumentFields, defaultDocument: { title: id.replaceAll('-', ' '), summary: `Curated ${id} summary.` } }));
   const flows = ['donation', 'marketplace-escrow', 'multi-party-approval', 'qard-hasan', 'revenue-split', 'volunteer-stipend', 'zakat'].map((id, index) => ({ id, title: id.replaceAll('-', ' '), defaultApprovals: index ? 2 : 1, minimumParties: index ? 2 : 1 }));
   const publishedListing = { id: 'listing_browser', state: 'published', version: 3, revision: { title: 'Synthetic cooperative template', summary: 'A clearly labelled browser-test listing.', currency: 'USD', priceMinor: 1200, license: 'private-beta-sandbox' } };
 
@@ -795,7 +1136,7 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
         : json(403, { error: 'Workspace access forbidden' });
     }
     if (request.method === 'GET' && pathName === '/api/templates' && actor) return json(200, { templates });
-    if (request.method === 'GET' && pathName === '/api/modules' && actor) return json(200, { modules });
+    if (request.method === 'GET' && pathName === '/api/modules' && actor) return json(200, { modules, componentDocumentPolicy: roleComponentPolicy });
     if (request.method === 'GET' && pathName === '/api/financial/flows' && actor) return json(200, { flows });
     if (request.method === 'POST' && pathName === '/api/shura/v1/invitations' && bearer === 'architect-token') {
       return json(201, { invitation: { id: 'invite_browser', workspace_id: 41, invitee: body.invitee, role: body.role, status: 'PENDING', version: 1 }, token: 'accept_browser_viewer' });
@@ -911,7 +1252,9 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
       const select = document.querySelector('#templateSelect'); select.value = 'community-workspace'; select.dispatchEvent(new Event('change', { bubbles: true }));
       return { templates: select.options.length, modules: document.querySelectorAll('#moduleList input[name="selectedModule"]').length, checked: document.querySelectorAll('#moduleList input[name="selectedModule"]:checked').length };
     })()`);
-    assert.deepEqual(catalog, { templates: 3, modules: 11, checked: 11 }, 'real catalog selection must feed the existing composer');
+    assert.deepEqual(catalog, { templates: 4, modules: 11, checked: 0 }, 'real catalog requires explicit template and component choices; no catalog data is invented or implicitly selected');
+    await evaluate(client, `(() => { for (let index = 0; index < 3; index += 1) document.querySelector('#moduleList input[name="selectedModule"]:not(:checked)').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelectorAll('#moduleList input[name="selectedModule"]:checked').length === 3`), 'organizer explicit component choices');
 
     delayedWorkspace41Responses = 1;
     await evaluate(client, `(() => {
@@ -981,6 +1324,7 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     await waitFor(() => evaluate(client, `document.readyState === 'complete' && !document.querySelector('#loginForm').hidden`), 'session refresh login');
     await login(client, 'architect@example.test');
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Architect'`), 'architect after refresh');
+    await waitFor(() => evaluate(client, `document.querySelector('#templateSelect').value === 'community-workspace' && document.querySelectorAll('#moduleList input:checked').length === 3`), 'principal workspace component draft after page refresh');
     await evaluate(client, `document.querySelector('#shuraTab').click(); document.querySelector('#proposalLookup').value = 'proposal_browser_role'; document.querySelector('#loadProposalButton').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#proposalDecisionID').value === 'decision_browser' && document.querySelector('#financeDecision').value === 'decision_browser'`), 'decision recovery after page refresh');
 
@@ -1080,7 +1424,11 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     await evaluate(client, `document.querySelector('#peopleTab').click()`);
     await evaluate(client, `(() => { document.querySelector('#acceptInviteToken').value = 'accept_browser_viewer'; document.querySelector('#acceptInviteButton').click(); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Viewer' && document.querySelector('#workspaceSelect').value === '41'`), 'Viewer invitation acceptance');
+    assert.equal(await evaluate(client, `document.querySelector('#templateSelect').value`), '', 'component drafts never cross principal scope');
+    await evaluate(client, `(() => { const select = document.querySelector('#templateSelect'); select.value = 'community-workspace'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelectorAll('#moduleList input[name="selectedModule"]').length === 11`), 'Viewer component catalog');
     assert.equal(await evaluate(client, `document.querySelector('#previewButton').disabled`), true, 'Viewer cannot build');
+    assert.equal(await evaluate(client, `[...document.querySelectorAll('#moduleList input, #moduleList textarea, #moduleList select, #moduleList button')].every((control) => control.disabled)`), true, 'Viewer may inspect component documents but every mutation control is disabled');
     assert.match(await evaluate(client, `document.querySelector('#workspaceHelp').textContent`), /read-only/u);
     await evaluate(client, `document.querySelector('#shuraTab').click(); document.querySelector('#proposalLookup').value = 'proposal_browser_role'; document.querySelector('#loadProposalButton').click()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#proposalRecord').hidden`), 'Viewer proposal read');
@@ -1092,6 +1440,9 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     await evaluate(client, `document.querySelector('#logoutButton').click()`);
     await login(client, 'maintainer@example.test');
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Maintainer'`), 'Maintainer role');
+    assert.equal(await evaluate(client, `document.querySelector('#templateSelect').value`), '', 'Maintainer begins with an independent principal-scoped draft');
+    await evaluate(client, `(() => { const select = document.querySelector('#templateSelect'); select.value = 'bazaar-cooperative'; select.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('#moduleList input[name="selectedModule"]').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#templateSelect').value === 'bazaar-cooperative' && document.querySelector('#moduleList input:checked') && !document.querySelector('[data-component-id="announcements"] .field input').disabled`), 'Maintainer editable component document');
     await evaluate(client, `document.querySelector('#shuraTab').click(); (() => { document.querySelector('#proposalTitle').value = 'Schedule the pantry rota'; document.querySelector('#proposalBody').value = 'Approve the volunteer rota for one month.'; document.querySelector('#createProposalButton').click(); })()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#proposalRecord').hidden && document.querySelector('#proposalLookup').value === 'proposal_maintainer'`), 'Maintainer proposal create');
     const maintainerControls = await evaluate(client, `({ vote: document.querySelector('#approveVoteButton').disabled, decide: document.querySelector('#approveDecisionButton').disabled, create: document.querySelector('#createProposalButton').disabled })`);
@@ -1099,6 +1450,18 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     await evaluate(client, `document.querySelector('#approveVoteButton').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#proposalRecordMeta').textContent.includes('1 vote(s)')`), 'Maintainer vote');
     assert.equal(await evaluate(client, `document.querySelector('#approveDecisionButton').disabled`), true, 'Maintainer can never record the final decision');
+
+    await evaluate(client, `document.querySelector('#buildTab').click()`);
+    for (const layoutWidth of [160, 200, 320, 400]) {
+      await client.send('Emulation.setDeviceMetricsOverride', { width: layoutWidth, height: 1_000, deviceScaleFactor: 1, mobile: false });
+      await waitFor(() => evaluate(client, `window.innerWidth === ${layoutWidth}`), `${layoutWidth}px component editor`);
+      const editorLayout = await evaluate(client, `({ overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, visible: !document.querySelector('#buildSurface').hidden, cardWidth: document.querySelector('.component-editor')?.getBoundingClientRect().width || 0, viewport: document.documentElement.clientWidth })`);
+      assert.equal(editorLayout.overflow, false, `${layoutWidth}px component editor must reflow without horizontal overflow`);
+      assert.equal(editorLayout.visible, true);
+      assert.ok(editorLayout.cardWidth <= editorLayout.viewport, `${layoutWidth}px component card stays inside the viewport`);
+    }
+    await client.send('Emulation.setDeviceMetricsOverride', { width: 1_280, height: 1_000, deviceScaleFactor: 1, mobile: false });
+    await waitFor(() => evaluate(client, `window.innerWidth === 1280`), 'desktop component editor reset');
 
     await evaluate(client, `document.querySelector('#buildTab').focus()`);
     await pressKey(client, 'ArrowRight', 'ArrowRight', 39);
