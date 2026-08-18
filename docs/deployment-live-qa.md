@@ -254,3 +254,63 @@ served document contained the Workspace tools, People, financial sandbox, and
 published Bazaar surfaces. Persona acceptance remains with the paired live-QA
 task; this handoff does not claim a published Bazaar fixture or controlled-DNS
 journey.
+
+## 2026-08-18 signed component-document checkpoint handoff
+
+Application commit `5c5018c` is the coherent signed component-document
+checkpoint. The independently reviewed implementation comprises the
+Shura-to-Finance decision handoff (`1b07df0`), the v2 durable component contract
+and legacy-v1 compatibility (`c5ff806`), raw Unicode-scalar rejection
+(`86dc1a3`), and the role-aware browser editor (`f78a191`). The data contract,
+bounds, recovery behavior, and rollback boundary are documented in
+`docs/component-document-contract.md`.
+
+The browser now requires an explicit real-catalog template choice, keeps one
+stable component instance per allowed module, edits declared and custom JSON
+data, and reconciles incompatible template switches without discarding the old
+draft. HTTP, MCP, Conductor, build requests, rendered files, manifests, digests,
+signatures, and verified track reloads bind the same canonical documents.
+Duplicate keys, non-canonical or precision-losing numbers, unpaired Unicode
+surrogates, reserved security fields, and bounded-depth/size violations fail
+before durable track or idempotency state. Viewer access remains read-only;
+Maintainer and Architect writes still require the server's workspace
+capability.
+
+The single integrated release gate passed every Go package/command test, 13/13
+Node tests including both promoted real-Chromium journeys, both production
+binary builds, and `git diff --check`. Chromium covered two signed templates,
+custom field add/edit/remove, exact Unicode round-trip, adversarial JSON,
+explicit template reconciliation, delayed build/file/runtime isolation,
+verified-track reload, receipt tampering, Viewer isolation, Maintainer editing,
+responsive reflow, and the approved Shura decision-to-finance handoff.
+
+Railway deployment `12cbe8e9-67fa-45dc-97e8-057ea4781de9` reached terminal
+`SUCCESS` with image digest
+`sha256:a1eddb5082114ea962f3932b15baec942ac4d42012d27b00b4a49918c35f0afc`.
+Deploy logs show one container start, database initialization, and the server
+binding `:8080` without an application error. Eight low-rate public probe pairs
+over approximately forty seconds returned 8/8 `200` for `/api/health`
+(`status=ok`) and 8/8 `200` for `/` (`Taawun Builder`).
+
+A bounded live API smoke used the real three-template/eleven-module catalog and
+created an exact Unicode component preview (`201`) on track
+`track_9a5s93wgCRQPpKsLubsmeMvc`. The signed document was anonymous `401` and
+owner `200`; a fresh Viewer was denied People access before invitation (`403`),
+accepted the invitation (`200`), then read People, the track, and signed file
+(`200`) while preview mutation remained denied (`403`). Workspace `25` and
+users `32`/`33` were deleted through supported routes with `204/204/204`.
+
+One earlier smoke harness stopped after registration because registration and
+login are intentionally separate. It created no workspace or artifact, but its
+random credential was not retained after the process exited. Allocation order
+suggests user `30`; that ID is an inference, not a read-back. It remains a
+supported-admin cleanup item and was not deleted or inspected through raw
+database access. The rollback evidence remains application `09cd897` /
+deployment `c2374acf-7102-4471-91fd-e568f7bdb5ce`; use Railway's supported
+redeploy path only for an application-caused regression, not for a transient
+edge event.
+
+This is an implementation/deployment handoff, not independent live-browser
+acceptance. QA's Codex Browser bridge is temporarily blocked by an external
+trusted-plugin-path mismatch and will run the required fresh browser matrix
+after that tooling trust state is refreshed.

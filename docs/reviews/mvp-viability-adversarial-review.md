@@ -444,3 +444,37 @@ diff. Railway deployment `c2374acf-7102-4471-91fd-e568f7bdb5ce` reached terminal
 surfaces are served. This is a deployment handoff awaiting independent persona
 acceptance, not a second adversarial review or a claim that external DNS/Bazaar
 fixtures are now available.
+
+The next bounded checkpoint is implemented in application commit `5c5018c`,
+again without re-running or reclassifying the original adversarial review. It
+turns the real curated catalog into a component-document builder while retaining
+one instance per allowed module and the existing signed-artifact primitives.
+Exact canonical JSON now flows through HTTP/MCP, durable tracks, build requests,
+safe rendering, per-component files, the v2 manifest/content hash/signature, and
+verified reload. Legacy v1 artifacts retain a narrow component-free read path.
+The editor fails closed on incomplete catalog contracts, duplicate or
+non-canonical JSON, unpaired Unicode surrogates, reserved authority/network/code
+keys, and bounded depth/size violations; delayed responses cannot replace a
+newer principal, workspace, draft, iframe, or trusted receipt.
+
+The Shura prerequisite is also closed in source: an exact final approved
+decision ID is displayed and carried into Finance only for the same selected
+workspace/proposal/version, while the finance server continues to revalidate
+authority. Viewer state is read-only and Maintainer/Architect controls retain
+their existing capability boundaries.
+
+All Go packages/commands, 13/13 Node tests with promoted real Chromium, both
+production builds, diff hygiene, backend security review, and UI release review
+passed. Deployment `12cbe8e9-67fa-45dc-97e8-057ea4781de9` reached Railway
+terminal `SUCCESS`; 8/8 health and 8/8 root probes were `200`. A live bounded
+organizer-to-Viewer smoke passed real 3-template/11-module catalog, exact Unicode
+preview, signed-file authorization, invitation isolation/acceptance, Viewer
+read, Viewer build denial, and supported cleanup. Workspace `25` and users
+`32`/`33` cleaned with `204`.
+
+One registration-only harness principal has no workspace or artifact and is
+inferred by allocation sequence as user `30`; no read-back or deletion is
+claimed. It joins the supported-admin cleanup backlog. Independent live-browser
+acceptance remains pending because the Codex Browser plugin currently fails
+before browser selection on an external trusted-path mismatch; API-only evidence
+does not replace that required gate.
