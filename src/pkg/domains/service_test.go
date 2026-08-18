@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -40,10 +41,34 @@ func (a fakeWorkspaceAuthorizer) AuthorizeWorkspaceCapability(actor *models.User
 
 type fakeResolver struct {
 	values map[string][]string
+	err    error
 }
 
 func (r *fakeResolver) LookupTXT(_ context.Context, name string) ([]string, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
 	return append([]string(nil), r.values[name]...), nil
+}
+
+func TestVerifyTreatsMissingDNSNameAsMissingProof(t *testing.T) {
+	db := openDomainTestDB(t)
+	service, err := NewService(db, fakeWorkspaceAuthorizer{roles: map[int]string{1: models.WorkspaceRoleOwner}}, Options{
+		Artifacts:      &fakeArtifacts{results: map[string]artifacts.BuildResult{}, files: map[string]map[string]artifacts.ArtifactFile{}},
+		PreviewOrigins: []string{"https://preview.taawun.example"},
+		Resolver:       &fakeResolver{err: &net.DNSError{Err: "no such host", Name: "_taawun.missing.example", IsNotFound: true}},
+	})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	owner := &models.User{ID: 1, Role: models.RoleUser}
+	claimed, err := service.ClaimOrigin(context.Background(), owner, 1, "https://missing.example")
+	if err != nil {
+		t.Fatalf("ClaimOrigin() error = %v", err)
+	}
+	if _, err := service.Verify(context.Background(), owner, 1, claimed.Claim.ID); !errors.Is(err, ErrDNSProofNotFound) {
+		t.Fatalf("Verify() missing DNS name error = %v, want ErrDNSProofNotFound", err)
+	}
 }
 
 type fakeArtifacts struct {

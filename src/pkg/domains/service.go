@@ -155,6 +155,10 @@ func (s *Service) Verify(ctx context.Context, actor *models.User, workspaceID in
 	}
 	values, err := s.resolver.LookupTXT(ctx, challengeRecord(claim.Host))
 	if err != nil {
+		var dnsError *net.DNSError
+		if errors.As(err, &dnsError) && dnsError.IsNotFound {
+			return Claim{}, ErrDNSProofNotFound
+		}
 		return Claim{}, fmt.Errorf("resolve DNS TXT proof: %w", err)
 	}
 	matched := false
