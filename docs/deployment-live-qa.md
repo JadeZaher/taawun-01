@@ -164,3 +164,22 @@ process-local one-use-ticket replay store. Durable relay federation, shared
 replay state, TURN provisioning, device-key enrollment/E2EE recovery, live
 financial settlement, and qualified scholarly authority remain explicitly
 deferred.
+
+## 2026-08-18 exact-manifest attestation handoff
+
+Commit `57d9fd1` binds the browser receipt to the exact manifest serialized by
+the trusted server after artifact signature verification. The client recomputes
+the SHA-256 digest, compares the complete manifest, checks the displayed scalar
+identity/signature relationships, and requires a future authorization expiry
+before showing the active verified state. Cryptographically attested but expired
+evidence is labelled signed-and-expired; missing, changed, inconsistent, or
+expired authorization never renders the active `Verified` claim.
+
+The integrated release gate passed all Go package/command tests and 12/12 Node
+tests, including the required real-Chromium positive and tamper matrix. Railway
+deployment `1bfa3008-319c-49ba-bd52-090da3dbfa5e` reached terminal `SUCCESS`
+with image digest
+`sha256:30bfd3f9eac2037ed991d9194630b38a95aabcc0de74e2b5387e0a7318a9b79b`.
+Independent public probes returned `200` for `/api/health` with `status=ok` and
+`200` for `/` with the Taawun cockpit. This remains an implementation handoff
+pending paired live-browser acceptance.

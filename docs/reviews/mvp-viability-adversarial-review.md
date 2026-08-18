@@ -394,3 +394,15 @@ Ranked next increments after baseline QA signs off:
 5. **Measured private-beta checkpoint:** use only lightweight, boundary-safe funnel
    diagnostics already available from request/track events; do not add surveillance
    or a separate analytics platform.
+
+The sole receipt-attestation P1 identified during the first trust retest is
+addressed in commit `57d9fd1`. The response now binds the exact server-serialized
+manifest to a digest after trusted artifact verification, while the cockpit
+recomputes and compares the complete manifest and rejects expired or internally
+inconsistent authorization. The promoted real-Chromium matrix covers altered
+identity/signature fields, lifecycle, expiry, every allowed-origin category,
+missing evidence, and elapsed expiry. Railway deployment
+`1bfa3008-319c-49ba-bd52-090da3dbfa5e` reached terminal `SUCCESS`; public health
+and cockpit probes both returned `200`. This is source/deployment evidence
+awaiting independent QA acceptance, not a second review or a broadened trust
+claim.

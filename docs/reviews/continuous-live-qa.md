@@ -297,3 +297,21 @@ Sign-off requires zero open P0/P1 findings, a real-browser sellable journey, gre
 deployment/tests, a final comprehensive regression pass with no new failures, and
 explicit limitation of remaining gaps to external DNS or the documented
 federation/TURN/E2EE deferrals.
+
+## Implementation handoff awaiting independent retest
+
+Application commit `57d9fd1` addresses the receipt-attestation scope finding by
+binding the trusted server's exact serialized manifest to a SHA-256 digest and
+requiring the browser to recompute and compare the complete rendered manifest.
+The active verified state additionally requires matching artifact, content,
+workspace, signature algorithm/key/value, internal subject/signer relationships,
+and a future authorization expiry. Expired authentic evidence is labelled
+signed-and-expired; missing, altered, inconsistent, or expired authorization does
+not display the active `Verified` claim.
+
+The implementation gate passed all Go package/command tests, 12/12 Node tests
+including required real Chromium, `git diff --check`, and independent source/test
+review. Railway deployment `1bfa3008-319c-49ba-bd52-090da3dbfa5e` reached
+terminal `SUCCESS`; direct public probes returned `200` for `/api/health`
+(`status=ok`) and `/` with the Taawun cockpit title. QA acceptance and persona
+discoverability work remain paused until the independent live retest completes.
