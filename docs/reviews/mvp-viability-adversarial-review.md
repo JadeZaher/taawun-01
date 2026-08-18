@@ -426,3 +426,21 @@ have deleted them; user `22`/workspace `17` is observed clean. Supported admin
 cleanup routes exist, but no authenticated admin principal or configured
 bootstrap-admin environment was available. No raw database cleanup or authority
 bypass was attempted.
+
+The next ranked increment is implemented in application commit `09cd897`, without
+re-running or reclassifying this review. The Swiss cockpit now exposes the real
+catalog, workspace-scoped People/invitations, Shura, durable financial sandbox,
+and published-only Bazaar through one role-aware Workspace surface. It explicitly
+labels session-only records where no list primitive exists, offers ID-based
+recovery, preserves honest error/empty states, and keeps the controlled-DNS and
+authorized-reviewer Bazaar fixture dependency visible. Delayed workspace and
+prior-principal responses fail closed before UI state changes.
+
+Every Go package/command and 13/13 Node tests passed, including required real
+Chromium organizer, invited Viewer, and Maintainer paths plus the previously
+accepted signed-receipt matrix. Independent source/test review approved the final
+diff. Railway deployment `c2374acf-7102-4471-91fd-e568f7bdb5ce` reached terminal
+`SUCCESS`; public health and cockpit checks returned `200` and confirmed the new
+surfaces are served. This is a deployment handoff awaiting independent persona
+acceptance, not a second adversarial review or a claim that external DNS/Bazaar
+fixtures are now available.

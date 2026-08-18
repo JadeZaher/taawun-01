@@ -215,3 +215,42 @@ attempt stopped before reading or mutating fixture data. No database access,
 token minting, or inferred deletion was used; the control room was asked to
 supply an authorized admin session or explicitly authorize deliberate use of
 the existing bootstrap-admin provisioning primitive.
+
+## 2026-08-18 role-aware workspace discoverability handoff
+
+Application commit `09cd897` adds one compact Workspace surface over existing
+private-beta primitives. It renders the real approved template/module catalog,
+workspace-scoped usernames and roles, invitation create/accept, Shura
+create/recover/vote/decide, the seven durable financial sandbox flows and quest
+lifecycle, and the public published-only Bazaar catalog. Where the server has no
+list API, the cockpit labels browser-session records and supports durable recovery
+by ID instead of inventing a feed. Empty/error/retry states remain explicit, and
+finance/Bazaar copy continues to disclaim custody, balances, settlement,
+certification, and scholarly authority.
+
+The People response contains only active usernames, roles, and join times after
+workspace authorization; email and password fields are absent. Delayed workspace
+or prior-principal responses are rejected before updating the cockpit, and
+workspace-bound invitation, Shura, quest, and Bazaar results cannot write across
+selection or sign-out boundaries. Viewer controls stay read-only, Maintainers may
+build/propose/vote, and Architects retain invitation, decision, publication, and
+state-valid sandbox controls.
+
+The integrated gate passed every Go package/command and 13/13 Node tests. Required
+real Chromium covered organizer → invited Viewer → Maintainer, rapid workspace
+and sign-out response races, keyboard tab/panel navigation, 320/400-pixel and
+effective 200% reflow, Shura vote/decision, donation quest
+PENDING → APPROVED → EXECUTING → SETTLED, and Bazaar
+error → empty → published test-drive/purchase/refresh/install. The accepted
+signed-preview/receipt/sandbox regression also remained green. Independent review
+approved the corrected diff.
+
+QA ledger commit `e8345ad` preserves the independent task's supplied evidence
+verbatim. Railway deployment `c2374acf-7102-4471-91fd-e568f7bdb5ce` reached
+terminal `SUCCESS` with image
+`sha256:825e94375a0920bcb88a25406d59552ee269717b18cc57b4b0a8174a26fc00a4`.
+Public `/api/health` returned `200` with `status=ok`; `/` returned `200` and the
+served document contained the Workspace tools, People, financial sandbox, and
+published Bazaar surfaces. Persona acceptance remains with the paired live-QA
+task; this handoff does not claim a published Bazaar fixture or controlled-DNS
+journey.
