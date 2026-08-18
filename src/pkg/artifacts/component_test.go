@@ -94,6 +94,46 @@ func TestComponentDocumentValidationRejectsUnsafeAndUnboundedData(t *testing.T) 
 	}
 }
 
+func TestComponentDocumentUnicodeScalarsRejectSubstitutionAndPreserveValidPairs(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		data string
+	}{
+		{name: "root high surrogate", data: `{"title":"Unicode","summary":"\ud800"}`},
+		{name: "root low surrogate", data: `{"title":"Unicode","summary":"\udfff"}`},
+		{name: "nested high surrogate", data: `{"title":"Unicode","summary":"Safe","details":{"note":"\ud800"}}`},
+		{name: "nested low surrogate", data: `{"title":"Unicode","summary":"Safe","items":[{"note":"\udc00"}]}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := CanonicalizeSuppliedComponents(TemplateCommunityIftar, []string{ModuleAnnouncements}, []ComponentInstance{{
+				ID: ModuleAnnouncements, Type: ModuleAnnouncements, Data: json.RawMessage(test.data),
+			}})
+			var validation *ComponentValidationError
+			if !errors.As(err, &validation) || validation.Reason != "invalid_unicode_scalar" || validation.Key != "" {
+				t.Fatalf("unicode validation = %#v err=%v", validation, err)
+			}
+			if strings.Contains(err.Error(), test.data) || strings.Contains(err.Error(), "d800") || strings.Contains(err.Error(), "dc00") || strings.Contains(err.Error(), "dfff") {
+				t.Fatalf("unicode validation leaked raw value: %v", err)
+			}
+		})
+	}
+
+	escaped := []ComponentInstance{{ID: ModuleAnnouncements, Type: ModuleAnnouncements, Data: json.RawMessage(`{"title":"Unicode","summary":"\ud83d\ude00","details":{"note":"\uD83D\uDE80"}}`)}}
+	literal := []ComponentInstance{{ID: ModuleAnnouncements, Type: ModuleAnnouncements, Data: json.RawMessage(`{"title":"Unicode","summary":"😀","details":{"note":"🚀"}}`)}}
+	first, err := CanonicalizeSuppliedComponents(TemplateCommunityIftar, []string{ModuleAnnouncements}, escaped)
+	if err != nil {
+		t.Fatalf("escaped surrogate pairs: %v", err)
+	}
+	second, err := CanonicalizeSuppliedComponents(TemplateCommunityIftar, []string{ModuleAnnouncements}, literal)
+	if err != nil {
+		t.Fatalf("literal Unicode scalars: %v", err)
+	}
+	want := `{"details":{"note":"🚀"},"summary":"😀","title":"Unicode"}`
+	if !componentInstancesEqual(first, second) || string(first[0].Data) != want {
+		t.Fatalf("valid Unicode canonicalization = %s / %s, want %s", first[0].Data, second[0].Data, want)
+	}
+}
+
 func TestComponentReservedKeysCoverCredentialAndArtifactVariants(t *testing.T) {
 	for _, key := range []string{
 		"artifactId", "CONTENT_HASH", "manifest-digest", "Contract_Version", "templateId", "module-id", "component_ID",

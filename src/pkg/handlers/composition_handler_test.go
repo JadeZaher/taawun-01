@@ -181,6 +181,44 @@ func TestCompositionPreviewReturnsSafeComponentValidationDetails(t *testing.T) {
 	}
 }
 
+func TestCompositionPreviewRejectsUnpairedUnicodeEscapesSafely(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		document string
+	}{
+		{name: "root high surrogate", document: `{"title":"Unicode","summary":"\ud800"}`},
+		{name: "nested low surrogate", document: `{"title":"Unicode","summary":"Safe","details":{"note":"\udc00"}}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			service := &compositionServiceStub{validateComponents: true}
+			handler, err := NewCompositionHTTPHandler(service, artifactReaderStub{}, CurrentUser, []string{"http://localhost:8080"})
+			if err != nil {
+				t.Fatalf("NewCompositionHTTPHandler() error = %v", err)
+			}
+			body := `{"idempotencyKey":"unicode-denial","workspaceId":7,"appName":"Preview","organizationName":"Community","city":"Denver","madhhab":"hanafi","templateId":"community-iftar","modules":["announcements"],"components":[{"id":"announcements","type":"announcements","data":DOCUMENT}],"requestedOrigins":{"surfaces":["http://localhost:8080"]}}`
+			body = strings.Replace(body, "DOCUMENT", test.document, 1)
+			request := httptest.NewRequest(http.MethodPost, "/api/artifacts/preview", strings.NewReader(body))
+			request.Header.Set("Content-Type", "application/json")
+			request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7}))
+			response := httptest.NewRecorder()
+
+			handler.Preview(response, request)
+
+			if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), `"code":"invalid_composition"`) || !strings.Contains(response.Body.String(), `"reason":"invalid_unicode_scalar"`) {
+				t.Fatalf("Unicode rejection = status:%d body:%s", response.Code, response.Body.String())
+			}
+			for _, secret := range []string{"d800", "dc00", "Unicode", "Safe"} {
+				if strings.Contains(response.Body.String(), secret) {
+					t.Fatalf("Unicode rejection leaked %q: %s", secret, response.Body.String())
+				}
+			}
+			if len(service.request.Components) != 1 || !bytes.Contains(service.request.Components[0].Data, []byte(`\u`)) {
+				t.Fatalf("HTTP transport lost raw Unicode escape: %#v", service.request.Components)
+			}
+		})
+	}
+}
+
 func TestCompositionPreviewRejectsExplicitEmptyComponents(t *testing.T) {
 	service := &compositionServiceStub{track: previewTrack(), rejectEmptyComponents: true}
 	handler, err := NewCompositionHTTPHandler(service, artifactReaderStub{}, CurrentUser, []string{"http://localhost:8080"})
@@ -437,12 +475,18 @@ type compositionServiceStub struct {
 	request               conductor.CompositionRequest
 	composeErr            error
 	rejectEmptyComponents bool
+	validateComponents    bool
 }
 
 func (s *compositionServiceStub) Compose(_ context.Context, actor *models.User, request conductor.CompositionRequest) (*conductor.ComposeResult, error) {
 	s.actor, s.request = actor, request
 	if s.rejectEmptyComponents && request.Components != nil && len(request.Components) == 0 {
 		return nil, errors.Join(conductor.ErrInvalidComposition, &artifacts.ComponentValidationError{Reason: "components_required"})
+	}
+	if s.validateComponents {
+		if _, err := artifacts.CanonicalizeSuppliedComponents(request.TemplateID, request.Modules, request.Components); err != nil {
+			return nil, errors.Join(conductor.ErrInvalidComposition, err)
+		}
 	}
 	if s.composeErr != nil {
 		return nil, s.composeErr

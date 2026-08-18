@@ -170,6 +170,45 @@ func TestInvalidComponentDocumentDoesNotConsumeTrackOrIdempotency(t *testing.T) 
 	}
 }
 
+func TestInvalidComponentUnicodeDoesNotConsumeTrackOrIdempotency(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		data json.RawMessage
+	}{
+		{name: "root high surrogate", data: json.RawMessage(`{"title":"Unicode","summary":"\ud800"}`)},
+		{name: "nested low surrogate", data: json.RawMessage(`{"title":"Unicode","summary":"Safe","details":{"note":"\udc00"}}`)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			harness := newConductorHarness(t)
+			request := validCompositionRequest()
+			request.IdempotencyKey = "unicode-scalar-retry"
+			request.Components = []artifacts.ComponentInstance{
+				{ID: artifacts.ModuleAnnouncements, Type: artifacts.ModuleAnnouncements, Data: test.data},
+				{ID: artifacts.ModuleRegistration, Type: artifacts.ModuleRegistration, Data: json.RawMessage(`{"title":"Register","summary":"Safe"}`)},
+			}
+
+			result, err := harness.service.Compose(context.Background(), harness.owner, request)
+			var validation *artifacts.ComponentValidationError
+			if result != nil || !errors.Is(err, ErrInvalidComposition) || !errors.As(err, &validation) || validation.Reason != "invalid_unicode_scalar" || harness.origins.calls != 0 || harness.builder.buildCalls != 0 {
+				t.Fatalf("invalid Unicode result=%#v validation=%#v origins=%d builds=%d err=%v", result, validation, harness.origins.calls, harness.builder.buildCalls, err)
+			}
+			var tracks int
+			if err := harness.repository.db.QueryRow(`SELECT COUNT(*) FROM conductor_tracks`).Scan(&tracks); err != nil || tracks != 0 {
+				t.Fatalf("invalid Unicode persisted %d tracks: %v", tracks, err)
+			}
+
+			request.Components[0].Data = json.RawMessage(`{"title":"Unicode","summary":"\ud83d\ude00","details":{"note":"🚀"}}`)
+			corrected, err := harness.service.Compose(context.Background(), harness.owner, request)
+			if err != nil || corrected == nil || !corrected.Created || corrected.Track.Status != TrackPreviewReady {
+				t.Fatalf("corrected Unicode same-key composition = %#v err=%v", corrected, err)
+			}
+			if got := string(corrected.Track.BuildRequest.Components[0].Data); got != `{"details":{"note":"🚀"},"summary":"😀","title":"Unicode"}` {
+				t.Fatalf("canonical persisted Unicode document = %s", got)
+			}
+		})
+	}
+}
+
 func TestExplicitEmptyComponentsFailBeforeTrackCreation(t *testing.T) {
 	harness := newConductorHarness(t)
 	request := validCompositionRequest()

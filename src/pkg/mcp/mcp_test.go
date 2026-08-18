@@ -168,7 +168,12 @@ func TestComposeRejectsExplicitEmptyComponentsAndUntrustedMetadata(t *testing.T)
 }
 
 func TestStreamableHTTPPreservesComponentDocumentLexemesForValidation(t *testing.T) {
-	store := &fakeArtifactStore{}
+	artifactID := "artifact_unicode_test"
+	hash := strings.Repeat("a", 64)
+	store := &fakeArtifactStore{openResult: artifacts.BuildResult{
+		ArtifactID: artifactID, ContentHash: hash,
+		Manifest: artifacts.Manifest{ArtifactID: artifactID, ContentHash: hash},
+	}}
 	server, err := NewMCPServer(store, &fakeWorkspaceAuthorizer{workspace: &models.Workspace{ID: 42, Status: models.WorkspaceStatusActive}}, testCurrentUser,
 		ServerOptions{OriginAuthorizer: mustStaticOriginAuthorizer(t, "https://app.example"), AuthorizationBoundary: allowAllAuthorizationBoundary{}})
 	if err != nil {
@@ -184,6 +189,8 @@ func TestStreamableHTTPPreservesComponentDocumentLexemesForValidation(t *testing
 		{name: "duplicate key", document: `{"title":"Register","summary":"Join","note":1,"note":2}`, reason: "duplicate_key"},
 		{name: "exponent", document: `{"title":"Register","summary":"Join","amount":1e0}`, reason: "non_canonical_number"},
 		{name: "trailing zero", document: `{"title":"Register","summary":"Join","amount":1.0}`, reason: "non_canonical_number"},
+		{name: "root high surrogate", document: `{"title":"Register","summary":"\ud800"}`, reason: "invalid_unicode_scalar"},
+		{name: "nested low surrogate", document: `{"title":"Register","summary":"Join","details":{"note":"\udc00"}}`, reason: "invalid_unicode_scalar"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			arguments := json.RawMessage(strings.Replace(argumentTemplate, "DOCUMENT", test.document, 1))
@@ -201,6 +208,19 @@ func TestStreamableHTTPPreservesComponentDocumentLexemesForValidation(t *testing
 	store.mu.Unlock()
 	if buildCalls != 0 {
 		t.Fatalf("artifact build called %d times for lexically invalid MCP documents", buildCalls)
+	}
+
+	arguments := json.RawMessage(strings.Replace(argumentTemplate, "DOCUMENT", `{"title":"Register","summary":"\ud83d\ude00","details":{"note":"🚀"}}`, 1))
+	result, err := session.CallTool(t.Context(), &mcpsdk.CallToolParams{Name: "taawun_compose_card_bundle", Arguments: arguments})
+	if err != nil || result.IsError {
+		t.Fatalf("valid Unicode scalar pair result = %#v err=%v", result, err)
+	}
+	store.mu.Lock()
+	lastBuild := store.lastBuild
+	buildCalls = store.buildCalls
+	store.mu.Unlock()
+	if buildCalls != 1 || len(lastBuild.Components) != 1 || string(lastBuild.Components[0].Data) != `{"details":{"note":"🚀"},"summary":"😀","title":"Register"}` {
+		t.Fatalf("valid Unicode MCP build = calls:%d components:%#v", buildCalls, lastBuild.Components)
 	}
 }
 

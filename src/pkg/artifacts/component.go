@@ -297,6 +297,9 @@ func canonicalComponentDocument(componentID string, document json.RawMessage) (j
 	if !utf8.Valid(document) {
 		return nil, componentError(componentID, "", "invalid_utf8")
 	}
+	if !validJSONUnicodeScalars(document) {
+		return nil, componentError(componentID, "", "invalid_unicode_scalar")
+	}
 	decoder := json.NewDecoder(bytes.NewReader(document))
 	decoder.UseNumber()
 	state := &documentValidationState{componentID: componentID}
@@ -315,6 +318,66 @@ func canonicalComponentDocument(componentID string, document json.RawMessage) (j
 		return nil, componentError(componentID, "", "document_too_large")
 	}
 	return json.RawMessage(canonical), nil
+}
+
+// validJSONUnicodeScalars rejects escapes that encoding/json would replace with U+FFFD.
+func validJSONUnicodeScalars(document []byte) bool {
+	inString := false
+	for index := 0; index < len(document); index++ {
+		switch document[index] {
+		case '"':
+			inString = !inString
+		case '\\':
+			if !inString || index+1 >= len(document) {
+				continue
+			}
+			escape := document[index+1]
+			if escape != 'u' {
+				index++
+				continue
+			}
+			code, ok := jsonUnicodeEscape(document, index)
+			if !ok {
+				continue
+			}
+			if code >= 0xdc00 && code <= 0xdfff {
+				return false
+			}
+			if code >= 0xd800 && code <= 0xdbff {
+				lowIndex := index + 6
+				low, paired := jsonUnicodeEscape(document, lowIndex)
+				if !paired || low < 0xdc00 || low > 0xdfff {
+					return false
+				}
+				index = lowIndex + 5
+				continue
+			}
+			index += 5
+		}
+	}
+	return true
+}
+
+func jsonUnicodeEscape(document []byte, slashIndex int) (uint16, bool) {
+	if slashIndex < 0 || slashIndex+5 >= len(document) || document[slashIndex] != '\\' || document[slashIndex+1] != 'u' {
+		return 0, false
+	}
+	var value uint16
+	for index := slashIndex + 2; index <= slashIndex+5; index++ {
+		digit := document[index]
+		value <<= 4
+		switch {
+		case digit >= '0' && digit <= '9':
+			value |= uint16(digit - '0')
+		case digit >= 'a' && digit <= 'f':
+			value |= uint16(digit-'a') + 10
+		case digit >= 'A' && digit <= 'F':
+			value |= uint16(digit-'A') + 10
+		default:
+			return 0, false
+		}
+	}
+	return value, true
 }
 
 func decodeDocumentValue(decoder *json.Decoder, state *documentValidationState, depth int, path string) (any, error) {
