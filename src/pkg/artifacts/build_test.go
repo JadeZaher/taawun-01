@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -41,6 +42,10 @@ func TestBuildPublishesCompleteContentAddressedBundle(t *testing.T) {
 		"cards/announcements.html",
 		"cards/donation-campaign.html",
 		"cards/iftar-registration.html",
+		"components.json",
+		"components/announcements.json",
+		"components/donation-campaign.json",
+		"components/iftar-registration.json",
 		"embed-loader.js",
 		"embed.html",
 		"index.html",
@@ -307,6 +312,132 @@ func TestBundleTreatsConfigurationAsDataAndContainsNoUserCode(t *testing.T) {
 	}
 	if !strings.Contains(index, datastarRuntimePath) || strings.Contains(index, "cdn.") {
 		t.Fatalf("preview does not use the pinned same-origin runtime: %s", index)
+	}
+}
+
+func TestComponentDocumentsDriveEscapedSignedOutputDeterministically(t *testing.T) {
+	builder := newTestBuilder(t)
+	request := validBuildRequest()
+	request.Components = []ComponentInstance{
+		{ID: ModuleRegistration, Type: ModuleRegistration, Data: defaultComponentDocument(ModuleRegistration)},
+		{ID: ModuleAnnouncements, Type: ModuleAnnouncements, Data: json.RawMessage(`{"zeta":{"b":2,"a":1},"summary":"<script>alert(1)</script>","title":"Trusted <updates>","audiences":["families",3,true]}`)},
+		{ID: ModuleDonationCampaign, Type: ModuleDonationCampaign, Data: defaultComponentDocument(ModuleDonationCampaign)},
+	}
+	first, err := builder.Build(context.Background(), request)
+	if err != nil {
+		t.Fatalf("Build(component documents): %v", err)
+	}
+	if first.Manifest.ContractVersion != ManifestContractVersion || first.Manifest.Signature.ContractVersion != SignatureContractVersion || len(first.Manifest.Components) != 3 {
+		t.Fatalf("v2 component manifest = %#v", first.Manifest)
+	}
+	var announcement ComponentManifest
+	for _, component := range first.Manifest.Components {
+		if component.Type == ModuleAnnouncements {
+			announcement = component
+		}
+	}
+	wantDocument := `{"audiences":["families",3,true],"summary":"\u003cscript\u003ealert(1)\u003c/script\u003e","title":"Trusted \u003cupdates\u003e","zeta":{"a":1,"b":2}}`
+	if string(announcement.Data) != wantDocument || announcement.DocumentSHA256 != componentDocumentDigest(announcement.Data) {
+		t.Fatalf("announcement binding = %#v", announcement)
+	}
+	if got := string(readBundleFile(t, first.Directory, announcement.DocumentPath)); got != wantDocument {
+		t.Fatalf("stored document = %q", got)
+	}
+	index := string(readBundleFile(t, first.Directory, "index.html"))
+	if strings.Contains(index, "<script>alert(1)</script>") || !strings.Contains(index, "&lt;script&gt;alert(1)&lt;/script&gt;") || !strings.Contains(index, "Trusted &lt;updates&gt;") || !strings.Contains(index, "audiences") {
+		t.Fatalf("component data was not generically escaped: %s", index)
+	}
+
+	reordered := request
+	reordered.Components = []ComponentInstance{
+		{ID: ModuleDonationCampaign, Type: ModuleDonationCampaign, Data: defaultComponentDocument(ModuleDonationCampaign)},
+		{ID: ModuleAnnouncements, Type: ModuleAnnouncements, Data: json.RawMessage(`{"title":"Trusted <updates>","audiences":["families",3,true],"zeta":{"a":1,"b":2},"summary":"<script>alert(1)</script>"}`)},
+		{ID: ModuleRegistration, Type: ModuleRegistration, Data: defaultComponentDocument(ModuleRegistration)},
+	}
+	second, err := builder.Build(context.Background(), reordered)
+	if err != nil || second.ContentHash != first.ContentHash || second.ArtifactID != first.ArtifactID {
+		t.Fatalf("canonical rebuild = %#v err=%v, want %s", second, err, first.ContentHash)
+	}
+
+	changed := request
+	changed.Components = append([]ComponentInstance(nil), request.Components...)
+	changed.Components[1].Data = json.RawMessage(`{"summary":"A changed summary","title":"Trusted updates"}`)
+	third, err := builder.Build(context.Background(), changed)
+	if err != nil || third.ContentHash == first.ContentHash {
+		t.Fatalf("changed component hash = %#v err=%v", third, err)
+	}
+}
+
+func TestOpenRejectsMissingOrTamperedV2ComponentDocuments(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		tamper func(string, Manifest)
+	}{
+		{name: "missing", tamper: func(directory string, manifest Manifest) {
+			_ = os.Remove(filepath.Join(directory, filepath.FromSlash(manifest.Components[0].DocumentPath)))
+		}},
+		{name: "tampered", tamper: func(directory string, manifest Manifest) {
+			_ = os.WriteFile(filepath.Join(directory, filepath.FromSlash(manifest.Components[0].DocumentPath)), []byte(`{"summary":"tampered","title":"tampered"}`), 0o644)
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			builder := newTestBuilder(t)
+			result, err := builder.Build(context.Background(), validBuildRequest())
+			if err != nil {
+				t.Fatalf("Build(): %v", err)
+			}
+			test.tamper(result.Directory, result.Manifest)
+			if _, err := builder.Open(context.Background(), result.ContentHash); !errors.Is(err, ErrArtifactConflict) {
+				t.Fatalf("Open() error = %v, want artifact conflict", err)
+			}
+		})
+	}
+}
+
+func TestOpenRetainsLegacyV1SignatureCompatibility(t *testing.T) {
+	builder := newTestBuilder(t)
+	createdAt := builder.now()
+	origins := OriginPolicy{Surfaces: []string{"https://community.example"}}
+	manifest := Manifest{
+		ContractVersion: ManifestContractVersionV1, WorkspaceID: 42, AppName: "Legacy card",
+		Template: TemplateIdentity{ID: TemplateCommunityIftar, Version: "1.0.0"},
+		Security: SecurityPolicy{AllowedOrigins: origins},
+		Authorization: BundleAuthorization{
+			Version: SignatureContractVersionV1, Subject: BundleSubject{ID: "user:7", UserID: 7, WorkspaceID: 42},
+			AllowedOrigins: origins, ApprovedDomains: []string{"community.example"}, ExpiresAt: createdAt.Add(time.Hour),
+			SignerKeyID: builder.keyID, Lifecycle: BundleLifecyclePreview,
+		},
+	}
+	contentHash, err := semanticManifestHash(manifest)
+	if err != nil {
+		t.Fatalf("legacy semantic hash: %v", err)
+	}
+	manifest.ArtifactID = "art_legacy_v1"
+	manifest.ContentHash = contentHash
+	manifest.CreatedAt = createdAt
+	manifest.Signature = BundleSignature{ContractVersion: SignatureContractVersionV1, Algorithm: "Ed25519", KeyID: builder.keyID, SignedFields: append([]string(nil), signedManifestFieldsV1...)}
+	payload, err := signaturePayload(manifest)
+	if err != nil {
+		t.Fatalf("legacy signature payload: %v", err)
+	}
+	manifest.Signature.Value = base64.RawURLEncoding.EncodeToString(ed25519.Sign(builder.privateKey, payload))
+	directory, err := safeJoin(builder.root, contentHash)
+	if err != nil || os.Mkdir(directory, 0o755) != nil {
+		t.Fatalf("create legacy fixture: path=%s err=%v", directory, err)
+	}
+	encoded, _ := json.MarshalIndent(manifest, "", "  ")
+	if err := os.WriteFile(filepath.Join(directory, "manifest.json"), encoded, 0o644); err != nil {
+		t.Fatalf("write legacy manifest: %v", err)
+	}
+	opened, err := builder.Open(context.Background(), contentHash)
+	if err != nil || opened.Manifest.ContractVersion != ManifestContractVersionV1 || len(opened.Manifest.Components) != 0 {
+		t.Fatalf("Open(legacy) = %#v err=%v", opened, err)
+	}
+
+	componentBearing := manifest
+	componentBearing.Components = []ComponentManifest{{ID: ModuleAnnouncements, Type: ModuleAnnouncements, Data: defaultComponentDocument(ModuleAnnouncements)}}
+	if err := VerifyManifestSignature(componentBearing, builder.privateKey.Public().(ed25519.PublicKey)); !errors.Is(err, ErrInvalidSignature) {
+		t.Fatalf("component-bearing v1 verification = %v", err)
 	}
 }
 

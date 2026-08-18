@@ -28,6 +28,12 @@ Workspace People responses are private workspace evidence. They use `no-store`
 and `nosniff`, keep forbidden/not-found outcomes bounded, and translate unknown
 repository failures to a generic 500 envelope rather than exposing database text.
 
+Component validation failures use a 422 envelope whose only details are the
+bounded component ID, key path, and reason class. Never echo a component value or
+raw document. Verified track reload is opt-in and must reopen the immutable
+artifact before returning the same manifest digest/signature receipt used by the
+initial preview; persisted track shape alone is not verification.
+
 ## Railway client attribution
 
 Public throttles may accept Railway's documented `X-Real-IP` only when the

@@ -23,3 +23,10 @@ Requested preview origins are preflighted and normalized before a durable draft
 or idempotency key is consumed. Conductor re-authorizes them again while
 advancing a staged track; a denial at that race boundary leaves the track
 resumable and never proceeds to validation or signing.
+
+Explicit component documents are validated and canonicalized before origin
+authorization, durable track creation, or idempotency consumption. Omitted
+components stay omitted in the legacy composition hash; default documents are
+resolved into the durable build request. Track cloning always deep-copies raw
+documents, and signed-artifact acceptance compares the exact request documents
+to the complete v2 manifest/file binding.

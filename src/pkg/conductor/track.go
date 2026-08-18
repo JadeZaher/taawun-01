@@ -65,17 +65,18 @@ const (
 )
 
 type CompositionRequest struct {
-	IdempotencyKey   string                 `json:"idempotencyKey"`
-	WorkspaceID      int                    `json:"workspaceId"`
-	AppName          string                 `json:"appName"`
-	OrganizationName string                 `json:"organizationName"`
-	City             string                 `json:"city"`
-	Madhhab          ethics.Madhhab         `json:"madhhab"`
-	TemplateID       string                 `json:"templateId"`
-	Theme            artifacts.ThemeRequest `json:"theme"`
-	Modules          []string               `json:"modules"`
-	RequestedOrigins artifacts.OriginPolicy `json:"requestedOrigins"`
-	TTLHours         int                    `json:"ttlHours"`
+	IdempotencyKey   string                        `json:"idempotencyKey"`
+	WorkspaceID      int                           `json:"workspaceId"`
+	AppName          string                        `json:"appName"`
+	OrganizationName string                        `json:"organizationName"`
+	City             string                        `json:"city"`
+	Madhhab          ethics.Madhhab                `json:"madhhab"`
+	TemplateID       string                        `json:"templateId"`
+	Theme            artifacts.ThemeRequest        `json:"theme"`
+	Modules          []string                      `json:"modules"`
+	Components       []artifacts.ComponentInstance `json:"components,omitempty"`
+	RequestedOrigins artifacts.OriginPolicy        `json:"requestedOrigins"`
+	TTLHours         int                           `json:"ttlHours"`
 }
 
 // TrackRequest is the safe declarative compatibility name used by older routing code.
@@ -221,6 +222,11 @@ func (s *Service) Compose(ctx context.Context, actor *models.User, request Compo
 	if err := validateCompositionRequest(request); err != nil {
 		return nil, err
 	}
+	components, err := artifacts.CanonicalizeSuppliedComponents(request.TemplateID, request.Modules, request.Components)
+	if err != nil {
+		return nil, errors.Join(ErrInvalidComposition, err)
+	}
+	request.Components = components
 	request = normalizeCompositionRequest(request)
 	authorizedOrigins, err := s.origins.AuthorizeOriginsForLifecycle(ctx, actor, workspace, artifacts.BundleLifecyclePreview, cloneOrigins(request.RequestedOrigins))
 	if err != nil {
@@ -291,8 +297,12 @@ func (s *Service) advance(ctx context.Context, actor *models.User, workspace *mo
 			buildRequest := artifacts.BuildRequest{
 				WorkspaceID: track.WorkspaceID, AppName: track.Request.AppName, OrganizationName: track.Request.OrganizationName,
 				City: track.Request.City, Madhhab: track.Request.Madhhab, TemplateID: track.Request.TemplateID,
-				Theme: track.Request.Theme, Modules: append([]string(nil), track.Request.Modules...), AllowedOrigins: cloneOrigins(authorizedOrigins),
+				Theme: track.Request.Theme, Modules: append([]string(nil), track.Request.Modules...), Components: cloneComponents(track.Request.Components), AllowedOrigins: cloneOrigins(authorizedOrigins),
 				Subject: subject, ExpiresAt: s.now().UTC().Add(time.Duration(track.Request.TTLHours) * time.Hour), Lifecycle: artifacts.BundleLifecyclePreview,
+			}
+			buildRequest, err = artifacts.ResolveBuildRequest(buildRequest)
+			if err != nil {
+				return s.fail(ctx, track, actor.ID, "composition_validation_failed", errors.Join(ErrInvalidComposition, err))
 			}
 			if err := s.validator.ValidateComposition(ctx, buildRequest); err != nil {
 				return s.fail(ctx, track, actor.ID, "composition_validation_failed", errors.Join(ErrInvalidComposition, err))
@@ -558,6 +568,8 @@ func validateCompositionRequest(request CompositionRequest) error {
 func normalizeCompositionRequest(request CompositionRequest) CompositionRequest {
 	request.Modules = append([]string(nil), request.Modules...)
 	sort.Strings(request.Modules)
+	request.Components = cloneComponents(request.Components)
+	sort.Slice(request.Components, func(i, j int) bool { return request.Components[i].Type < request.Components[j].Type })
 	request.RequestedOrigins = cloneOrigins(request.RequestedOrigins)
 	return request
 }
@@ -598,7 +610,10 @@ func validateSignedArtifact(artifact ArtifactReference, request artifacts.BuildR
 		return ErrInvalidComposition
 	}
 	manifest := artifact.Manifest
-	if manifest.ArtifactID != artifact.ArtifactID || manifest.ContentHash != artifact.ContentHash || manifest.WorkspaceID != request.WorkspaceID || manifest.Authorization.Subject.WorkspaceID != request.WorkspaceID || manifest.Authorization.Subject.UserID != request.Subject.UserID || manifest.Authorization.Subject.ID != request.Subject.ID || manifest.Authorization.Lifecycle != artifacts.BundleLifecyclePreview || manifest.Signature.Algorithm != "Ed25519" || manifest.Signature.Value == "" || !reflect.DeepEqual(manifest.Authorization.AllowedOrigins, request.AllowedOrigins) {
+	if err := artifacts.ValidateManifestComponents(manifest); err != nil {
+		return ErrInvalidComposition
+	}
+	if manifest.ArtifactID != artifact.ArtifactID || manifest.ContentHash != artifact.ContentHash || manifest.WorkspaceID != request.WorkspaceID || manifest.Authorization.Subject.WorkspaceID != request.WorkspaceID || manifest.Authorization.Subject.UserID != request.Subject.UserID || manifest.Authorization.Subject.ID != request.Subject.ID || manifest.Authorization.Lifecycle != artifacts.BundleLifecyclePreview || manifest.Signature.Algorithm != "Ed25519" || manifest.Signature.Value == "" || !reflect.DeepEqual(manifest.Authorization.AllowedOrigins, request.AllowedOrigins) || !manifestMatchesComponents(manifest, request) {
 		return ErrInvalidComposition
 	}
 	return nil
@@ -613,6 +628,7 @@ func cloneTrack(track *Track) *Track {
 	if track.BuildRequest != nil {
 		build := *track.BuildRequest
 		build.Modules = append([]string(nil), track.BuildRequest.Modules...)
+		build.Components = cloneComponents(track.BuildRequest.Components)
 		build.AllowedOrigins = cloneOrigins(track.BuildRequest.AllowedOrigins)
 		copy.BuildRequest = &build
 	}
@@ -635,6 +651,31 @@ func cloneTrack(track *Track) *Track {
 		copy.Publication = &publication
 	}
 	return &copy
+}
+
+func cloneComponents(components []artifacts.ComponentInstance) []artifacts.ComponentInstance {
+	if components == nil {
+		return nil
+	}
+	cloned := make([]artifacts.ComponentInstance, len(components))
+	for index, component := range components {
+		cloned[index] = component
+		cloned[index].Data = append(json.RawMessage(nil), component.Data...)
+	}
+	return cloned
+}
+
+func manifestMatchesComponents(manifest artifacts.Manifest, request artifacts.BuildRequest) bool {
+	if manifest.ContractVersion != artifacts.ManifestContractVersion || len(manifest.Components) != len(request.Components) {
+		return false
+	}
+	for index, component := range request.Components {
+		bound := manifest.Components[index]
+		if bound.ID != component.ID || bound.Type != component.Type || !reflect.DeepEqual(bound.Data, component.Data) {
+			return false
+		}
+	}
+	return true
 }
 
 func cloneOrigins(policy artifacts.OriginPolicy) artifacts.OriginPolicy {

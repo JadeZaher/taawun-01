@@ -1,6 +1,9 @@
 package artifacts
 
-import "sort"
+import (
+	"encoding/json"
+	"sort"
+)
 
 const (
 	ModuleRegistration     = "iftar-registration"
@@ -88,15 +91,17 @@ var templateCatalog = map[string]templateDefinition{
 
 // ModuleDescriptor is a declarative module contract, never executable code.
 type ModuleDescriptor struct {
-	ContractVersion      string            `json:"contractVersion"`
-	ID                   string            `json:"id"`
-	Version              string            `json:"version"`
-	Title                string            `json:"title"`
-	Capabilities         []string          `json:"capabilities"`
-	Routes               []RouteDescriptor `json:"routes"`
-	Events               []EventDescriptor `json:"events"`
-	DataClassifications  []string          `json:"dataClassifications"`
-	AllowedServerSignals []string          `json:"allowedServerSignals"`
+	ContractVersion      string                     `json:"contractVersion"`
+	ID                   string                     `json:"id"`
+	Version              string                     `json:"version"`
+	Title                string                     `json:"title"`
+	Capabilities         []string                   `json:"capabilities"`
+	Routes               []RouteDescriptor          `json:"routes"`
+	Events               []EventDescriptor          `json:"events"`
+	DataClassifications  []string                   `json:"dataClassifications"`
+	AllowedServerSignals []string                   `json:"allowedServerSignals"`
+	DocumentFields       []ComponentFieldDescriptor `json:"documentFields,omitempty"`
+	DefaultDocument      map[string]any             `json:"defaultDocument,omitempty"`
 }
 
 // RouteDescriptor names a renderer-owned surface route, not a backend endpoint.
@@ -250,6 +255,37 @@ var moduleCatalog = map[string]ModuleDescriptor{
 	},
 }
 
+var moduleDocumentSummaries = map[string]string{
+	ModuleRegistration:     "Invite community members to register locally for the gathering.",
+	ModuleAnnouncements:    "Share concise community updates in the signed card.",
+	ModuleDonationCampaign: "Explain a sandbox fundraising goal without custody or settlement.",
+	ModuleShuraGovernance:  "Describe the community decision process and its review boundary.",
+	ModuleComplianceReview: "Show source-review context as reference-only, pending qualified review.",
+	ModuleBazaarLifecycle:  "Explain the curated Bazaar draft and review lifecycle.",
+	ModuleZakat:            "Present a private estimate workspace with qualified-review reminders.",
+	ModuleQardHasan:        "Describe interest-free assistance terms for a sandbox request.",
+	ModuleVolunteerStipend: "Summarize a transparent volunteer stipend arrangement.",
+	ModuleSandboxEscrow:    "Explain non-custodial sandbox milestones and mutual confirmation.",
+	ModuleRevenueSplit:     "Present explicit sandbox split terms without implying disbursement.",
+}
+
+func declaredComponentFields() []ComponentFieldDescriptor {
+	return []ComponentFieldDescriptor{
+		{Key: "title", Label: "Card heading", ValueType: "string", Description: "A short heading rendered in the curated card title slot.", Required: true, MaxLength: 120},
+		{Key: "summary", Label: "Summary", ValueType: "string", Description: "Plain text rendered in the curated card summary slot.", Required: true, MaxLength: 600},
+	}
+}
+
+func defaultComponentDocument(moduleID string) json.RawMessage {
+	document, _ := json.Marshal(defaultComponentDocumentObject(moduleID))
+	return json.RawMessage(document)
+}
+
+func defaultComponentDocumentObject(moduleID string) map[string]any {
+	module := moduleCatalog[moduleID]
+	return map[string]any{"summary": moduleDocumentSummaries[moduleID], "title": module.Title}
+}
+
 func selectedModules(ids []string) []ModuleDescriptor {
 	modules := make([]ModuleDescriptor, 0, len(ids))
 	for _, id := range ids {
@@ -260,6 +296,8 @@ func selectedModules(ids []string) []ModuleDescriptor {
 		module.Events = append([]EventDescriptor(nil), module.Events...)
 		module.DataClassifications = append([]string(nil), module.DataClassifications...)
 		module.AllowedServerSignals = append([]string(nil), module.AllowedServerSignals...)
+		module.DocumentFields = declaredComponentFields()
+		module.DefaultDocument = defaultComponentDocumentObject(id)
 		modules = append(modules, module)
 	}
 	return modules

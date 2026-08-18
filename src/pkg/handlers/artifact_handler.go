@@ -144,8 +144,13 @@ func (h *ArtifactHTTPHandler) build(w http.ResponseWriter, r *http.Request, auth
 	}
 	request.Subject = authority.Subject
 	request.AllowedOrigins = authority.AllowedOrigins
+	request, err = artifacts.ResolveBuildRequest(request)
+	if err != nil {
+		writeArtifactValidationError(w, err)
+		return
+	}
 	if err := artifacts.ValidateRequest(request); err != nil {
-		writeArtifactError(w, http.StatusBadRequest, "invalid_build_request", "Artifact build request is invalid.")
+		writeArtifactValidationError(w, err)
 		return
 	}
 	result, err := h.store.Build(r.Context(), request)
@@ -204,6 +209,11 @@ func (h *ArtifactHTTPHandler) read(w http.ResponseWriter, r *http.Request, autho
 }
 
 func (h *ArtifactHTTPHandler) writeStoreError(w http.ResponseWriter, err error) {
+	var componentError *artifacts.ComponentValidationError
+	if errors.As(err, &componentError) {
+		writeArtifactValidationError(w, err)
+		return
+	}
 	switch {
 	case errors.Is(err, artifacts.ErrInvalidBuildRequest), errors.Is(err, artifacts.ErrInvalidTemplate), errors.Is(err, artifacts.ErrInvalidContentHash):
 		writeArtifactError(w, http.StatusBadRequest, "invalid_artifact_request", "Artifact request is invalid.")
@@ -220,6 +230,19 @@ func (h *ArtifactHTTPHandler) writeStoreError(w http.ResponseWriter, err error) 
 	default:
 		writeArtifactError(w, http.StatusInternalServerError, "artifact_operation_failed", "Artifact operation failed.")
 	}
+}
+
+func writeArtifactValidationError(w http.ResponseWriter, err error) {
+	var componentError *artifacts.ComponentValidationError
+	if errors.As(err, &componentError) {
+		details := componentError.SafeDetails()
+		writeArtifactJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": map[string]any{
+			"code": "invalid_component_document", "message": "A component document is not valid curated data.",
+			"details": map[string]string{"componentId": details.ComponentID, "key": details.Key, "reason": details.Reason},
+		}})
+		return
+	}
+	writeArtifactError(w, http.StatusBadRequest, "invalid_build_request", "Artifact build request is invalid.")
 }
 
 type artifactBuildResponse struct {

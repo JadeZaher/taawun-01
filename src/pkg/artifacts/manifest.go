@@ -6,8 +6,12 @@ import (
 	"taawun/pkg/ethics"
 )
 
-const ManifestContractVersion = "taawun.artifact/v1"
-const SignatureContractVersion = "taawun.bundle-signature/v1"
+const (
+	ManifestContractVersionV1  = "taawun.artifact/v1"
+	SignatureContractVersionV1 = "taawun.bundle-signature/v1"
+	ManifestContractVersion    = "taawun.artifact/v2"
+	SignatureContractVersion   = "taawun.bundle-signature/v2"
+)
 
 // RenderMode names a supported renderer while keeping the bundle renderer-neutral.
 type RenderMode string
@@ -29,6 +33,7 @@ type Manifest struct {
 	RenderModes          []RenderModeDescriptor `json:"renderModes"`
 	DefaultEmbedBoundary string                 `json:"defaultEmbedBoundary"`
 	Modules              []ModuleDescriptor     `json:"modules"`
+	Components           []ComponentManifest    `json:"components,omitempty"`
 	DataClassifications  []DataClassification   `json:"dataClassifications"`
 	AllowedServerSignals []string               `json:"allowedServerSignals"`
 	Security             SecurityPolicy         `json:"security"`
@@ -178,6 +183,7 @@ type TemplateDescriptor struct {
 	Configuration   TemplateConfig   `json:"configuration"`
 	RenderModes     []RenderMode     `json:"renderModes"`
 	ModuleRefs      []string         `json:"moduleRefs"`
+	ComponentRefs   []string         `json:"componentRefs,omitempty"`
 	Slots           []string         `json:"slots"`
 }
 

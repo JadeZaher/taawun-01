@@ -1,11 +1,20 @@
 package artifacts
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
 	"strconv"
 )
+
+func componentIDs(components []ComponentInstance) []string {
+	ids := make([]string, len(components))
+	for index, component := range components {
+		ids[index] = component.ID
+	}
+	return ids
+}
 
 var themeTokenNames = []string{
 	"--taawun-color-accent",
@@ -130,6 +139,7 @@ var dataCatalog = map[string]DataClassification{
 
 func assembleBundle(request BuildRequest, signerKeyID string) (Manifest, map[string][]byte, error) {
 	modules := selectedModules(request.Modules)
+	components := cloneComponents(request.Components)
 	templateDefinition := templateCatalog[request.TemplateID]
 	renderModes := renderModeDescriptors()
 	signals := allowedServerSignals(modules)
@@ -150,9 +160,10 @@ func assembleBundle(request BuildRequest, signerKeyID string) (Manifest, map[str
 			City:             request.City,
 			Madhhab:          request.Madhhab,
 		},
-		RenderModes: []RenderMode{RenderModeStandalone, RenderModeEmbed},
-		ModuleRefs:  append([]string(nil), request.Modules...),
-		Slots:       append([]string(nil), templateDefinition.Slots...),
+		RenderModes:   []RenderMode{RenderModeStandalone, RenderModeEmbed},
+		ModuleRefs:    append([]string(nil), request.Modules...),
+		ComponentRefs: componentIDs(components),
+		Slots:         append([]string(nil), templateDefinition.Slots...),
 	}
 
 	runtime, err := bundledDatastarRuntime()
@@ -180,6 +191,14 @@ func assembleBundle(request BuildRequest, signerKeyID string) (Manifest, map[str
 		}
 		files["modules/"+module.ID+".json"] = encoded
 	}
+	componentAggregate, err := json.Marshal(components)
+	if err != nil {
+		return Manifest{}, nil, fmt.Errorf("encode component aggregate: %w", err)
+	}
+	files["components.json"] = componentAggregate
+	for _, component := range components {
+		files["components/"+component.ID+".json"] = append([]byte(nil), component.Data...)
+	}
 	previewFiles, err := renderPreviewDocuments(request, templateDefinition, modules, references, security)
 	if err != nil {
 		return Manifest{}, nil, err
@@ -196,6 +215,7 @@ func assembleBundle(request BuildRequest, signerKeyID string) (Manifest, map[str
 		RenderModes:          renderModes,
 		DefaultEmbedBoundary: "isolated-iframe",
 		Modules:              modules,
+		Components:           componentManifests(components),
 		DataClassifications:  data,
 		AllowedServerSignals: signals,
 		Security:             security,

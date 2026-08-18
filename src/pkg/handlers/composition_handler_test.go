@@ -29,7 +29,7 @@ func TestCompositionPreviewUsesAuthenticatedPrincipalAndServerPreviewOrigin(t *t
 	if err != nil {
 		t.Fatalf("NewCompositionHTTPHandler() error = %v", err)
 	}
-	body := `{"workspaceId":7,"appName":"Community Iftar","organizationName":"Northside Mosque","city":"Denver","madhhab":"hanafi","templateId":"community-iftar","theme":{"accentColor":"#166534"},"modules":["iftar-registration"]}`
+	body := `{"workspaceId":7,"appName":"Community Iftar","organizationName":"Northside Mosque","city":"Denver","madhhab":"hanafi","templateId":"community-iftar","theme":{"accentColor":"#166534"},"modules":["iftar-registration"],"components":[{"id":"iftar-registration","type":"iftar-registration","data":{"title":"Register","summary":"Join us","audience":["families"]}}]}`
 	request := httptest.NewRequest(http.MethodPost, "/api/artifacts/preview", strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
 	request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7}))
@@ -45,6 +45,9 @@ func TestCompositionPreviewUsesAuthenticatedPrincipalAndServerPreviewOrigin(t *t
 	}
 	if len(service.request.RequestedOrigins.Surfaces) != 1 || service.request.RequestedOrigins.Surfaces[0] != "http://localhost:8080" {
 		t.Fatalf("preview origins = %#v", service.request.RequestedOrigins)
+	}
+	if len(service.request.Components) != 1 || string(service.request.Components[0].Data) != `{"title":"Register","summary":"Join us","audience":["families"]}` {
+		t.Fatalf("preview components = %#v", service.request.Components)
 	}
 	var payload struct {
 		Manifest     artifacts.Manifest `json:"manifest"`
@@ -161,6 +164,192 @@ func TestCompositionPreviewReturnsInvalidCompositionEnvelope(t *testing.T) {
 	}
 }
 
+func TestCompositionPreviewReturnsSafeComponentValidationDetails(t *testing.T) {
+	componentErr := &artifacts.ComponentValidationError{ComponentID: "announcements", Key: "meta.actorId", Reason: "reserved_key"}
+	service := &compositionServiceStub{composeErr: errors.Join(conductor.ErrInvalidComposition, componentErr)}
+	handler, err := NewCompositionHTTPHandler(service, artifactReaderStub{}, CurrentUser, []string{"http://localhost:8080"})
+	if err != nil {
+		t.Fatalf("NewCompositionHTTPHandler() error = %v", err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/artifacts/preview", strings.NewReader(`{"workspaceId":7}`))
+	request.Header.Set("Content-Type", "application/json")
+	request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7}))
+	response := httptest.NewRecorder()
+	handler.Preview(response, request)
+	if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), `"componentId":"announcements"`) || !strings.Contains(response.Body.String(), `"key":""`) || !strings.Contains(response.Body.String(), `"reason":"reserved_key"`) || strings.Contains(response.Body.String(), "actorId") {
+		t.Fatalf("component validation envelope = status:%d body:%s", response.Code, response.Body.String())
+	}
+}
+
+func TestCompositionPreviewRejectsExplicitEmptyComponents(t *testing.T) {
+	service := &compositionServiceStub{track: previewTrack(), rejectEmptyComponents: true}
+	handler, err := NewCompositionHTTPHandler(service, artifactReaderStub{}, CurrentUser, []string{"http://localhost:8080"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/artifacts/preview", strings.NewReader(`{"workspaceId":7,"components":[]}`))
+	request.Header.Set("Content-Type", "application/json")
+	request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7}))
+	response := httptest.NewRecorder()
+	handler.Preview(response, request)
+	if response.Code != http.StatusUnprocessableEntity || service.request.Components == nil || !strings.Contains(response.Body.String(), `"reason":"components_required"`) {
+		t.Fatalf("explicit empty components = status:%d request:%#v body:%s", response.Code, service.request.Components, response.Body.String())
+	}
+}
+
+func TestCompositionValidationEnvelopeRedactsUntrustedMetadata(t *testing.T) {
+	secretID := strings.Repeat("secret-token-", 40)
+	secretKey := strings.Repeat("credential.", 40) + "password"
+	response := httptest.NewRecorder()
+	writeCompositionServiceError(response, errors.Join(conductor.ErrInvalidComposition, &artifacts.ComponentValidationError{ComponentID: secretID, Key: secretKey, Reason: "reserved_key"}))
+	if response.Code != http.StatusUnprocessableEntity || strings.Contains(response.Body.String(), "secret-token") || strings.Contains(response.Body.String(), "credential") || strings.Contains(response.Body.String(), "password") || response.Body.Len() > 400 {
+		t.Fatalf("untrusted component metadata leaked: %s", response.Body.String())
+	}
+}
+
+func TestCompositionGetTrackCanReopenVerifiedPreview(t *testing.T) {
+	track := previewTrack()
+	opened := verifiedBuildResult(track)
+	handler, err := NewCompositionHTTPHandler(&compositionServiceStub{track: track}, artifactReaderStub{open: opened}, CurrentUser, []string{"http://localhost:8080"})
+	if err != nil {
+		t.Fatalf("NewCompositionHTTPHandler() error = %v", err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/conductor/tracks/track-1?includeVerifiedPreview=true", nil)
+	request = mux.SetURLVars(request, map[string]string{"track_id": "track-1"})
+	request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7}))
+	response := httptest.NewRecorder()
+	handler.GetTrack(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"verified":true`) || !strings.Contains(response.Body.String(), `"manifestDigest"`) || !strings.Contains(response.Body.String(), `"previewUrl":"/api/conductor/tracks/track-1/preview/files/index.html"`) {
+		t.Fatalf("verified track response = status:%d body:%s", response.Code, response.Body.String())
+	}
+}
+
+func TestCompositionGetTrackCanReopenVerifiedLegacyV1Preview(t *testing.T) {
+	track := legacyPreviewTrack()
+	opened := verifiedBuildResult(track)
+	handler, err := NewCompositionHTTPHandler(&compositionServiceStub{track: track}, artifactReaderStub{open: opened}, CurrentUser, []string{"http://localhost:8080"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/conductor/tracks/legacy-track?includeVerifiedPreview=true", nil)
+	request = mux.SetURLVars(request, map[string]string{"track_id": "legacy-track"})
+	request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7}))
+	response := httptest.NewRecorder()
+	handler.GetTrack(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"verified":true`) || !strings.Contains(response.Body.String(), artifacts.ManifestContractVersionV1) {
+		t.Fatalf("legacy verified track = status:%d body:%s", response.Code, response.Body.String())
+	}
+}
+
+func TestCompositionGetTrackLegacyV1BindingRejectsComponentOrManifestTampering(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*conductor.Track, *artifacts.BuildResult)
+	}{
+		{name: "explicit request components", mutate: func(track *conductor.Track, _ *artifacts.BuildResult) {
+			track.Request.Components = []artifacts.ComponentInstance{}
+		}},
+		{name: "explicit build components", mutate: func(track *conductor.Track, _ *artifacts.BuildResult) {
+			track.BuildRequest.Components = []artifacts.ComponentInstance{}
+		}},
+		{name: "stored component-bearing v1", mutate: func(track *conductor.Track, _ *artifacts.BuildResult) {
+			track.Artifact.Manifest.Components = []artifacts.ComponentManifest{}
+		}},
+		{name: "reopened component-bearing v1", mutate: func(_ *conductor.Track, opened *artifacts.BuildResult) {
+			opened.Manifest.Components = []artifacts.ComponentManifest{}
+		}},
+		{name: "stored module tamper", mutate: func(track *conductor.Track, _ *artifacts.BuildResult) {
+			track.Artifact.Manifest.Modules[0].Title = "Changed"
+		}},
+		{name: "reopened template tamper", mutate: func(_ *conductor.Track, opened *artifacts.BuildResult) { opened.Manifest.Template.Version = "changed" }},
+		{name: "signature contract tamper", mutate: func(_ *conductor.Track, opened *artifacts.BuildResult) {
+			opened.Manifest.Signature.ContractVersion = artifacts.SignatureContractVersion
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			track := clonePreviewTrack(t, legacyPreviewTrack())
+			opened := cloneBuildResult(t, verifiedBuildResult(track))
+			test.mutate(track, &opened)
+			handler, err := NewCompositionHTTPHandler(&compositionServiceStub{track: track}, artifactReaderStub{open: opened}, CurrentUser, []string{"http://localhost:8080"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := httptest.NewRequest(http.MethodGet, "/api/conductor/tracks/legacy-track?includeVerifiedPreview=true", nil)
+			request = mux.SetURLVars(request, map[string]string{"track_id": "legacy-track"})
+			request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7}))
+			response := httptest.NewRecorder()
+			handler.GetTrack(response, request)
+			if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), `"code":"preview_integrity_error"`) {
+				t.Fatalf("legacy tamper = status:%d body:%s", response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
+func TestCompositionGetTrackVerifiedPreviewFailsClosedAcrossEveryComponentLayer(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*conductor.Track, *artifacts.BuildResult)
+	}{
+		{name: "request missing", mutate: func(track *conductor.Track, _ *artifacts.BuildResult) {
+			track.Request.Components = []artifacts.ComponentInstance{}
+		}},
+		{name: "request tampered", mutate: func(track *conductor.Track, _ *artifacts.BuildResult) {
+			track.Request.Components[0].Data = json.RawMessage(`{"summary":"changed","title":"Register"}`)
+		}},
+		{name: "build missing", mutate: func(track *conductor.Track, _ *artifacts.BuildResult) { track.BuildRequest.Components = nil }},
+		{name: "build tampered", mutate: func(track *conductor.Track, _ *artifacts.BuildResult) {
+			track.BuildRequest.Components[0].Data = json.RawMessage(`{"summary":"changed","title":"Register"}`)
+		}},
+		{name: "stored manifest missing", mutate: func(track *conductor.Track, _ *artifacts.BuildResult) { track.Artifact.Manifest.Components = nil }},
+		{name: "stored manifest tampered", mutate: func(track *conductor.Track, _ *artifacts.BuildResult) {
+			track.Artifact.Manifest.Components[0].Data = json.RawMessage(`{"summary":"changed","title":"Register"}`)
+		}},
+		{name: "stored module tampered", mutate: func(track *conductor.Track, _ *artifacts.BuildResult) {
+			track.Artifact.Manifest.Modules[0].Title = "Changed"
+		}},
+		{name: "stored template tampered", mutate: func(track *conductor.Track, _ *artifacts.BuildResult) {
+			track.Artifact.Manifest.Template.Version = "tampered"
+		}},
+		{name: "reopened manifest missing", mutate: func(_ *conductor.Track, opened *artifacts.BuildResult) { opened.Manifest.Components = nil }},
+		{name: "reopened manifest tampered", mutate: func(_ *conductor.Track, opened *artifacts.BuildResult) {
+			opened.Manifest.Components[0].Data = json.RawMessage(`{"summary":"changed","title":"Register"}`)
+		}},
+		{name: "reopened module tampered", mutate: func(_ *conductor.Track, opened *artifacts.BuildResult) { opened.Manifest.Modules[0].Title = "Changed" }},
+		{name: "reopened template tampered", mutate: func(_ *conductor.Track, opened *artifacts.BuildResult) {
+			opened.Manifest.Template.ID = artifacts.TemplateCommunityWorkspace
+		}},
+		{name: "matching module descriptor tamper", mutate: func(track *conductor.Track, opened *artifacts.BuildResult) {
+			track.Artifact.Manifest.Modules[0].Title = "Changed"
+			opened.Manifest.Modules[0].Title = "Changed"
+		}},
+		{name: "matching template identity tamper", mutate: func(track *conductor.Track, opened *artifacts.BuildResult) {
+			track.Artifact.Manifest.Template.Version = "tampered"
+			opened.Manifest.Template.Version = "tampered"
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			track := clonePreviewTrack(t, previewTrack())
+			opened := cloneBuildResult(t, verifiedBuildResult(track))
+			test.mutate(track, &opened)
+			handler, err := NewCompositionHTTPHandler(&compositionServiceStub{track: track}, artifactReaderStub{open: opened}, CurrentUser, []string{"http://localhost:8080"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := httptest.NewRequest(http.MethodGet, "/api/conductor/tracks/track-1?includeVerifiedPreview=true", nil)
+			request = mux.SetURLVars(request, map[string]string{"track_id": "track-1"})
+			request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7}))
+			response := httptest.NewRecorder()
+			handler.GetTrack(response, request)
+			if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), `"code":"preview_integrity_error"`) {
+				t.Fatalf("mismatch response = status:%d body:%s", response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
 func TestCompositionOperationalFailuresDoNotUseClientDenialEnvelope(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -243,18 +432,42 @@ func TestCompositionRequestIDRejectsUntrustedRailwayHeader(t *testing.T) {
 }
 
 type compositionServiceStub struct {
-	track      *conductor.Track
-	actor      *models.User
-	request    conductor.CompositionRequest
-	composeErr error
+	track                 *conductor.Track
+	actor                 *models.User
+	request               conductor.CompositionRequest
+	composeErr            error
+	rejectEmptyComponents bool
 }
 
 func (s *compositionServiceStub) Compose(_ context.Context, actor *models.User, request conductor.CompositionRequest) (*conductor.ComposeResult, error) {
 	s.actor, s.request = actor, request
+	if s.rejectEmptyComponents && request.Components != nil && len(request.Components) == 0 {
+		return nil, errors.Join(conductor.ErrInvalidComposition, &artifacts.ComponentValidationError{Reason: "components_required"})
+	}
 	if s.composeErr != nil {
 		return nil, s.composeErr
 	}
 	return &conductor.ComposeResult{Track: s.track, Created: true}, nil
+}
+
+func clonePreviewTrack(t *testing.T, track *conductor.Track) *conductor.Track {
+	t.Helper()
+	encoded, _ := json.Marshal(track)
+	var cloned conductor.Track
+	if err := json.Unmarshal(encoded, &cloned); err != nil {
+		t.Fatal(err)
+	}
+	return &cloned
+}
+
+func cloneBuildResult(t *testing.T, result artifacts.BuildResult) artifacts.BuildResult {
+	t.Helper()
+	encoded, _ := json.Marshal(result)
+	var cloned artifacts.BuildResult
+	if err := json.Unmarshal(encoded, &cloned); err != nil {
+		t.Fatal(err)
+	}
+	return cloned
 }
 
 func (s *compositionServiceStub) Resume(context.Context, *models.User, string, int64) (*conductor.Track, error) {
@@ -292,8 +505,21 @@ func (s artifactReaderStub) ReadFile(context.Context, string, string) (artifacts
 }
 
 func previewTrack() *conductor.Track {
+	componentData := json.RawMessage(`{"summary":"Join the gathering","title":"Register"}`)
+	module, _ := artifacts.GetModule(artifacts.ModuleRegistration)
+	component := artifacts.ComponentManifest{ID: artifacts.ModuleRegistration, Type: artifacts.ModuleRegistration, Data: componentData,
+		DocumentPath: "components/iftar-registration.json", DocumentSHA256: sha256Hex(componentData)}
+	aggregate, _ := json.Marshal([]artifacts.ComponentInstance{{ID: artifacts.ModuleRegistration, Type: artifacts.ModuleRegistration, Data: componentData}})
 	manifest := artifacts.Manifest{
-		ArtifactID: "art-test", ContentHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", WorkspaceID: 7,
+		ContractVersion: artifacts.ManifestContractVersion,
+		ArtifactID:      "art-test", ContentHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", WorkspaceID: 7,
+		Template:   artifacts.TemplateIdentity{ID: artifacts.TemplateCommunityIftar, Version: artifacts.TemplateCommunityIftarVersion},
+		Modules:    []artifacts.ModuleDescriptor{module},
+		Components: []artifacts.ComponentManifest{component},
+		Files: []artifacts.FileDigest{
+			{Path: "components.json", SHA256: sha256Hex(aggregate), Bytes: len(aggregate)},
+			{Path: component.DocumentPath, SHA256: component.DocumentSHA256, Bytes: len(componentData)},
+		},
 		Authorization: artifacts.BundleAuthorization{
 			Subject: artifacts.BundleSubject{WorkspaceID: 7}, ExpiresAt: time.Now().Add(time.Hour), SignerKeyID: "test-key-1", Lifecycle: artifacts.BundleLifecyclePreview,
 		},
@@ -301,11 +527,34 @@ func previewTrack() *conductor.Track {
 	}
 	return &conductor.Track{
 		ID: "track-1", WorkspaceID: 7,
+		Request: conductor.CompositionRequest{TemplateID: artifacts.TemplateCommunityIftar, Modules: []string{artifacts.ModuleRegistration},
+			Components: []artifacts.ComponentInstance{{ID: artifacts.ModuleRegistration, Type: artifacts.ModuleRegistration, Data: componentData}}},
+		BuildRequest: &artifacts.BuildRequest{TemplateID: artifacts.TemplateCommunityIftar, Modules: []string{artifacts.ModuleRegistration},
+			Components: []artifacts.ComponentInstance{{ID: artifacts.ModuleRegistration, Type: artifacts.ModuleRegistration, Data: componentData}}},
 		Artifact: &conductor.ArtifactReference{ArtifactID: manifest.ArtifactID, ContentHash: manifest.ContentHash, Manifest: manifest},
 		Preview:  &conductor.PreviewMetadata{ContentHash: manifest.ContentHash},
 	}
 }
 
+func sha256Hex(value []byte) string {
+	digest := sha256.Sum256(value)
+	return hex.EncodeToString(digest[:])
+}
+
 func verifiedBuildResult(track *conductor.Track) artifacts.BuildResult {
 	return artifacts.BuildResult{ArtifactID: track.Artifact.ArtifactID, ContentHash: track.Artifact.ContentHash, Manifest: track.Artifact.Manifest}
+}
+
+func legacyPreviewTrack() *conductor.Track {
+	track := previewTrack()
+	track.ID = "legacy-track"
+	track.Request.Components = nil
+	track.BuildRequest.Components = nil
+	track.Artifact.Manifest.ContractVersion = artifacts.ManifestContractVersionV1
+	track.Artifact.Manifest.Template.Version = "1.0.0"
+	track.Artifact.Manifest.Components = nil
+	track.Artifact.Manifest.Files = nil
+	track.Artifact.Manifest.Authorization.Version = artifacts.SignatureContractVersionV1
+	track.Artifact.Manifest.Signature.ContractVersion = artifacts.SignatureContractVersionV1
+	return track
 }

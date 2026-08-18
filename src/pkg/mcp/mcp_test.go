@@ -107,6 +107,103 @@ func TestComposeUsesLifecycleScopedPreviewOrigins(t *testing.T) {
 	}
 }
 
+func TestComposeRejectsReservedComponentAuthorityBeforeBuild(t *testing.T) {
+	store := &fakeArtifactStore{}
+	server, err := NewMCPServer(store, &fakeWorkspaceAuthorizer{workspace: &models.Workspace{ID: 42}}, testCurrentUser,
+		ServerOptions{OriginAuthorizer: &previewLifecycleAuthorizer{}, AuthorizationBoundary: allowAllAuthorizationBoundary{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.WithValue(context.Background(), testUserContextKey{}, &models.User{ID: 7, Role: models.RoleUser})
+	_, _, err = server.composeCardBundle(ctx, nil, ComposeCardBundleInput{WorkspaceID: 42, AppName: "Preview",
+		OrganizationName: "Community", City: "Denver", Madhhab: "hanafi", TemplateID: artifacts.TemplateCommunityIftar,
+		Modules: []string{artifacts.ModuleRegistration}, Components: []MCPComponentInput{{ID: artifacts.ModuleRegistration, Type: artifacts.ModuleRegistration,
+			Data: map[string]any{"title": "Register", "summary": "Join", "workspaceId": 99}}},
+		AllowedOrigins: artifacts.OriginPolicy{Surfaces: []string{"http://localhost:8080"}}, TTLHours: 1})
+	var validation *artifacts.ComponentValidationError
+	if !errors.As(err, &validation) || validation.Reason != "reserved_key" {
+		t.Fatalf("component validation = %#v err=%v", validation, err)
+	}
+	if strings.Contains(err.Error(), "workspaceId") {
+		t.Fatalf("MCP error reflected reserved key: %v", err)
+	}
+	store.mu.Lock()
+	buildCalls := store.buildCalls
+	store.mu.Unlock()
+	if buildCalls != 0 {
+		t.Fatalf("build called %d times for invalid component", buildCalls)
+	}
+}
+
+func TestComposeRejectsExplicitEmptyComponentsAndUntrustedMetadata(t *testing.T) {
+	store := &fakeArtifactStore{}
+	server, err := NewMCPServer(store, &fakeWorkspaceAuthorizer{workspace: &models.Workspace{ID: 42}}, testCurrentUser,
+		ServerOptions{OriginAuthorizer: &previewLifecycleAuthorizer{}, AuthorizationBoundary: allowAllAuthorizationBoundary{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.WithValue(context.Background(), testUserContextKey{}, &models.User{ID: 7, Role: models.RoleUser})
+	base := ComposeCardBundleInput{WorkspaceID: 42, AppName: "Preview", OrganizationName: "Community", City: "Denver", Madhhab: "hanafi",
+		TemplateID: artifacts.TemplateCommunityIftar, Modules: []string{artifacts.ModuleRegistration},
+		AllowedOrigins: artifacts.OriginPolicy{Surfaces: []string{"http://localhost:8080"}}, TTLHours: 1}
+	base.Components = []MCPComponentInput{}
+	_, _, err = server.composeCardBundle(ctx, nil, base)
+	var validation *artifacts.ComponentValidationError
+	if !errors.As(err, &validation) || validation.Reason != "components_required" {
+		t.Fatalf("explicit empty MCP components = %#v err=%v", validation, err)
+	}
+
+	secretID := strings.Repeat("secret-token-", 40)
+	base.Components = []MCPComponentInput{{ID: secretID, Type: artifacts.ModuleRegistration, Data: map[string]any{"title": "Register", "summary": "Join"}}}
+	_, _, err = server.composeCardBundle(ctx, nil, base)
+	if !errors.As(err, &validation) || strings.Contains(err.Error(), "secret-token") || len(err.Error()) > 256 {
+		t.Fatalf("unsafe MCP component metadata = %#v err=%v", validation, err)
+	}
+	store.mu.Lock()
+	buildCalls := store.buildCalls
+	store.mu.Unlock()
+	if buildCalls != 0 {
+		t.Fatalf("build called %d times for rejected MCP components", buildCalls)
+	}
+}
+
+func TestStreamableHTTPPreservesComponentDocumentLexemesForValidation(t *testing.T) {
+	store := &fakeArtifactStore{}
+	server, err := NewMCPServer(store, &fakeWorkspaceAuthorizer{workspace: &models.Workspace{ID: 42, Status: models.WorkspaceStatusActive}}, testCurrentUser,
+		ServerOptions{OriginAuthorizer: mustStaticOriginAuthorizer(t, "https://app.example"), AuthorizationBoundary: allowAllAuthorizationBoundary{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session := connectTestClient(t, server.Handler(), "https://app.example")
+	argumentTemplate := `{"workspaceId":42,"appName":"Preview","organizationName":"Community","city":"Denver","madhhab":"hanafi","templateId":"community-iftar","theme":{},"modules":["iftar-registration"],"components":[{"id":"iftar-registration","type":"iftar-registration","data":DOCUMENT}],"allowedOrigins":{"surfaces":["https://app.example"]},"ttlHours":1}`
+	for _, test := range []struct {
+		name     string
+		document string
+		reason   string
+	}{
+		{name: "duplicate key", document: `{"title":"Register","summary":"Join","note":1,"note":2}`, reason: "duplicate_key"},
+		{name: "exponent", document: `{"title":"Register","summary":"Join","amount":1e0}`, reason: "non_canonical_number"},
+		{name: "trailing zero", document: `{"title":"Register","summary":"Join","amount":1.0}`, reason: "non_canonical_number"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			arguments := json.RawMessage(strings.Replace(argumentTemplate, "DOCUMENT", test.document, 1))
+			result, err := session.CallTool(t.Context(), &mcpsdk.CallToolParams{Name: "taawun_compose_card_bundle", Arguments: arguments})
+			if err != nil {
+				t.Fatalf("raw protocol call: %v", err)
+			}
+			if !result.IsError || !toolTextContains(result, test.reason) {
+				t.Fatalf("raw document result = %#v, want %s", result, test.reason)
+			}
+		})
+	}
+	store.mu.Lock()
+	buildCalls := store.buildCalls
+	store.mu.Unlock()
+	if buildCalls != 0 {
+		t.Fatalf("artifact build called %d times for lexically invalid MCP documents", buildCalls)
+	}
+}
+
 type allowAllAuthorizationBoundary struct{}
 
 func (allowAllAuthorizationBoundary) AuthorizeScope(context.Context, string) error       { return nil }
@@ -277,6 +374,9 @@ func TestStreamableHTTPAdvertisesTypedControlPlaneAndRunsLifecycle(t *testing.T)
 	if !toolsByName["taawun_list_templates"].Annotations.ReadOnlyHint || toolsByName["taawun_compose_card_bundle"].Annotations.ReadOnlyHint {
 		t.Fatal("read/write annotations do not match tool behavior")
 	}
+	if !schemaContainsObjectProperty(toolsByName["taawun_compose_card_bundle"].InputSchema, "data") {
+		t.Fatalf("compose schema no longer advertises component data as an object: %#v", toolsByName["taawun_compose_card_bundle"].InputSchema)
+	}
 
 	assertSuccessfulTool(t, session, "taawun_list_templates", map[string]any{})
 	assertSuccessfulTool(t, session, "taawun_inspect_template", map[string]any{"templateId": artifacts.TemplateCommunityIftar})
@@ -292,8 +392,10 @@ func TestStreamableHTTPAdvertisesTypedControlPlaneAndRunsLifecycle(t *testing.T)
 		"templateId":       artifacts.TemplateCommunityIftar,
 		"theme":            map[string]any{"accentColor": "#166534"},
 		"modules":          []string{artifacts.ModuleRegistration},
-		"allowedOrigins":   map[string]any{"surfaces": []string{"https://app.example"}},
-		"ttlHours":         24,
+		"components": []map[string]any{{"id": artifacts.ModuleRegistration, "type": artifacts.ModuleRegistration,
+			"data": map[string]any{"title": "Register", "summary": "Join tonight", "audience": []any{"families", 3}}}},
+		"allowedOrigins": map[string]any{"surfaces": []string{"https://app.example"}},
+		"ttlHours":       24,
 	})
 	if buildResult.StructuredContent == nil {
 		t.Fatal("compose tool must return structured content")
@@ -309,6 +411,9 @@ func TestStreamableHTTPAdvertisesTypedControlPlaneAndRunsLifecycle(t *testing.T)
 	}
 	if lastBuild.Lifecycle != artifacts.BundleLifecyclePreview {
 		t.Fatalf("lifecycle = %s, want preview", lastBuild.Lifecycle)
+	}
+	if len(lastBuild.Components) != 1 || string(lastBuild.Components[0].Data) != `{"audience":["families",3],"summary":"Join tonight","title":"Register"}` {
+		t.Fatalf("MCP component payload = %#v", lastBuild.Components)
 	}
 	assertSuccessfulTool(t, session, "taawun_get_manifest", map[string]any{"workspaceId": 42, "contentHash": hash})
 	card := assertSuccessfulTool(t, session, "taawun_get_card", map[string]any{"workspaceId": 42, "contentHash": hash, "path": "standalone/index.html"})
@@ -515,6 +620,29 @@ func toolTextContains(result *mcpsdk.CallToolResult, substring string) bool {
 	for _, content := range result.Content {
 		if text, ok := content.(*mcpsdk.TextContent); ok && strings.Contains(text.Text, substring) {
 			return true
+		}
+	}
+	return false
+}
+
+func schemaContainsObjectProperty(value any, property string) bool {
+	switch typed := value.(type) {
+	case map[string]any:
+		if properties, ok := typed["properties"].(map[string]any); ok {
+			if candidate, ok := properties[property].(map[string]any); ok && candidate["type"] == "object" {
+				return true
+			}
+		}
+		for _, child := range typed {
+			if schemaContainsObjectProperty(child, property) {
+				return true
+			}
+		}
+	case []any:
+		for _, child := range typed {
+			if schemaContainsObjectProperty(child, property) {
+				return true
+			}
 		}
 	}
 	return false

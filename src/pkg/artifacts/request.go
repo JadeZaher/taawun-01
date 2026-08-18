@@ -26,9 +26,9 @@ const (
 	// TemplateBazaarCooperative focuses the catalog on ethical marketplace workflows.
 	TemplateBazaarCooperative = "bazaar-cooperative"
 	// Template versions are bumped for any output-affecting template change.
-	TemplateCommunityIftarVersion     = "1.0.0"
-	TemplateCommunityWorkspaceVersion = "1.0.0"
-	TemplateBazaarCooperativeVersion  = "1.0.0"
+	TemplateCommunityIftarVersion     = "2.0.0"
+	TemplateCommunityWorkspaceVersion = "2.0.0"
+	TemplateBazaarCooperativeVersion  = "2.0.0"
 	defaultAccentColor                = "#166534"
 )
 
@@ -41,18 +41,19 @@ var (
 
 // BuildRequest is transport-neutral so an HTTP or MCP handler can decode it directly.
 type BuildRequest struct {
-	WorkspaceID      int             `json:"workspaceId"`
-	AppName          string          `json:"appName"`
-	OrganizationName string          `json:"organizationName"`
-	City             string          `json:"city"`
-	Madhhab          ethics.Madhhab  `json:"madhhab"`
-	TemplateID       string          `json:"templateId"`
-	Theme            ThemeRequest    `json:"theme"`
-	Modules          []string        `json:"modules"`
-	AllowedOrigins   OriginPolicy    `json:"allowedOrigins"`
-	Subject          SubjectBinding  `json:"subject"`
-	ExpiresAt        time.Time       `json:"expiresAt"`
-	Lifecycle        BundleLifecycle `json:"lifecycle"`
+	WorkspaceID      int                 `json:"workspaceId"`
+	AppName          string              `json:"appName"`
+	OrganizationName string              `json:"organizationName"`
+	City             string              `json:"city"`
+	Madhhab          ethics.Madhhab      `json:"madhhab"`
+	TemplateID       string              `json:"templateId"`
+	Theme            ThemeRequest        `json:"theme"`
+	Modules          []string            `json:"modules,omitempty"`
+	Components       []ComponentInstance `json:"components,omitempty"`
+	AllowedOrigins   OriginPolicy        `json:"allowedOrigins"`
+	Subject          SubjectBinding      `json:"subject"`
+	ExpiresAt        time.Time           `json:"expiresAt"`
+	Lifecycle        BundleLifecycle     `json:"lifecycle"`
 }
 
 // BundleLifecycle distinguishes short previews from published card bundles.
@@ -97,6 +98,10 @@ func DecodeBuildRequest(reader io.Reader) (BuildRequest, error) {
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return BuildRequest{}, fmt.Errorf("%w: request body must contain one JSON object", ErrInvalidBuildRequest)
 	}
+	request, err := ResolveBuildRequest(request)
+	if err != nil {
+		return BuildRequest{}, err
+	}
 	if err := ValidateRequest(request); err != nil {
 		return BuildRequest{}, err
 	}
@@ -135,7 +140,7 @@ func ValidateRequest(request BuildRequest) error {
 	if request.Theme.AccentColor != "" && !validHexColor(request.Theme.AccentColor) {
 		return fmt.Errorf("%w: accentColor must be empty or a six-digit CSS hex color", ErrInvalidBuildRequest)
 	}
-	if err := validateModules(request.TemplateID, request.Modules); err != nil {
+	if _, err := CanonicalizeSuppliedComponents(request.TemplateID, request.Modules, request.Components); err != nil {
 		return err
 	}
 	if len(request.AllowedOrigins.Surfaces) == 0 {
@@ -283,6 +288,8 @@ func normalizedRequest(request BuildRequest) BuildRequest {
 	copy.Theme.AccentColor = resolvedAccentColor(request.Theme.AccentColor)
 	copy.Modules = append([]string(nil), request.Modules...)
 	sort.Strings(copy.Modules)
+	copy.Components = cloneComponents(request.Components)
+	sortComponents(copy.Components)
 	copy.AllowedOrigins.Surfaces = normalizedOrigins(request.AllowedOrigins.Surfaces)
 	copy.AllowedOrigins.Embedders = normalizedOrigins(request.AllowedOrigins.Embedders)
 	copy.AllowedOrigins.Connections = normalizedOrigins(request.AllowedOrigins.Connections)

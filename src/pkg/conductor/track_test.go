@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -53,6 +54,9 @@ func TestCompositionCreatesDurableSignedPreviewBeforeExplicitPublication(t *test
 	if err != nil || persisted.Status != TrackPreviewReady || persisted.Artifact.ContentHash != track.Artifact.ContentHash {
 		t.Fatalf("durable preview: track=%+v err=%v", persisted, err)
 	}
+	if len(persisted.BuildRequest.Components) != len(persisted.Request.Modules) || !reflect.DeepEqual(persisted.BuildRequest.Components[0].Data, persisted.Artifact.Manifest.Components[0].Data) {
+		t.Fatalf("durable component documents = request:%#v build:%#v manifest:%#v", persisted.Request.Components, persisted.BuildRequest.Components, persisted.Artifact.Manifest.Components)
+	}
 
 	requested, err := harness.service.RequestPublication(ctx, harness.owner, track.ID, persisted.Version, "claim-community")
 	if err != nil || requested.Status != TrackPublicationRequested || harness.publisher.publishCalls != 0 {
@@ -93,7 +97,7 @@ func TestInvalidOrRejectedCompositionFailsBeforeArtifactBuild(t *testing.T) {
 	request := validCompositionRequest()
 	request.TemplateID = "arbitrary-code-template"
 	result, err := harness.service.Compose(context.Background(), harness.owner, request)
-	if !errors.Is(err, ErrInvalidComposition) || result.Track.Status != TrackFailed || result.Track.FailureCode != "composition_validation_failed" || harness.builder.buildCalls != 0 {
+	if !errors.Is(err, ErrInvalidComposition) || result != nil || harness.builder.buildCalls != 0 {
 		t.Fatalf("invalid composition: result=%+v builds=%d err=%v", result, harness.builder.buildCalls, err)
 	}
 
@@ -141,6 +145,57 @@ func TestUnverifiedPreviewOriginsDoNotConsumeDurableIdempotency(t *testing.T) {
 				t.Fatalf("retry after verification = %+v err=%v", retried, err)
 			}
 		})
+	}
+}
+
+func TestInvalidComponentDocumentDoesNotConsumeTrackOrIdempotency(t *testing.T) {
+	harness := newConductorHarness(t)
+	request := validCompositionRequest()
+	request.Components = []artifacts.ComponentInstance{
+		{ID: artifacts.ModuleAnnouncements, Type: artifacts.ModuleAnnouncements, Data: json.RawMessage(`{"title":"Updates","summary":"Safe","actorId":7}`)},
+		{ID: artifacts.ModuleRegistration, Type: artifacts.ModuleRegistration, Data: json.RawMessage(`{"title":"Register","summary":"Safe"}`)},
+	}
+	result, err := harness.service.Compose(context.Background(), harness.owner, request)
+	var validation *artifacts.ComponentValidationError
+	if result != nil || !errors.Is(err, ErrInvalidComposition) || !errors.As(err, &validation) || validation.Reason != "reserved_key" || harness.builder.buildCalls != 0 {
+		t.Fatalf("invalid component result=%#v validation=%#v builds=%d err=%v", result, validation, harness.builder.buildCalls, err)
+	}
+	request.Components[0].Data = json.RawMessage(`{"title":"Updates","summary":"Safe","audience":"families"}`)
+	corrected, err := harness.service.Compose(context.Background(), harness.owner, request)
+	if err != nil || corrected == nil || !corrected.Created || corrected.Track.Status != TrackPreviewReady {
+		t.Fatalf("corrected same-key composition = %#v err=%v", corrected, err)
+	}
+	if got := string(corrected.Track.BuildRequest.Components[0].Data); got != `{"audience":"families","summary":"Safe","title":"Updates"}` {
+		t.Fatalf("canonical persisted document = %s", got)
+	}
+}
+
+func TestExplicitEmptyComponentsFailBeforeTrackCreation(t *testing.T) {
+	harness := newConductorHarness(t)
+	request := validCompositionRequest()
+	request.Components = []artifacts.ComponentInstance{}
+	result, err := harness.service.Compose(context.Background(), harness.owner, request)
+	var validation *artifacts.ComponentValidationError
+	if result != nil || !errors.As(err, &validation) || validation.Reason != "components_required" || harness.origins.calls != 0 || harness.builder.buildCalls != 0 {
+		t.Fatalf("explicit empty components = result:%#v validation:%#v origins:%d builds:%d err:%v", result, validation, harness.origins.calls, harness.builder.buildCalls, err)
+	}
+}
+
+func TestViewerCanInspectButCannotComposeComponentDocuments(t *testing.T) {
+	harness := newConductorHarness(t)
+	created, err := harness.service.Compose(context.Background(), harness.owner, validCompositionRequest())
+	if err != nil {
+		t.Fatalf("owner compose: %v", err)
+	}
+	viewer := &models.User{ID: 8}
+	read, err := harness.service.GetTrack(context.Background(), viewer, created.Track.ID)
+	if err != nil || read.ID != created.Track.ID || len(read.BuildRequest.Components) == 0 {
+		t.Fatalf("viewer read = %#v err=%v", read, err)
+	}
+	request := validCompositionRequest()
+	request.IdempotencyKey = "viewer-component-build"
+	if result, err := harness.service.Compose(context.Background(), viewer, request); result != nil || !errors.Is(err, ErrWorkspaceForbidden) {
+		t.Fatalf("viewer compose = %#v err=%v", result, err)
 	}
 }
 
@@ -286,8 +341,8 @@ func validCompositionRequest() CompositionRequest {
 
 type fakeWorkspaceAuthorizer struct{}
 
-func (*fakeWorkspaceAuthorizer) AuthorizeWorkspaceCapability(actor *models.User, workspaceID int, _ models.WorkspaceCapability) (*models.Workspace, error) {
-	if actor == nil || actor.ID != 7 || workspaceID != 42 {
+func (*fakeWorkspaceAuthorizer) AuthorizeWorkspaceCapability(actor *models.User, workspaceID int, capability models.WorkspaceCapability) (*models.Workspace, error) {
+	if actor == nil || workspaceID != 42 || (actor.ID != 7 && !(actor.ID == 8 && capability == models.WorkspaceCapabilityView)) {
 		return nil, errors.New("denied")
 	}
 	return &models.Workspace{ID: 42, Status: models.WorkspaceStatusActive}, nil
@@ -324,8 +379,26 @@ func (b *fakeSignedBuilder) Build(_ context.Context, request artifacts.BuildRequ
 	digest := sha256.Sum256(encoded)
 	contentHash := hex.EncodeToString(digest[:])
 	artifactID := "artifact_signed_1"
+	modules := make([]artifacts.ModuleDescriptor, 0, len(request.Modules))
+	components := make([]artifacts.ComponentManifest, 0, len(request.Components))
+	for _, moduleID := range request.Modules {
+		module, _ := artifacts.GetModule(moduleID)
+		modules = append(modules, module)
+	}
+	for _, component := range request.Components {
+		documentDigest := sha256.Sum256(component.Data)
+		components = append(components, artifacts.ComponentManifest{ID: component.ID, Type: component.Type, Data: component.Data,
+			DocumentPath: "components/" + component.ID + ".json", DocumentSHA256: hex.EncodeToString(documentDigest[:])})
+	}
+	componentAggregate, _ := json.Marshal(request.Components)
+	aggregateDigest := sha256.Sum256(componentAggregate)
+	files := []artifacts.FileDigest{{Path: "components.json", SHA256: hex.EncodeToString(aggregateDigest[:]), Bytes: len(componentAggregate)}}
+	for _, component := range components {
+		files = append(files, artifacts.FileDigest{Path: component.DocumentPath, SHA256: component.DocumentSHA256, Bytes: len(component.Data)})
+	}
 	manifest := artifacts.Manifest{
-		ArtifactID: artifactID, ContentHash: contentHash, WorkspaceID: request.WorkspaceID,
+		ContractVersion: artifacts.ManifestContractVersion, ArtifactID: artifactID, ContentHash: contentHash, WorkspaceID: request.WorkspaceID,
+		Template: artifacts.TemplateIdentity{ID: request.TemplateID, Version: artifacts.TemplateCommunityIftarVersion}, Modules: modules, Components: components, Files: files,
 		Authorization: artifacts.BundleAuthorization{
 			Subject:        artifacts.BundleSubject{ID: request.Subject.ID, UserID: request.Subject.UserID, WorkspaceID: request.WorkspaceID},
 			AllowedOrigins: request.AllowedOrigins, ExpiresAt: request.ExpiresAt, Lifecycle: request.Lifecycle,

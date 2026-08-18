@@ -35,6 +35,13 @@ type cardView struct {
 	City             string
 	Madhhab          string
 	References       []ComplianceReference
+	Summary          string
+	CustomFields     []componentFieldView
+}
+
+type componentFieldView struct {
+	Key   string
+	Value string
 }
 
 func renderPreviewDocuments(request BuildRequest, definition templateDefinition, modules []ModuleDescriptor, references []ComplianceReference, security SecurityPolicy) (map[string][]byte, error) {
@@ -106,9 +113,17 @@ func renderCard(moduleID string, request BuildRequest, references []ComplianceRe
 	if !supported {
 		return "", fmt.Errorf("render unsupported module %q", moduleID)
 	}
+	component, found := componentForType(request.Components, moduleID)
+	if !found {
+		return "", fmt.Errorf("component %q has no canonical document", moduleID)
+	}
+	title, summary, custom, err := componentCardData(component)
+	if err != nil {
+		return "", fmt.Errorf("render component %s: %w", moduleID, err)
+	}
 	view := cardView{
-		ID: module.ID, Title: module.Title, OrganizationName: request.OrganizationName,
-		City: request.City, Madhhab: string(request.Madhhab), References: references,
+		ID: module.ID, Title: title, OrganizationName: request.OrganizationName,
+		City: request.City, Madhhab: string(request.Madhhab), References: references, Summary: summary, CustomFields: custom,
 	}
 	cardTemplate, ok := cardTemplates[moduleID]
 	if !ok {
@@ -118,7 +133,52 @@ func renderCard(moduleID string, request BuildRequest, references []ComplianceRe
 	if err != nil {
 		return "", fmt.Errorf("render module %s: %w", moduleID, err)
 	}
-	return template.HTML(encoded), nil
+	document, err := executeHTML(componentDocumentTemplate, view)
+	if err != nil {
+		return "", fmt.Errorf("render component document %s: %w", moduleID, err)
+	}
+	return template.HTML(append(encoded, document...)), nil
+}
+
+func componentForType(components []ComponentInstance, moduleID string) (ComponentInstance, bool) {
+	for _, component := range components {
+		if component.Type == moduleID {
+			return component, true
+		}
+	}
+	return ComponentInstance{}, false
+}
+
+func componentCardData(component ComponentInstance) (string, string, []componentFieldView, error) {
+	decoder := json.NewDecoder(bytes.NewReader(component.Data))
+	decoder.UseNumber()
+	var document map[string]any
+	if err := decoder.Decode(&document); err != nil {
+		return "", "", nil, err
+	}
+	title, _ := document["title"].(string)
+	summary, _ := document["summary"].(string)
+	keys := make([]string, 0, len(document))
+	for key := range document {
+		if key != "title" && key != "summary" {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	custom := make([]componentFieldView, 0, len(keys))
+	for _, key := range keys {
+		value := document[key]
+		formatted, ok := value.(string)
+		if !ok {
+			encoded, err := json.Marshal(value)
+			if err != nil {
+				return "", "", nil, err
+			}
+			formatted = string(encoded)
+		}
+		custom = append(custom, componentFieldView{Key: key, Value: formatted})
+	}
+	return title, summary, custom, nil
 }
 
 func executeHTML(source string, value any) ([]byte, error) {
@@ -226,6 +286,8 @@ const documentTemplate = `<!doctype html>
 </body>
 </html>
 `
+
+const componentDocumentTemplate = `<aside class="taawun-card taawun-component-document" data-component-id="{{.ID}}"><div class="taawun-card-head"><span>Component data</span><h3>Signed content</h3></div><p>{{.Summary}}</p>{{if .CustomFields}}<dl>{{range .CustomFields}}<dt>{{.Key}}</dt><dd>{{.Value}}</dd>{{end}}</dl>{{else}}<small>No custom fields in this component.</small>{{end}}</aside>`
 
 var cardTemplates = map[string]string{
 	ModuleRegistration:     `<section class="taawun-card" id="card-iftar-registration"><div class="taawun-card-head"><span>Community</span><h2>{{.Title}}</h2></div><form data-on:submit="$_registered = true; $_notice = 'Registration preview saved for this tab'" class="taawun-form"><label>Name<input required maxlength="80" autocomplete="name" data-bind:_attendee></label><label>Party size<input required type="number" min="1" max="20" value="1" data-bind:_party-size></label><button type="submit">Preview registration</button><p class="taawun-success" data-show="$_registered">JazakAllahu khayran—your preview registration is ready.</p></form></section>`,

@@ -27,3 +27,20 @@ Theme foregrounds are selected from the Swiss ink/light palette by measured
 WCAG contrast. A pure-black fallback covers the narrow mid-luminance range
 where neither palette foreground reaches 4.5:1 for normal text. Text placed over
 the hero gradient's fixed ink segment uses its own opaque ink/white treatment.
+
+## Component documents
+
+The v2 bundle contract adds one stable component instance per selected module;
+for this checkpoint its ID equals its curated module type. Component `data` is a
+canonical JSON object with fixed depth, size, key, collection, string, and number
+bounds. Duplicate keys, prototype-like names, event handlers, and security,
+authority, origin, governance, or financial-control names are rejected at every
+depth. Values remain escaped presentation data and never become markup, script,
+CSS, routes, signals, origins, identities, or authority.
+
+Legacy modules-only inputs resolve to catalog defaults only at the build seam so
+old composition idempotency hashes remain unchanged. New manifests use the v2
+manifest/signature versions and bind the exact component data plus the
+manifest-listed `components.json` and `components/<id>.json` digests. Readers
+retain the exact v1 signed-field allowlist for existing bundles and reject any
+component-bearing v1 or incomplete v2 contract.

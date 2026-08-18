@@ -21,7 +21,7 @@ var (
 	ErrArtifactExpired      = errors.New("artifact authorization has expired")
 )
 
-var signedManifestFields = []string{
+var signedManifestFieldsV1 = []string{
 	"allowedServerSignals",
 	"appName",
 	"artifactId",
@@ -44,6 +44,13 @@ var signedManifestFields = []string{
 	"theme",
 	"workspaceId",
 }
+
+var signedManifestFieldsV2 = func() []string {
+	fields := append([]string(nil), signedManifestFieldsV1...)
+	fields = append(fields, "components")
+	sort.Strings(fields)
+	return fields
+}()
 
 // SigningConfig injects a stable signer and trusted verification key registry.
 type SigningConfig struct {
@@ -96,7 +103,7 @@ func signManifest(manifest *Manifest, keyID string, privateKey ed25519.PrivateKe
 		ContractVersion: SignatureContractVersion,
 		Algorithm:       "Ed25519",
 		KeyID:           keyID,
-		SignedFields:    append([]string(nil), signedManifestFields...),
+		SignedFields:    append([]string(nil), signedManifestFieldsV2...),
 	}
 	payload, err := signaturePayload(*manifest)
 	if err != nil {
@@ -108,7 +115,8 @@ func signManifest(manifest *Manifest, keyID string, privateKey ed25519.PrivateKe
 
 // VerifyManifestSignature validates the canonical signature contract with a trusted key.
 func VerifyManifestSignature(manifest Manifest, publicKey ed25519.PublicKey) error {
-	if len(publicKey) != ed25519.PublicKeySize || manifest.Signature.ContractVersion != SignatureContractVersion || manifest.Signature.Algorithm != "Ed25519" || manifest.Signature.KeyID == "" || manifest.Signature.KeyID != manifest.Authorization.SignerKeyID || !reflect.DeepEqual(manifest.Signature.SignedFields, signedManifestFields) {
+	expectedFields, validContract := signedFieldsForManifest(manifest)
+	if len(publicKey) != ed25519.PublicKeySize || !validContract || manifest.Signature.Algorithm != "Ed25519" || manifest.Signature.KeyID == "" || manifest.Signature.KeyID != manifest.Authorization.SignerKeyID || !reflect.DeepEqual(manifest.Signature.SignedFields, expectedFields) {
 		return ErrInvalidSignature
 	}
 	signature, err := base64.RawURLEncoding.DecodeString(manifest.Signature.Value)
@@ -120,6 +128,17 @@ func VerifyManifestSignature(manifest Manifest, publicKey ed25519.PublicKey) err
 		return ErrInvalidSignature
 	}
 	return nil
+}
+
+func signedFieldsForManifest(manifest Manifest) ([]string, bool) {
+	switch {
+	case manifest.ContractVersion == ManifestContractVersionV1 && manifest.Signature.ContractVersion == SignatureContractVersionV1 && manifest.Authorization.Version == SignatureContractVersionV1 && len(manifest.Components) == 0:
+		return signedManifestFieldsV1, true
+	case manifest.ContractVersion == ManifestContractVersion && manifest.Signature.ContractVersion == SignatureContractVersion && manifest.Authorization.Version == SignatureContractVersion && len(manifest.Components) > 0:
+		return signedManifestFieldsV2, true
+	default:
+		return nil, false
+	}
 }
 
 func signaturePayload(manifest Manifest) ([]byte, error) {
@@ -138,7 +157,7 @@ func (b *Builder) verifyManifestAuthorization(manifest Manifest) error {
 	if manifest.CreatedAt.IsZero() || !manifest.Authorization.ExpiresAt.After(manifest.CreatedAt) || manifest.Authorization.Subject.WorkspaceID != manifest.WorkspaceID || manifest.Authorization.Subject.UserID <= 0 || !validSubjectID(manifest.Authorization.Subject.ID) {
 		return ErrInvalidSignature
 	}
-	if manifest.Authorization.Version != SignatureContractVersion || !sameOriginPolicy(manifest.Authorization.AllowedOrigins, manifest.Security.AllowedOrigins) {
+	if _, valid := signedFieldsForManifest(manifest); !valid || !sameOriginPolicy(manifest.Authorization.AllowedOrigins, manifest.Security.AllowedOrigins) {
 		return ErrInvalidSignature
 	}
 	if !reflect.DeepEqual(manifest.Authorization.ApprovedDomains, approvedDomains(manifest.Authorization.AllowedOrigins)) || (manifest.Authorization.Lifecycle != BundleLifecyclePreview && manifest.Authorization.Lifecycle != BundleLifecyclePublished) {

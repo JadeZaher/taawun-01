@@ -108,6 +108,11 @@ func (b *Builder) Build(ctx context.Context, request BuildRequest) (BuildResult,
 	if err := contextError(ctx); err != nil {
 		return BuildResult{}, err
 	}
+	resolved, err := ResolveBuildRequest(request)
+	if err != nil {
+		return BuildResult{}, err
+	}
+	request = resolved
 	if err := ValidateRequest(request); err != nil {
 		return BuildResult{}, err
 	}
@@ -150,7 +155,7 @@ func (b *Builder) Build(ctx context.Context, request BuildRequest) (BuildResult,
 	if err := signManifest(&manifest, b.keyID, b.privateKey); err != nil {
 		return BuildResult{}, fmt.Errorf("sign artifact manifest: %w", err)
 	}
-	manifestBytes, err := marshalDocument(manifest)
+	manifestBytes, err := json.Marshal(manifest)
 	if err != nil {
 		return BuildResult{}, fmt.Errorf("encode manifest: %w", err)
 	}
@@ -247,6 +252,9 @@ func (b *Builder) loadExisting(directory, expectedHash string) (BuildResult, err
 		if len(contents) != file.Bytes || hex.EncodeToString(digest[:]) != file.SHA256 {
 			return BuildResult{}, fmt.Errorf("%w: file digest mismatch for %s", ErrArtifactConflict, file.Path)
 		}
+	}
+	if err := validateStoredComponentDocuments(directory, manifest); err != nil {
+		return BuildResult{}, err
 	}
 	return BuildResult{
 		ArtifactID:  manifest.ArtifactID,

@@ -3,15 +3,19 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"taawun/pkg/artifacts"
@@ -219,12 +223,21 @@ func (s *MCPServer) registerTools() {
 		Annotations: readOnly("Audit a build prompt"),
 	}, s.auditCompliance)
 
-	mcpsdk.AddTool(s.sdk, &mcpsdk.Tool{
+	composeInputSchema, err := jsonschema.For[ComposeCardBundleInput](nil)
+	if err != nil {
+		panic(fmt.Errorf("derive compose input schema: %w", err))
+	}
+	composeOutputSchema, err := jsonschema.For[CardBundleOutput](nil)
+	if err != nil {
+		panic(fmt.Errorf("derive compose output schema: %w", err))
+	}
+	s.sdk.AddTool(&mcpsdk.Tool{
 		Name:        "taawun_compose_card_bundle",
 		Title:       "Compose a signed card bundle",
 		Description: "Builds an immutable, content-addressed card bundle from one curated template. The server binds the signed bundle to the bearer-authenticated user and authorized workspace; arbitrary source code and container execution are not accepted.",
 		Annotations: additive("Compose a signed card bundle", false),
-	}, s.composeCardBundle)
+		InputSchema: composeInputSchema, OutputSchema: composeOutputSchema,
+	}, s.composeCardBundleRaw)
 
 	mcpsdk.AddTool(s.sdk, &mcpsdk.Tool{
 		Name:        "taawun_get_manifest",
@@ -304,8 +317,37 @@ type ComposeCardBundleInput struct {
 	TemplateID       string                 `json:"templateId" jsonschema:"Curated template ID"`
 	Theme            artifacts.ThemeRequest `json:"theme" jsonschema:"Curated theme token values"`
 	Modules          []string               `json:"modules" jsonschema:"Primitive IDs allowed by the selected template"`
+	Components       []MCPComponentInput    `json:"components,omitempty" jsonschema:"Curated component instances with stable id/type and bounded JSON data objects"`
 	AllowedOrigins   artifacts.OriginPolicy `json:"allowedOrigins" jsonschema:"Exact HTTPS origins for surfaces, embedders, connections, and resources"`
 	TTLHours         int                    `json:"ttlHours" jsonschema:"Authorization lifetime in hours, from 1 through 2160"`
+}
+
+// MCPComponentInput keeps arbitrary data as an object in the generated tool schema.
+type MCPComponentInput struct {
+	ID   string         `json:"id" jsonschema:"Stable component ID; for this checkpoint it equals type"`
+	Type string         `json:"type" jsonschema:"Curated module type from the selected template"`
+	Data map[string]any `json:"data" jsonschema:"Bounded JSON content object; it cannot declare code, routes, origins, or authority"`
+	raw  json.RawMessage
+}
+
+type rawComposeCardBundleInput struct {
+	WorkspaceID      int                    `json:"workspaceId"`
+	AppName          string                 `json:"appName"`
+	OrganizationName string                 `json:"organizationName"`
+	City             string                 `json:"city"`
+	Madhhab          string                 `json:"madhhab"`
+	TemplateID       string                 `json:"templateId"`
+	Theme            artifacts.ThemeRequest `json:"theme"`
+	Modules          []string               `json:"modules"`
+	Components       []rawMCPComponentInput `json:"components,omitempty"`
+	AllowedOrigins   artifacts.OriginPolicy `json:"allowedOrigins"`
+	TTLHours         int                    `json:"ttlHours"`
+}
+
+type rawMCPComponentInput struct {
+	ID   string          `json:"id"`
+	Type string          `json:"type"`
+	Data json.RawMessage `json:"data"`
 }
 
 type CardBundleOutput struct {
@@ -489,6 +531,7 @@ func (s *MCPServer) composeCardBundle(ctx context.Context, _ *mcpsdk.CallToolReq
 		TemplateID:       input.TemplateID,
 		Theme:            input.Theme,
 		Modules:          append([]string(nil), input.Modules...),
+		Components:       mcpComponentInstances(input.Components),
 		AllowedOrigins:   cloneOriginPolicy(authorizedOrigins),
 		Subject: artifacts.SubjectBinding{
 			ID:     fmt.Sprintf("taawun:user:%d", actor.ID),
@@ -496,6 +539,10 @@ func (s *MCPServer) composeCardBundle(ctx context.Context, _ *mcpsdk.CallToolReq
 		},
 		ExpiresAt: s.now().UTC().Add(time.Duration(input.TTLHours) * time.Hour),
 		Lifecycle: artifacts.BundleLifecyclePreview,
+	}
+	request, err = artifacts.ResolveBuildRequest(request)
+	if err != nil {
+		return nil, CardBundleOutput{}, fmt.Errorf("invalid component document: %w", err)
 	}
 	built, err := s.artifacts.Build(ctx, request)
 	if err != nil {
@@ -506,6 +553,77 @@ func (s *MCPServer) composeCardBundle(ctx context.Context, _ *mcpsdk.CallToolReq
 	}
 	output := CardBundleOutput{ArtifactID: built.ArtifactID, ContentHash: built.ContentHash, Manifest: built.Manifest}
 	return textResult(fmt.Sprintf("Built signed bundle %s at content hash %s for workspace %d; it expires %s.", built.ArtifactID, built.ContentHash, input.WorkspaceID, built.Manifest.Authorization.ExpiresAt.UTC().Format(time.RFC3339))), output, nil
+}
+
+func (s *MCPServer) composeCardBundleRaw(ctx context.Context, request *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
+	input, err := decodeComposeCardBundleInput(request)
+	if err != nil {
+		var result mcpsdk.CallToolResult
+		result.SetError(err)
+		return &result, nil
+	}
+	result, output, err := s.composeCardBundle(ctx, request, input)
+	if err != nil {
+		var errorResult mcpsdk.CallToolResult
+		errorResult.SetError(err)
+		return &errorResult, nil
+	}
+	if result == nil {
+		result = &mcpsdk.CallToolResult{}
+	}
+	encoded, err := json.Marshal(output)
+	if err != nil {
+		return nil, fmt.Errorf("encode card bundle output: %w", err)
+	}
+	result.StructuredContent = json.RawMessage(encoded)
+	if result.Content == nil {
+		result.Content = []mcpsdk.Content{&mcpsdk.TextContent{Text: string(encoded)}}
+	}
+	return result, nil
+}
+
+func decodeComposeCardBundleInput(request *mcpsdk.CallToolRequest) (ComposeCardBundleInput, error) {
+	if request == nil || request.Params == nil || len(request.Params.Arguments) == 0 {
+		return ComposeCardBundleInput{}, errors.New("compose arguments are required")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(request.Params.Arguments))
+	decoder.DisallowUnknownFields()
+	var raw rawComposeCardBundleInput
+	if err := decoder.Decode(&raw); err != nil {
+		return ComposeCardBundleInput{}, fmt.Errorf("invalid compose arguments: %w", err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return ComposeCardBundleInput{}, errors.New("compose arguments must contain one JSON object")
+	}
+	components := make([]MCPComponentInput, len(raw.Components))
+	if raw.Components == nil {
+		components = nil
+	}
+	for index, component := range raw.Components {
+		components[index] = MCPComponentInput{ID: component.ID, Type: component.Type, raw: append(json.RawMessage(nil), component.Data...)}
+	}
+	return ComposeCardBundleInput{
+		WorkspaceID: raw.WorkspaceID, AppName: raw.AppName, OrganizationName: raw.OrganizationName,
+		City: raw.City, Madhhab: raw.Madhhab, TemplateID: raw.TemplateID, Theme: raw.Theme,
+		Modules: append([]string(nil), raw.Modules...), Components: components,
+		AllowedOrigins: cloneOriginPolicy(raw.AllowedOrigins), TTLHours: raw.TTLHours,
+	}, nil
+}
+
+func mcpComponentInstances(components []MCPComponentInput) []artifacts.ComponentInstance {
+	if components == nil {
+		return nil
+	}
+	cloned := make([]artifacts.ComponentInstance, len(components))
+	for index, component := range components {
+		data := append(json.RawMessage(nil), component.raw...)
+		if data == nil {
+			data, _ = json.Marshal(component.Data)
+		}
+		cloned[index] = artifacts.ComponentInstance{ID: component.ID, Type: component.Type, Data: json.RawMessage(data)}
+	}
+	return cloned
 }
 
 func (s *MCPServer) getManifest(ctx context.Context, _ *mcpsdk.CallToolRequest, input GetManifestInput) (*mcpsdk.CallToolResult, ManifestOutput, error) {

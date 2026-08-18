@@ -97,6 +97,42 @@ func TestArtifactHTTPHandlerRejectsClientAuthorityAndStrictHTTPViolations(t *tes
 	}
 }
 
+func TestArtifactHTTPHandlerRejectsComponentAuthorityInjectionSafely(t *testing.T) {
+	handler, _, _ := newArtifactHandler(t)
+	request := handlerBuildRequest()
+	request.Subject = artifacts.SubjectBinding{}
+	request.AllowedOrigins = artifacts.OriginPolicy{}
+	request.Components = []artifacts.ComponentInstance{
+		{ID: artifacts.ModuleAnnouncements, Type: artifacts.ModuleAnnouncements, Data: json.RawMessage(`{"title":"Updates","summary":"Safe","endpointUrl":"https://private.example"}`)},
+		{ID: artifacts.ModuleDonationCampaign, Type: artifacts.ModuleDonationCampaign, Data: json.RawMessage(`{"title":"Donate","summary":"Sandbox"}`)},
+		{ID: artifacts.ModuleRegistration, Type: artifacts.ModuleRegistration, Data: json.RawMessage(`{"title":"Register","summary":"Join"}`)},
+	}
+	body, _ := json.Marshal(request)
+	httpRequest := httptest.NewRequest(http.MethodPost, artifactAPIBase, bytes.NewReader(body))
+	httpRequest.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httpRequest)
+	if recorder.Code != http.StatusUnprocessableEntity || !strings.Contains(recorder.Body.String(), `"componentId":"announcements"`) || !strings.Contains(recorder.Body.String(), `"reason":"reserved_key"`) || strings.Contains(recorder.Body.String(), "private.example") {
+		t.Fatalf("component rejection = status:%d body:%s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestArtifactHTTPHandlerRejectsExplicitEmptyComponents(t *testing.T) {
+	handler, _, _ := newArtifactHandler(t)
+	request := handlerBuildRequest()
+	request.Subject = artifacts.SubjectBinding{}
+	request.AllowedOrigins = artifacts.OriginPolicy{}
+	body, _ := json.Marshal(request)
+	body = bytes.Replace(body, []byte(`"allowedOrigins"`), []byte(`"components":[],"allowedOrigins"`), 1)
+	httpRequest := httptest.NewRequest(http.MethodPost, artifactAPIBase, bytes.NewReader(body))
+	httpRequest.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httpRequest)
+	if recorder.Code != http.StatusUnprocessableEntity || !strings.Contains(recorder.Body.String(), `"reason":"components_required"`) {
+		t.Fatalf("explicit empty component response = status:%d body:%s", recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestArtifactHTTPHandlerServesScopedVerifiedImmutableFiles(t *testing.T) {
 	handler, builder, authority := newArtifactHandler(t)
 	buildRequest := handlerBuildRequest()

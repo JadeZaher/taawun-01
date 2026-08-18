@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/netip"
 	"path"
+	"reflect"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -96,21 +97,22 @@ func (h *CompositionHTTPHandler) Templates(w http.ResponseWriter, r *http.Reques
 
 // Modules exposes the fixed primitive contracts available to curated templates.
 func (h *CompositionHTTPHandler) Modules(w http.ResponseWriter, r *http.Request) {
-	writeCompositionJSON(w, http.StatusOK, map[string]any{"modules": artifacts.ListModules()})
+	writeCompositionJSON(w, http.StatusOK, map[string]any{"modules": artifacts.ListModules(), "componentDocumentPolicy": artifacts.ComponentPolicy()})
 }
 
 type previewCompositionInput struct {
-	IdempotencyKey   string                 `json:"idempotencyKey,omitempty"`
-	WorkspaceID      int                    `json:"workspaceId"`
-	AppName          string                 `json:"appName"`
-	OrganizationName string                 `json:"organizationName"`
-	City             string                 `json:"city"`
-	Madhhab          ethics.Madhhab         `json:"madhhab"`
-	TemplateID       string                 `json:"templateId"`
-	Theme            artifacts.ThemeRequest `json:"theme"`
-	Modules          []string               `json:"modules"`
-	RequestedOrigins artifacts.OriginPolicy `json:"requestedOrigins"`
-	TTLHours         int                    `json:"ttlHours,omitempty"`
+	IdempotencyKey   string                        `json:"idempotencyKey,omitempty"`
+	WorkspaceID      int                           `json:"workspaceId"`
+	AppName          string                        `json:"appName"`
+	OrganizationName string                        `json:"organizationName"`
+	City             string                        `json:"city"`
+	Madhhab          ethics.Madhhab                `json:"madhhab"`
+	TemplateID       string                        `json:"templateId"`
+	Theme            artifacts.ThemeRequest        `json:"theme"`
+	Modules          []string                      `json:"modules"`
+	Components       []artifacts.ComponentInstance `json:"components,omitempty"`
+	RequestedOrigins artifacts.OriginPolicy        `json:"requestedOrigins"`
+	TTLHours         int                           `json:"ttlHours,omitempty"`
 }
 
 // Preview composes a signed preview under the authenticated actor and workspace capability.
@@ -147,7 +149,7 @@ func (h *CompositionHTTPHandler) Preview(w http.ResponseWriter, r *http.Request)
 		IdempotencyKey: input.IdempotencyKey, WorkspaceID: input.WorkspaceID,
 		AppName: input.AppName, OrganizationName: input.OrganizationName, City: input.City,
 		Madhhab: input.Madhhab, TemplateID: input.TemplateID, Theme: input.Theme,
-		Modules: append([]string(nil), input.Modules...), RequestedOrigins: input.RequestedOrigins, TTLHours: input.TTLHours,
+		Modules: append([]string(nil), input.Modules...), Components: cloneComponentInputs(input.Components), RequestedOrigins: input.RequestedOrigins, TTLHours: input.TTLHours,
 	})
 	if err != nil {
 		if errors.Is(err, conductor.ErrPreviewOriginDenied) {
@@ -161,27 +163,16 @@ func (h *CompositionHTTPHandler) Preview(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	opened, err := h.artifacts.Open(r.Context(), result.Track.Artifact.ContentHash)
-	if err != nil || opened.ArtifactID != result.Track.Artifact.ArtifactID || opened.ContentHash != result.Track.Artifact.ContentHash || opened.Manifest.WorkspaceID != result.Track.WorkspaceID || result.Track.Preview.ContentHash != opened.ContentHash {
+	if err != nil || opened.ArtifactID != result.Track.Artifact.ArtifactID || opened.ContentHash != result.Track.Artifact.ContentHash || opened.Manifest.WorkspaceID != result.Track.WorkspaceID || result.Track.Preview.ContentHash != opened.ContentHash || !verifiedTrackComponentBinding(result.Track, opened) {
 		writeCompositionError(w, http.StatusConflict, "preview_integrity_error", "The signed preview could not be verified.")
 		return
 	}
-	manifestJSON, err := json.Marshal(opened.Manifest)
+	response, err := verifiedCompositionResponse(result.Track, result.Created, opened)
 	if err != nil {
 		writeCompositionError(w, http.StatusInternalServerError, "composition_unavailable", "The signed preview receipt could not be prepared.")
 		return
 	}
-	manifestDigest := sha256.Sum256(manifestJSON)
-	preview := compositionPreviewURLs(result.Track)
-	writeCompositionJSON(w, http.StatusCreated, map[string]any{
-		"track": result.Track, "created": result.Created, "manifest": opened.Manifest,
-		"verification": map[string]any{
-			"status": "verified", "verified": true,
-			"artifactId": opened.Manifest.ArtifactID, "contentHash": opened.Manifest.ContentHash, "workspaceId": opened.Manifest.WorkspaceID,
-			"signatureAlgorithm": opened.Manifest.Signature.Algorithm, "signerKeyId": opened.Manifest.Signature.KeyID, "signatureValue": opened.Manifest.Signature.Value,
-			"manifestDigest": hex.EncodeToString(manifestDigest[:]), "manifestJson": string(manifestJSON),
-		},
-		"preview": preview, "previewUrl": preview.DocumentURL,
-	})
+	writeCompositionJSON(w, http.StatusCreated, response)
 }
 
 func (h *CompositionHTTPHandler) logPreviewOutcome(requestID, outcome, reason string, status int) {
@@ -239,7 +230,25 @@ func (h *CompositionHTTPHandler) GetTrack(w http.ResponseWriter, r *http.Request
 		writeCompositionServiceError(w, err)
 		return
 	}
-	writeCompositionJSON(w, http.StatusOK, track)
+	if r.URL.Query().Get("includeVerifiedPreview") != "true" {
+		writeCompositionJSON(w, http.StatusOK, track)
+		return
+	}
+	if track.Preview == nil || track.Artifact == nil {
+		writeCompositionError(w, http.StatusConflict, "preview_not_ready", "The composition does not have a verified preview.")
+		return
+	}
+	opened, err := h.artifacts.Open(r.Context(), track.Artifact.ContentHash)
+	if err != nil || opened.ArtifactID != track.Artifact.ArtifactID || opened.ContentHash != track.Artifact.ContentHash || opened.Manifest.WorkspaceID != track.WorkspaceID || track.Preview.ContentHash != opened.ContentHash || !verifiedTrackComponentBinding(track, opened) {
+		writeCompositionError(w, http.StatusConflict, "preview_integrity_error", "The signed preview could not be verified.")
+		return
+	}
+	response, err := verifiedCompositionResponse(track, false, opened)
+	if err != nil {
+		writeCompositionError(w, http.StatusInternalServerError, "composition_unavailable", "The signed preview receipt could not be prepared.")
+		return
+	}
+	writeCompositionJSON(w, http.StatusOK, response)
 }
 
 // Events returns the append-only history for a workspace-authorized composition track.
@@ -413,6 +422,15 @@ func compositionID(prefix string) (string, error) {
 }
 
 func writeCompositionServiceError(w http.ResponseWriter, err error) {
+	var componentError *artifacts.ComponentValidationError
+	if errors.As(err, &componentError) {
+		details := componentError.SafeDetails()
+		writeCompositionJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": map[string]any{
+			"code": "invalid_composition", "message": "A component document is not valid curated data.",
+			"details": map[string]string{"componentId": details.ComponentID, "key": details.Key, "reason": details.Reason},
+		}})
+		return
+	}
 	switch {
 	case errors.Is(err, conductor.ErrWorkspaceForbidden):
 		writeCompositionError(w, http.StatusForbidden, "workspace_forbidden", "This account is not authorized for that workspace operation.")
@@ -429,6 +447,106 @@ func writeCompositionServiceError(w http.ResponseWriter, err error) {
 	default:
 		writeCompositionError(w, http.StatusInternalServerError, "composition_operation_failed", "The composition operation could not be completed.")
 	}
+}
+
+func cloneComponentInputs(components []artifacts.ComponentInstance) []artifacts.ComponentInstance {
+	if components == nil {
+		return nil
+	}
+	cloned := make([]artifacts.ComponentInstance, len(components))
+	for index, component := range components {
+		cloned[index] = component
+		cloned[index].Data = append(json.RawMessage(nil), component.Data...)
+	}
+	return cloned
+}
+
+func verifiedCompositionResponse(track *conductor.Track, created bool, opened artifacts.BuildResult) (map[string]any, error) {
+	manifestJSON, err := json.Marshal(opened.Manifest)
+	if err != nil {
+		return nil, err
+	}
+	manifestDigest := sha256.Sum256(manifestJSON)
+	preview := compositionPreviewURLs(track)
+	return map[string]any{
+		"track": track, "created": created, "manifest": opened.Manifest,
+		"verification": map[string]any{
+			"status": "verified", "verified": true,
+			"artifactId": opened.Manifest.ArtifactID, "contentHash": opened.Manifest.ContentHash, "workspaceId": opened.Manifest.WorkspaceID,
+			"signatureAlgorithm": opened.Manifest.Signature.Algorithm, "signerKeyId": opened.Manifest.Signature.KeyID, "signatureValue": opened.Manifest.Signature.Value,
+			"manifestDigest": hex.EncodeToString(manifestDigest[:]), "manifestJson": string(manifestJSON),
+		},
+		"preview": preview, "previewUrl": preview.DocumentURL,
+	}, nil
+}
+
+func verifiedTrackComponentBinding(track *conductor.Track, opened artifacts.BuildResult) bool {
+	if track == nil || track.BuildRequest == nil || track.Artifact == nil || track.Preview == nil {
+		return false
+	}
+	storedManifest := track.Artifact.Manifest
+	if storedManifest.ContractVersion == artifacts.ManifestContractVersionV1 || opened.Manifest.ContractVersion == artifacts.ManifestContractVersionV1 {
+		return verifiedLegacyTrackBinding(track, opened)
+	}
+	expected, err := artifacts.ResolveBuildRequest(artifacts.BuildRequest{
+		TemplateID: track.Request.TemplateID,
+		Modules:    append([]string(nil), track.Request.Modules...),
+		Components: cloneComponentInputs(track.Request.Components),
+	})
+	if err != nil || track.BuildRequest.TemplateID != track.Request.TemplateID || !reflect.DeepEqual(track.BuildRequest.Modules, expected.Modules) || !reflect.DeepEqual(track.BuildRequest.Components, expected.Components) {
+		return false
+	}
+	if artifacts.ValidateManifestComponents(storedManifest) != nil || artifacts.ValidateManifestComponents(opened.Manifest) != nil || storedManifest.Template.ID != track.BuildRequest.TemplateID || !manifestComponentsMatchBuild(storedManifest, *track.BuildRequest) {
+		return false
+	}
+	return reflect.DeepEqual(opened.Manifest.Template, storedManifest.Template) &&
+		reflect.DeepEqual(opened.Manifest.Modules, storedManifest.Modules) &&
+		reflect.DeepEqual(opened.Manifest.Components, storedManifest.Components)
+}
+
+func verifiedLegacyTrackBinding(track *conductor.Track, opened artifacts.BuildResult) bool {
+	build := track.BuildRequest
+	stored := track.Artifact.Manifest
+	reopened := opened.Manifest
+	if build == nil || track.Request.Components != nil || build.Components != nil || stored.Components != nil || reopened.Components != nil {
+		return false
+	}
+	if stored.ContractVersion != artifacts.ManifestContractVersionV1 || reopened.ContractVersion != artifacts.ManifestContractVersionV1 ||
+		stored.Signature.ContractVersion != artifacts.SignatureContractVersionV1 || reopened.Signature.ContractVersion != artifacts.SignatureContractVersionV1 ||
+		stored.Authorization.Version != artifacts.SignatureContractVersionV1 || reopened.Authorization.Version != artifacts.SignatureContractVersionV1 {
+		return false
+	}
+	if artifacts.ValidateManifestComponents(stored) != nil || artifacts.ValidateManifestComponents(reopened) != nil ||
+		build.TemplateID != track.Request.TemplateID || stored.Template.ID != build.TemplateID ||
+		!reflect.DeepEqual(track.Request.Modules, build.Modules) || !manifestModulesMatchBuild(stored, *build) {
+		return false
+	}
+	return reflect.DeepEqual(reopened.Template, stored.Template) && reflect.DeepEqual(reopened.Modules, stored.Modules)
+}
+
+func manifestModulesMatchBuild(manifest artifacts.Manifest, build artifacts.BuildRequest) bool {
+	if len(manifest.Modules) != len(build.Modules) {
+		return false
+	}
+	for index, module := range manifest.Modules {
+		if module.ID != build.Modules[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func manifestComponentsMatchBuild(manifest artifacts.Manifest, build artifacts.BuildRequest) bool {
+	if !manifestModulesMatchBuild(manifest, build) || len(manifest.Components) != len(build.Components) {
+		return false
+	}
+	for index, component := range manifest.Components {
+		buildComponent := build.Components[index]
+		if component.ID != buildComponent.ID || component.Type != buildComponent.Type || !reflect.DeepEqual(component.Data, buildComponent.Data) {
+			return false
+		}
+	}
+	return true
 }
 
 func writeCompositionError(w http.ResponseWriter, status int, code, message string) {
