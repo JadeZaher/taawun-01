@@ -21,6 +21,14 @@ type WorkspaceUser struct {
 	JoinedAt    time.Time `json:"joined_at" db:"joined_at" gorm:"not null;default:CURRENT_TIMESTAMP"`
 }
 
+// WorkspaceMember is the workspace-scoped, non-sensitive membership view.
+type WorkspaceMember struct {
+	UserID   int       `json:"user_id"`
+	Username string    `json:"username"`
+	Role     string    `json:"role"`
+	JoinedAt time.Time `json:"joined_at"`
+}
+
 type CreateWorkspaceRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`

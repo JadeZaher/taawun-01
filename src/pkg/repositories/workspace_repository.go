@@ -120,6 +120,19 @@ func (r *WorkspaceRepository) GetUserRole(workspaceID, userID int) (string, erro
 	return membership.Role, nil
 }
 
+func (r *WorkspaceRepository) GetMembers(workspaceID int) ([]models.WorkspaceMember, error) {
+	var members []models.WorkspaceMember
+	err := r.db.Table("workspace_users AS wu").
+		Select("wu.user_id, u.username, wu.role, wu.joined_at").
+		Joins("INNER JOIN users AS u ON u.id = wu.user_id").
+		Where("wu.workspace_id = ? AND u.status = ?", workspaceID, models.StatusActive).
+		Order("wu.joined_at ASC, wu.user_id ASC").Scan(&members).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workspace members: %v", err)
+	}
+	return members, nil
+}
+
 func (r *WorkspaceRepository) Count() (int, error) {
 	return r.count(nil, nil, "failed to count workspaces")
 }

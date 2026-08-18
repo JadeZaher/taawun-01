@@ -98,6 +98,14 @@ func (s *WorkspaceService) GetWorkspaces(actor *models.User) ([]*models.Workspac
 	return workspaces, nil
 }
 
+// GetWorkspaceMembers exposes the authoritative membership view to workspace members.
+func (s *WorkspaceService) GetWorkspaceMembers(actor *models.User, id int) ([]models.WorkspaceMember, error) {
+	if _, err := s.AuthorizeWorkspaceCapability(actor, id, models.WorkspaceCapabilityView); err != nil {
+		return nil, err
+	}
+	return s.workspaceRepo.GetMembers(id)
+}
+
 func (s *WorkspaceService) UpdateWorkspace(actor *models.User, id int, req *models.UpdateWorkspaceRequest) (*models.Workspace, error) {
 	workspace, err := s.authorize(actor, id, models.WorkspaceRoleOwner, models.WorkspaceRoleAdmin)
 	if err != nil {

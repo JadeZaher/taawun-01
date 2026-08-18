@@ -51,6 +51,16 @@ func TestWorkspaceServiceEnforcesMembershipAndManagementRoles(t *testing.T) {
 	if _, err := service.GetWorkspace(users[3], workspace.ID); !errors.Is(err, ErrWorkspaceForbidden) {
 		t.Fatalf("outsider read error = %v, want forbidden", err)
 	}
+	members, err := service.GetWorkspaceMembers(users[5], workspace.ID)
+	if err != nil {
+		t.Fatalf("viewer membership read error = %v", err)
+	}
+	if len(members) != 4 || members[0].UserID != users[0].ID || members[0].Username != "owner" || members[0].Role != models.WorkspaceRoleOwner {
+		t.Fatalf("workspace member projection = %+v", members)
+	}
+	if _, err := service.GetWorkspaceMembers(users[3], workspace.ID); !errors.Is(err, ErrWorkspaceForbidden) {
+		t.Fatalf("outsider membership read error = %v, want forbidden", err)
+	}
 	if _, err := service.UpdateWorkspace(users[2], workspace.ID, &models.UpdateWorkspaceRequest{Name: "Denied"}); !errors.Is(err, ErrWorkspaceForbidden) {
 		t.Fatalf("member update error = %v, want forbidden", err)
 	}

@@ -24,6 +24,10 @@ reason class, and HTTP status. Railway's request ID is accepted only from the
 same trusted direct-proxy boundary as client attribution; otherwise the handler
 generates its own ID. Never log the actor, origin, token, email, or request body.
 
+Workspace People responses are private workspace evidence. They use `no-store`
+and `nosniff`, keep forbidden/not-found outcomes bounded, and translate unknown
+repository failures to a generic 500 envelope rather than exposing database text.
+
 ## Railway client attribution
 
 Public throttles may accept Railway's documented `X-Real-IP` only when the

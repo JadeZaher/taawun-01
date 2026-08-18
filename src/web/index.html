@@ -154,6 +154,31 @@
     .build-state span { display: block; color: var(--parchment-dim); font: 500 9px/1.2 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; }
     .build-state strong { display: block; margin-top: 5px; font-size: 13px; }
 
+    .workspace-tabs { max-width: 1500px; margin: -10px auto 18px; display: flex; gap: 4px; overflow-x: auto; padding: 3px; border: 1px solid var(--line); background: rgba(17, 22, 26, 0.58); }
+    .workspace-tab { flex: 0 0 auto; min-height: 44px; border: 0; padding: 9px 14px; background: transparent; color: var(--parchment-dim); cursor: pointer; font: 500 11px/1 var(--mono); letter-spacing: 0.03em; }
+    .workspace-tab[aria-selected="true"] { background: var(--ink-3); color: var(--parchment); box-shadow: inset 0 -2px var(--emerald-bright); }
+    .workspace-role { margin-left: auto; align-self: center; padding: 6px 10px; color: var(--gold); font: 500 10px/1.2 var(--mono); white-space: nowrap; }
+    .workspace-surface { max-width: 1500px; margin: 0 auto; }
+    .workspace-surface > .panel { min-width: 0; }
+    .surface-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .surface-section { min-width: 0; padding: 14px; border: 1px solid var(--line); background: rgba(17, 22, 26, 0.38); }
+    .surface-section h3 { font: 500 16px/1.25 var(--serif); }
+    .surface-section > p { margin-top: 5px; color: var(--parchment-dim); font-size: 11px; }
+    .surface-fields { display: grid; gap: 10px; margin-top: 13px; }
+    .surface-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .surface-list { list-style: none; display: grid; gap: 8px; margin: 12px 0 0; padding: 0; }
+    .surface-record { min-width: 0; padding: 11px; border-left: 2px solid var(--emerald); background: rgba(23, 30, 36, 0.82); }
+    .surface-record strong, .surface-record span { display: block; overflow-wrap: anywhere; }
+    .surface-record strong { font-size: 12px; }
+    .surface-record span { margin-top: 3px; color: var(--parchment-dim); font-size: 10px; }
+    .capability-note { margin-top: 12px; padding: 10px 11px; border-left: 2px solid var(--gold); background: var(--soft-gold); color: var(--parchment-dim); font-size: 11px; }
+    .copy-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+    .copy-field input { font-family: var(--mono); font-size: 10px; }
+    .catalog-count { color: var(--emerald-bright); font: 500 10px/1.2 var(--mono); }
+    .catalog-modules { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+    .catalog-modules span { padding: 4px 6px; background: rgba(17, 22, 26, 0.66); color: var(--parchment-dim); font: 500 9px/1.2 var(--mono); }
+    .trust-boundary { border-color: rgba(199, 162, 74, 0.32); background: var(--soft-gold); }
+
     .builder-grid { max-width: 1500px; margin: 0 auto; display: grid; grid-template-columns: minmax(330px, 430px) minmax(430px, 1fr); gap: 18px; align-items: start; }
     .panel { border: 1px solid var(--line-strong); background: rgba(23, 30, 36, 0.88); }
     .panel-head { min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
@@ -296,6 +321,8 @@
       .build-state { margin-top: 18px; }
       .field-row { grid-template-columns: 1fr; }
       .deploy-strip { grid-template-columns: 1fr; }
+      .surface-grid { grid-template-columns: 1fr; }
+      .workspace-role { margin-left: 0; }
     }
     @media (max-width: 430px) {
       .composition-contract { grid-template-columns: 1fr; }
@@ -338,6 +365,9 @@
       .preview-empty h3 { font-size: 20px; }
       .contract-grid, .manifest-row, .adapter { grid-template-columns: 1fr; }
       .deploy-strip { padding-inline: 10px; }
+      .workspace-tabs { flex-wrap: wrap; overflow: visible; }
+      .workspace-tab { flex: 1 1 72px; padding-inline: 6px; }
+      .surface-grid, .copy-field { grid-template-columns: 1fr; }
       .button, input, select, textarea { max-width: 100%; overflow-wrap: anywhere; }
     }
     @media (prefers-reduced-motion: reduce) {
@@ -451,6 +481,17 @@
           </div>
         </header>
 
+        <nav class="workspace-tabs" role="tablist" aria-label="Workspace tools">
+          <button id="buildTab" class="workspace-tab" type="button" role="tab" aria-selected="true" aria-controls="buildSurface" tabindex="0" data-workspace-tab="build">Build</button>
+          <button id="peopleTab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="peopleSurface" tabindex="-1" data-workspace-tab="people">People</button>
+          <button id="shuraTab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="shuraSurface" tabindex="-1" data-workspace-tab="shura">Shura</button>
+          <button id="financeTab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="financeSurface" tabindex="-1" data-workspace-tab="finance">Finance sandbox</button>
+          <button id="bazaarTab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="bazaarSurface" tabindex="-1" data-workspace-tab="bazaar">Bazaar</button>
+          <span id="workspaceRole" class="workspace-role" aria-live="polite">Select a workspace</span>
+        </nav>
+        <div id="workspaceAnnouncer" class="visually-hidden" role="status" aria-live="polite"></div>
+
+        <section id="buildSurface" class="workspace-surface" role="tabpanel" aria-labelledby="buildTab" tabindex="-1">
         <div class="builder-grid">
           <section class="panel" aria-labelledby="configureTitle">
             <div class="panel-head"><div><span class="panel-number">01</span><h2 id="configureTitle">Build configuration</h2></div></div>
@@ -488,27 +529,28 @@
                   <textarea id="buildBrief" maxlength="500" data-bind:_build-brief placeholder="Coordinate Ramadan registration, announcements, and a transparent sandbox donation campaign."></textarea>
                   <div class="field-help">This private brief stays on this device. The structured controls below are the only fields submitted to build.</div>
                 </div>
+                <div class="field">
+                  <label for="templateSelect">Approved template</label>
+                  <select id="templateSelect" aria-describedby="templateCatalogCount" disabled></select>
+                  <div id="templateCatalogCount" class="field-help">Loading the real template and module catalog…</div>
+                </div>
                 <article class="template-card" aria-labelledby="templateTitle">
                   <div class="template-card-top">
                     <div><div class="eyebrow">Selected template</div><h3 id="templateTitle">Community Iftar</h3></div>
                     <span id="templateBadge" class="template-badge">Loading</span>
                   </div>
                   <p id="templateDescription">Checking the approved template catalog…</p>
-                  <div class="template-meta"><span>community-iftar</span><span>Fixed server template</span><span>3 adapters</span></div>
+                  <div id="templateMeta" class="template-meta"><span>community-iftar</span><span>Fixed server template</span><span>3 adapters</span></div>
                   <button id="retryTemplate" class="button tertiary" type="button" hidden>Retry template catalog</button>
                 </article>
 
                 <div class="section-rule" aria-hidden="true"></div>
-                <div class="subhead"><h3>Composition</h3><span>3 approved modules</span></div>
+                <div class="subhead"><h3>Composition</h3><span id="moduleCount">3 approved modules</span></div>
                 <div class="composition-contract" aria-label="Included composition modes">
                   <div class="composition-mode"><span>Included</span><strong>Monolithic shell</strong><small>One cohesive standalone community app.</small></div>
                   <div class="composition-mode"><span>Included</span><strong>Isolated modules</strong><small>Stable routes for embed and MCP adapters.</small></div>
                 </div>
-                <div class="module-list" aria-label="Included modules">
-                  <label class="module-option"><input id="moduleRegistration" type="checkbox" value="iftar-registration" data-bind:_module-registration checked><span><strong>Iftar registration</strong><small>Browser-owned attendee and household registration.</small></span><code>convergent</code></label>
-                  <label class="module-option"><input id="moduleAnnouncements" type="checkbox" value="announcements" data-bind:_module-announcements checked><span><strong>Community announcements</strong><small>Locally editable event notices and schedule updates.</small></span><code>convergent</code></label>
-                  <label class="module-option"><input id="moduleDonation" type="checkbox" value="donation-campaign" data-bind:_module-donation checked><span><strong>Donation campaign</strong><small>AZOA sandbox intent handoff; never a local ledger.</small></span><code>transactional</code></label>
-                </div>
+                <div id="moduleList" class="module-list" aria-label="Included modules"></div>
 
                 <div class="section-rule" aria-hidden="true"></div>
                 <div class="subhead"><h3>Identity &amp; theme</h3><span>Template slots</span></div>
@@ -601,19 +643,150 @@
             </section>
           </div>
         </div>
+        </section>
+
+        <section id="peopleSurface" class="workspace-surface" role="tabpanel" aria-labelledby="peopleTab" tabindex="-1" hidden>
+          <div class="panel">
+            <div class="panel-head"><div><span class="panel-number">People</span><h2>Membership and invitations</h2></div><button id="retryPeople" class="button tertiary" type="button">Reload people</button></div>
+            <div class="panel-body surface-grid">
+              <section class="surface-section" aria-labelledby="membersTitle">
+                <h3 id="membersTitle">Workspace members</h3>
+                <p>Authoritative names and roles for this workspace only. Email addresses are not exposed here.</p>
+                <div id="peopleState" class="compact-state" role="status">Select a workspace to load members.</div>
+                <ul id="peopleList" class="surface-list" aria-label="Workspace members"></ul>
+              </section>
+              <section class="surface-section" aria-labelledby="inviteTitle">
+                <h3 id="inviteTitle">Invite a teammate</h3>
+                <p>Architects may issue a time-limited invitation. Viewers can read; Maintainers can propose and vote; Architects also invite and decide.</p>
+                <div class="surface-fields">
+                  <div class="field"><label for="invitee">Invitee email or user ID</label><input id="invitee" autocomplete="off" placeholder="member@example.org"></div>
+                  <div class="field"><label for="inviteRole">Workspace role</label><select id="inviteRole"><option>Viewer</option><option>Maintainer</option><option>Architect</option></select></div>
+                  <button id="createInviteButton" class="button" type="button" disabled>Create invitation</button>
+                  <div id="inviteResult" class="notice" role="status" hidden></div>
+                  <div id="inviteGrant" class="copy-field" hidden><input id="inviteTokenOutput" readonly aria-label="Invitation acceptance token"><button id="copyInviteButton" class="button secondary" type="button">Copy token</button></div>
+                </div>
+                <div class="section-rule" aria-hidden="true"></div>
+                <div class="surface-fields">
+                  <div class="field"><label for="acceptInviteToken">Accept an invitation token</label><input id="acceptInviteToken" autocomplete="off" placeholder="accept_…"></div>
+                  <button id="acceptInviteButton" class="button secondary" type="button">Accept and join</button>
+                  <div id="acceptInviteResult" class="notice" role="status" hidden></div>
+                </div>
+                <div class="capability-note">Invitation records shown here are only records created or accepted in this browser session. Taawun does not invent a pending-invitation list.</div>
+                <ul id="invitationList" class="surface-list" aria-label="Invitation activity opened this session"></ul>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <section id="shuraSurface" class="workspace-surface" role="tabpanel" aria-labelledby="shuraTab" tabindex="-1" hidden>
+          <div class="panel">
+            <div class="panel-head"><div><span class="panel-number">Shura</span><h2>Governance work</h2></div><span id="shuraCapability" class="status-pill">No workspace capability</span></div>
+            <div class="panel-body surface-grid">
+              <section class="surface-section">
+                <h3>Create a proposal</h3>
+                <p>Maintainers and Architects may propose. A signed, short-lived capability is issued only for the selected workspace.</p>
+                <div class="surface-fields">
+                  <div class="field"><label for="proposalTitle">Title</label><input id="proposalTitle" maxlength="180"></div>
+                  <div class="field"><label for="proposalBody">Proposal</label><textarea id="proposalBody" maxlength="4000"></textarea></div>
+                  <div class="field-row"><div class="field"><label for="proposalQuorum">Quorum</label><input id="proposalQuorum" type="number" min="1" value="1"></div><div class="field"><label for="proposalThreshold">Approvals required</label><input id="proposalThreshold" type="number" min="1" value="1"></div></div>
+                  <button id="createProposalButton" class="button" type="button" disabled>Create proposal</button>
+                </div>
+              </section>
+              <section class="surface-section">
+                <h3>Open a proposal</h3>
+                <p>Paste a real proposal ID to recover work after reload. There is no fabricated workspace proposal feed.</p>
+                <div class="surface-fields">
+                  <div class="field"><label for="proposalLookup">Proposal ID</label><input id="proposalLookup" autocomplete="off" placeholder="proposal_…"></div>
+                  <button id="loadProposalButton" class="button secondary" type="button" disabled>Load proposal</button>
+                </div>
+                <div id="proposalAlert" class="notice" role="status" hidden></div>
+                <article id="proposalRecord" class="surface-record" hidden>
+                  <strong id="proposalRecordTitle"></strong><span id="proposalRecordMeta"></span><p id="proposalRecordBody" class="muted"></p>
+                  <div class="surface-actions"><button id="approveVoteButton" class="button secondary" type="button">Vote approve</button><button id="rejectVoteButton" class="button secondary" type="button">Vote reject</button><button id="approveDecisionButton" class="button" type="button">Decide approved</button><button id="rejectDecisionButton" class="button secondary" type="button">Decide rejected</button></div>
+                </article>
+                <div class="capability-note">Viewers receive read-only capability. Maintainers may deliberate, vote, and propose. Only Architects may record the explicit final decision.</div>
+                <ul id="proposalList" class="surface-list" aria-label="Governance records opened this session"></ul>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <section id="financeSurface" class="workspace-surface" role="tabpanel" aria-labelledby="financeTab" tabindex="-1" hidden>
+          <div class="panel">
+            <div class="panel-head"><div><span class="panel-number">AZOA</span><h2>Financial sandbox</h2></div><button id="retryFinance" class="button tertiary" type="button">Reload flows</button></div>
+            <div class="panel-body surface-grid">
+              <section class="surface-section trust-boundary">
+                <h3>Sandbox only · no custody</h3>
+                <p>These are durable orchestration quests, not balances or transactions. Taawun does not hold funds and this environment performs no real settlement.</p>
+                <div id="financeState" class="compact-state" role="status">Loading the vetted sandbox flow catalog…</div>
+                <ul id="flowList" class="surface-list" aria-label="Vetted financial sandbox flows"></ul>
+              </section>
+              <section class="surface-section">
+                <h3>Start or inspect a quest</h3>
+                <p>Creation requires a final approved Shura decision for this workspace. The authenticated principal is injected server-side.</p>
+                <div class="surface-fields">
+                  <div class="field"><label for="financeFlow">Vetted flow</label><select id="financeFlow"></select></div>
+                  <div class="field-row"><div class="field"><label for="financeAmount">Amount (minor units)</label><input id="financeAmount" type="number" min="1" value="1000"></div><div class="field"><label for="financeCurrency">Currency</label><input id="financeCurrency" maxlength="3" value="USD"></div></div>
+                  <div class="field"><label for="financeParties">Declared parties, comma-separated</label><input id="financeParties" placeholder="taawun:user:123"></div>
+                  <div class="field"><label for="financeDecision">Approved Shura decision ID</label><input id="financeDecision" placeholder="decision_…"></div>
+                  <button id="createQuestButton" class="button" type="button" disabled>Create sandbox quest</button>
+                  <div class="field"><label for="questLookup">Existing quest ID</label><input id="questLookup" placeholder="quest_…"></div>
+                  <button id="loadQuestButton" class="button secondary" type="button">Load quest</button>
+                </div>
+                <div id="questAlert" class="notice" role="status" hidden></div>
+                <article id="questRecord" class="surface-record" hidden><strong id="questRecordTitle"></strong><span id="questRecordMeta"></span><div class="surface-actions"><button id="questApproveButton" class="button secondary" type="button">Approve</button><button id="questExecuteButton" class="button secondary" type="button">Execute</button><button id="questReconcileButton" class="button secondary" type="button">Check reconciliation</button><button id="questCancelButton" class="button secondary" type="button">Cancel</button></div></article>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <section id="bazaarSurface" class="workspace-surface" role="tabpanel" aria-labelledby="bazaarTab" tabindex="-1" hidden>
+          <div class="panel">
+            <div class="panel-head"><div><span class="panel-number">Bazaar</span><h2>Published template catalog</h2></div><button id="retryBazaar" class="button tertiary" type="button">Reload Bazaar</button></div>
+            <div class="panel-body">
+              <div class="capability-note">Only reviewed, published listings appear. Test drives precede sandbox escrow. No real settlement, custody, compliance certification, or scholarly authority is implied. A full private-beta fixture still requires controlled DNS and an authorized reviewer.</div>
+              <div id="bazaarState" class="compact-state" role="status">Loading the published-only catalog…</div>
+              <ul id="bazaarList" class="surface-list" aria-label="Published Bazaar listings"></ul>
+              <div id="bazaarAlert" class="notice" role="status" hidden></div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   </div>
 
   <script type="module">
-    const TEMPLATE_ID = 'community-iftar';
-    const MODULE_IDS = ['iftar-registration', 'announcements', 'donation-campaign'];
+    const DEFAULT_TEMPLATE_ID = 'community-iftar';
+    const DEFAULT_MODULE_IDS = ['iftar-registration', 'announcements', 'donation-campaign'];
+    const SHURA_ROLE_SCOPES = {
+      Viewer: ['shura:read'],
+      Maintainer: ['shura:read', 'shura:deliberate', 'shura:vote', 'shura:propose'],
+      Architect: ['shura:read', 'shura:deliberate', 'shura:vote', 'shura:propose', 'shura:decide', 'shura:invite', 'shura:capability.issue', 'shura:capability.revoke'],
+    };
     const state = {
       token: '',
       user: null,
       templateReady: false,
       workspacesReady: false,
       workspaces: [],
+      templates: [],
+      modules: [],
+      selectedTemplateId: DEFAULT_TEMPLATE_ID,
+      members: [],
+      workspaceRole: '',
+      productRole: '',
+      shuraToken: '',
+      shuraClaims: null,
+      invitations: [],
+      proposals: [],
+      proposalRecord: null,
+      flows: [],
+      quest: null,
+      listings: [],
+      purchase: null,
+      sessionEpoch: 0,
+      workspacesEpoch: 0,
+      workspaceEpoch: 0,
       previewReady: false,
       building: false,
       publishing: false,
@@ -635,9 +808,13 @@
     async function api(path, options = {}) {
       const method = options.method || 'GET';
       const headers = { Accept: 'application/json' };
+      const requestSessionEpoch = state.sessionEpoch;
+      let requestBearer = '';
       if (options.auth !== false) {
-        if (!state.token) throw new ApiError('Your session is not active. Please sign in again.', 401);
-        headers.Authorization = `Bearer ${state.token}`;
+        const bearer = options.bearer || state.token;
+        if (!bearer) throw new ApiError('Your session is not active. Please sign in again.', 401);
+        requestBearer = bearer;
+        headers.Authorization = `Bearer ${bearer}`;
       }
       if (options.body !== undefined) headers['Content-Type'] = 'application/json';
       const response = await fetch(`/api${path}`, {
@@ -655,7 +832,7 @@
         const message = typeof data === 'object' && data && (data.error || data.message)
           ? String((data.error && typeof data.error === 'object' && data.error.message) || data.error || data.message)
           : (typeof data === 'string' && data.trim() ? data.trim() : `Request failed (${response.status})`);
-        if (response.status === 401 && options.auth !== false) showAuth('Your session expired. Please sign in again.');
+        if (response.status === 401 && options.auth !== false && !options.bearer && currentSession(requestSessionEpoch) && requestBearer === state.token) showAuth('Your session expired. Please sign in again.');
         throw new ApiError(message, response.status);
       }
       return data;
@@ -692,12 +869,30 @@
     }
 
     function clearSession() {
+      state.sessionEpoch += 1;
+      state.workspacesEpoch += 1;
+      state.workspaceEpoch += 1;
       state.token = '';
       state.user = null;
       state.previewReady = false;
       state.templateReady = false;
       state.workspacesReady = false;
       state.workspaces = [];
+      state.templates = [];
+      state.modules = [];
+      state.selectedTemplateId = DEFAULT_TEMPLATE_ID;
+      state.members = [];
+      state.workspaceRole = '';
+      state.productRole = '';
+      state.shuraToken = '';
+      state.shuraClaims = null;
+      state.invitations = [];
+      state.proposals = [];
+      state.proposalRecord = null;
+      state.flows = [];
+      state.quest = null;
+      state.listings = [];
+      state.purchase = null;
       state.track = null;
       state.domainClaim = null;
       state.domainOrigin = '';
@@ -715,9 +910,32 @@
       element('workspaceSelect').replaceChildren();
       element('builderForm').reset();
       element('accentHex').value = '#57A68E';
-      ['appName', 'organizationName', 'city', 'madhhab', 'accentColor', 'buildBrief', 'moduleRegistration', 'moduleAnnouncements', 'moduleDonation'].forEach((id) => {
-        element(id).dispatchEvent(new Event('input', { bubbles: true }));
+      ['appName', 'organizationName', 'city', 'madhhab', 'accentColor', 'buildBrief'].forEach((id) => {
+        element(id)?.dispatchEvent(new Event('input', { bubbles: true }));
       });
+      element('templateSelect').replaceChildren();
+      element('moduleList').replaceChildren();
+      element('peopleList').replaceChildren();
+      element('invitationList').replaceChildren();
+      element('proposalList').replaceChildren();
+      element('flowList').replaceChildren();
+      element('bazaarList').replaceChildren();
+      element('invitee').value = '';
+      element('inviteRole').value = 'Viewer';
+      element('acceptInviteToken').value = '';
+      element('inviteTokenOutput').value = '';
+      element('inviteGrant').hidden = true;
+      element('proposalTitle').value = '';
+      element('proposalBody').value = '';
+      element('proposalLookup').value = '';
+      element('proposalRecord').hidden = true;
+      element('financeParties').value = '';
+      element('financeDecision').value = '';
+      element('questLookup').value = '';
+      element('questRecord').hidden = true;
+      for (const id of ['inviteResult', 'acceptInviteResult', 'proposalAlert', 'questAlert', 'bazaarAlert']) setNotice(element(id), '');
+      switchWorkspaceTab('build');
+      renderWorkspaceAccess();
       element('previewButton').textContent = 'Create staging preview';
       element('domainOrigin').value = '';
       element('domainProof').textContent = '';
@@ -747,7 +965,7 @@
       element('appView').hidden = false;
       setSkipDestination('mainContent', 'Skip to builder');
       renderProfile(state.user);
-      await Promise.allSettled([loadProfile(), loadWorkspaces(), loadTemplate()]);
+      await Promise.allSettled([loadProfile(), loadWorkspaces(), loadCatalog(), loadFinance(), loadBazaar()]);
       updatePreviewAvailability();
       element('mainContent').focus();
     }
@@ -762,11 +980,14 @@
     }
 
     async function loadProfile() {
+      const sessionEpoch = state.sessionEpoch;
       try {
         const profile = await api('/profile');
+        if (!currentSession(sessionEpoch)) return;
         state.user = profile;
         renderProfile(profile);
       } catch (error) {
+        if (!currentSession(sessionEpoch)) return;
         if (!(error instanceof ApiError && error.status === 401)) {
           element('profileEmail').textContent = 'Profile unavailable';
         }
@@ -779,7 +1000,167 @@
       return [];
     }
 
+    function productRoleForWorkspaceRole(role) {
+      if (role === 'owner' || role === 'admin') return 'Architect';
+      if (role === 'member') return 'Maintainer';
+      if (role === 'viewer') return 'Viewer';
+      return '';
+    }
+
+    function currentSession(epoch) {
+      return epoch === state.sessionEpoch && Boolean(state.token);
+    }
+
+    function workspaceMarker() {
+      return { sessionEpoch: state.sessionEpoch, workspaceEpoch: state.workspaceEpoch, workspaceID: currentWorkspaceID() };
+    }
+
+    function currentWorkspace(marker) {
+      return currentSession(marker.sessionEpoch) && marker.workspaceEpoch === state.workspaceEpoch && marker.workspaceID === currentWorkspaceID();
+    }
+
+    class StaleWorkspaceView extends Error {}
+
+    function ignoreStaleWorkspace(error) {
+      return error instanceof StaleWorkspaceView;
+    }
+
+    function canBuildWorkspace() {
+      return state.productRole === 'Architect' || state.productRole === 'Maintainer';
+    }
+
+    function canPublishWorkspace() {
+      return state.productRole === 'Architect';
+    }
+
+    function announce(message) {
+      element('workspaceAnnouncer').textContent = '';
+      requestAnimationFrame(() => { element('workspaceAnnouncer').textContent = message; });
+    }
+
+    function switchWorkspaceTab(tab, { focusTab = false, focusPanel = false } = {}) {
+      const tabs = [...document.querySelectorAll('[data-workspace-tab]')];
+      tabs.forEach((button) => {
+        const selected = button.dataset.workspaceTab === tab;
+        button.setAttribute('aria-selected', String(selected));
+        button.tabIndex = selected ? 0 : -1;
+        const panel = element(button.getAttribute('aria-controls'));
+        if (panel) panel.hidden = !selected;
+      });
+      const selected = tabs.find((button) => button.dataset.workspaceTab === tab);
+      if (focusTab) selected?.focus();
+      if (focusPanel) element(selected?.getAttribute('aria-controls'))?.focus();
+      announce(`${selected?.textContent.trim() || 'Workspace'} workspace tool opened.`);
+    }
+
+    function renderWorkspaceAccess() {
+      const workspaceID = currentWorkspaceID();
+      const roleLabel = workspaceID && state.productRole ? state.productRole : 'Select a workspace';
+      element('workspaceRole').textContent = roleLabel;
+      const buildAllowed = workspaceID > 0 && canBuildWorkspace();
+      const publishAllowed = workspaceID > 0 && canPublishWorkspace();
+      element('createInviteButton').disabled = !publishAllowed;
+      element('createInviteButton').title = publishAllowed ? '' : 'Only an Architect may invite workspace members.';
+      element('createProposalButton').disabled = !workspaceID || !['Architect', 'Maintainer'].includes(state.productRole);
+      element('loadProposalButton').disabled = !workspaceID;
+      element('createQuestButton').disabled = !buildAllowed || !state.flows.length;
+      const record = state.proposalRecord && state.proposalRecord.proposal;
+      const open = record && record.status === 'OPEN';
+      element('approveVoteButton').disabled = !open || !['Architect', 'Maintainer'].includes(state.productRole);
+      element('rejectVoteButton').disabled = element('approveVoteButton').disabled;
+      element('approveDecisionButton').disabled = !open || !publishAllowed;
+      element('rejectDecisionButton').disabled = element('approveDecisionButton').disabled;
+      const questStatus = String(state.quest && state.quest.status || '').toUpperCase();
+      const questParties = Array.isArray(state.quest && state.quest.intent && state.quest.intent.parties) ? state.quest.intent.parties : [];
+      const actorParty = `taawun:user:${state.user && state.user.id}`;
+      const providerConfirmed = Boolean(state.quest && state.quest.providerReference);
+      const questActions = {
+        questApproveButton: publishAllowed && questStatus === 'PENDING' && questParties.includes(actorParty),
+        questExecuteButton: publishAllowed && (questStatus === 'APPROVED' || (questStatus === 'EXECUTING' && !providerConfirmed)),
+        questReconcileButton: publishAllowed && questStatus === 'EXECUTING' && providerConfirmed,
+        questCancelButton: publishAllowed && ['PENDING', 'APPROVED'].includes(questStatus),
+      };
+      for (const [id, allowed] of Object.entries(questActions)) {
+        element(id).disabled = !allowed;
+        element(id).title = allowed ? '' : (!publishAllowed ? 'Only an Architect may advance a sandbox quest.' : 'This action is not available in the quest’s current durable state.');
+      }
+      element('shuraCapability').textContent = state.shuraToken ? `${state.productRole} capability active` : (workspaceID ? `${roleLabel} · capability on demand` : 'No workspace capability');
+      if (!buildAllowed && workspaceID) {
+        element('workspaceHelp').textContent = 'This workspace is read-only for your Viewer role. Ask an Architect to assign Maintainer access to build.';
+      } else {
+        element('workspaceHelp').textContent = 'The artifact is scoped to this workspace.';
+      }
+      if (state.listings.length) renderBazaar();
+      updatePreviewAvailability();
+    }
+
+    function renderRecordList(target, records, render) {
+      target.replaceChildren();
+      for (const record of records) {
+        const item = document.createElement('li');
+        item.className = 'surface-record';
+        const summary = render(record);
+        const strong = document.createElement('strong');
+        strong.textContent = summary.title;
+        const meta = document.createElement('span');
+        meta.textContent = summary.meta;
+        item.append(strong, meta);
+        target.append(item);
+      }
+    }
+
+    async function loadWorkspaceContext() {
+      const workspaceID = currentWorkspaceID();
+      const marker = { sessionEpoch: state.sessionEpoch, workspaceEpoch: ++state.workspaceEpoch, workspaceID };
+      state.members = [];
+      state.workspaceRole = '';
+      state.productRole = '';
+      state.shuraToken = '';
+      state.shuraClaims = null;
+      state.proposalRecord = null;
+      state.quest = null;
+      state.purchase = null;
+      element('proposalRecord').hidden = true;
+      element('questRecord').hidden = true;
+      element('inviteTokenOutput').value = '';
+      element('inviteGrant').hidden = true;
+      setNotice(element('proposalAlert'), '');
+      setNotice(element('questAlert'), '');
+      setNotice(element('bazaarAlert'), '');
+      element('peopleList').replaceChildren();
+      renderInvitations();
+      renderProposals();
+      if (!workspaceID) {
+        element('peopleState').textContent = 'Select a workspace to load members.';
+        renderWorkspaceAccess();
+        return;
+      }
+      element('peopleState').hidden = false;
+      element('peopleState').textContent = 'Loading authoritative workspace membership…';
+      try {
+        const payload = await api(`/workspaces/${workspaceID}/people`);
+        if (!currentWorkspace(marker)) return;
+        state.members = normalizeCollection(payload, 'members');
+        const current = state.members.find((member) => Number(member.user_id) === Number(state.user && state.user.id));
+        const platformAdmin = String(state.user && state.user.role || '').toLowerCase() === 'admin';
+        state.workspaceRole = current ? String(current.role || '') : (platformAdmin ? 'admin' : '');
+        state.productRole = productRoleForWorkspaceRole(state.workspaceRole);
+        renderRecordList(element('peopleList'), state.members, (member) => ({
+          title: String(member.username || `User ${member.user_id}`),
+          meta: `${productRoleForWorkspaceRole(String(member.role || '')) || 'Unknown role'} · workspace role ${member.role || 'unknown'}`,
+        }));
+        element('peopleState').textContent = state.members.length ? `${state.members.length} real workspace member${state.members.length === 1 ? '' : 's'}.` : 'No active workspace members were returned.';
+      } catch (error) {
+        if (!currentWorkspace(marker)) return;
+        element('peopleState').textContent = `Could not load workspace people: ${error.message || 'request failed'}. Use Reload people to retry.`;
+      } finally {
+        if (currentWorkspace(marker)) renderWorkspaceAccess();
+      }
+    }
+
     async function loadWorkspaces(preferredId = '') {
+      const sessionEpoch = state.sessionEpoch;
+      const requestEpoch = ++state.workspacesEpoch;
       element('workspaceLoading').hidden = false;
       element('workspaceError').hidden = true;
       element('workspaceReady').hidden = true;
@@ -788,6 +1169,7 @@
       state.workspacesReady = false;
       try {
         const payload = await api('/workspaces');
+        if (!currentSession(sessionEpoch) || requestEpoch !== state.workspacesEpoch) return;
         const workspaces = normalizeCollection(payload, 'workspaces');
         state.workspaces = workspaces;
         const select = element('workspaceSelect');
@@ -807,12 +1189,16 @@
           seedOrganizationFromWorkspace();
         }
         state.workspacesReady = true;
+        await loadWorkspaceContext();
       } catch (error) {
+        if (!currentSession(sessionEpoch) || requestEpoch !== state.workspacesEpoch) return;
         setNotice(element('workspaceError'), error.message || 'Could not load workspaces.', 'error');
         element('retryWorkspaces').hidden = false;
       } finally {
-        element('workspaceLoading').hidden = true;
-        updatePreviewAvailability();
+        if (currentSession(sessionEpoch) && requestEpoch === state.workspacesEpoch) {
+          element('workspaceLoading').hidden = true;
+          updatePreviewAvailability();
+        }
       }
     }
 
@@ -850,24 +1236,84 @@
       }
     }
 
-    async function loadTemplate() {
+    function selectedTemplate() {
+      return state.templates.find((template) => String(template.id || template.template?.id || '') === state.selectedTemplateId) || null;
+    }
+
+    function renderSelectedTemplate() {
+      const template = selectedTemplate();
+      const moduleList = element('moduleList');
+      moduleList.replaceChildren();
+      if (!template) return;
+      const version = String(template.version || template.template?.version || '1.0.0');
+      const allowed = Array.isArray(template.allowedModules) ? template.allowedModules : [];
+      const defaults = state.selectedTemplateId === DEFAULT_TEMPLATE_ID ? DEFAULT_MODULE_IDS : allowed;
+      element('templateTitle').textContent = String(template.title || state.selectedTemplateId);
+      element('templateDescription').textContent = String(template.description || 'Curated Taawun template.');
+      element('templateBadge').textContent = `Ready · v${version}`;
+      element('templateMeta').replaceChildren();
+      for (const value of [state.selectedTemplateId, 'Fixed server template', `${allowed.length} approved modules`]) {
+        const span = document.createElement('span');
+        span.textContent = value;
+        element('templateMeta').append(span);
+      }
+      element('moduleCount').textContent = `${allowed.length} approved modules`;
+      for (const id of allowed) {
+        const module = state.modules.find((entry) => entry.id === id) || { id, title: id };
+        const label = document.createElement('label');
+        label.className = 'module-option';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.name = 'selectedModule';
+        input.value = id;
+        input.checked = defaults.includes(id);
+        const copy = document.createElement('span');
+        const strong = document.createElement('strong');
+        strong.textContent = String(module.title || id);
+        const small = document.createElement('small');
+        const classifications = Array.isArray(module.dataClassifications) ? module.dataClassifications.join(', ') : 'curated module';
+        small.textContent = classifications;
+        copy.append(strong, small);
+        const code = document.createElement('code');
+        code.textContent = Array.isArray(module.allowedServerSignals) && module.allowedServerSignals.length ? 'server adapter' : 'browser';
+        label.append(input, copy, code);
+        moduleList.append(label);
+      }
+      state.templateReady = true;
+      markPreviewDirty();
+      updatePreviewAvailability();
+    }
+
+    async function loadCatalog() {
       state.templateReady = false;
       element('templateBadge').textContent = 'Loading';
       element('templateDescription').textContent = 'Checking the approved template catalog…';
       element('retryTemplate').hidden = true;
+      element('templateSelect').disabled = true;
       try {
-        const payload = await api('/templates');
-        const templates = normalizeCollection(payload, 'templates');
-        const template = templates.find((item) => String(item.id || item.templateId || (item.template && item.template.id) || '') === TEMPLATE_ID);
-        if (!template) throw new Error('The Community Iftar template is not available in this catalog.');
-        const version = String(template.version || (template.template && template.template.version) || '1.0.0');
-        const description = String(template.description || 'Registration, announcements, and a sandbox-only donation campaign for one community.');
-        element('templateBadge').textContent = `Ready · v${version}`;
-        element('templateDescription').textContent = description;
-        state.templateReady = true;
+        const [templatePayload, modulePayload] = await Promise.all([api('/templates'), api('/modules')]);
+        state.templates = normalizeCollection(templatePayload, 'templates');
+        state.modules = normalizeCollection(modulePayload, 'modules');
+        if (!state.templates.length || !state.modules.length) throw new Error('The approved catalog is empty.');
+        const select = element('templateSelect');
+        select.replaceChildren();
+        for (const template of state.templates) {
+          const id = String(template.id || template.template?.id || '');
+          if (!id) continue;
+          const option = document.createElement('option');
+          option.value = id;
+          option.textContent = String(template.title || id);
+          select.append(option);
+        }
+        if (![...select.options].some((option) => option.value === state.selectedTemplateId)) state.selectedTemplateId = select.options[0]?.value || '';
+        select.value = state.selectedTemplateId;
+        select.disabled = false;
+        element('templateCatalogCount').textContent = `${state.templates.length} real templates · ${state.modules.length} real modules from the approved catalog.`;
+        renderSelectedTemplate();
       } catch (error) {
         element('templateBadge').textContent = 'Unavailable';
         element('templateDescription').textContent = error.message || 'Could not load the template catalog.';
+        element('templateCatalogCount').textContent = 'Catalog unavailable. Retry without losing the workspace selection.';
         element('retryTemplate').hidden = false;
       } finally {
         updatePreviewAvailability();
@@ -876,7 +1322,9 @@
 
     function updatePreviewAvailability() {
       const hasWorkspace = state.workspacesReady && element('workspaceSelect').options.length > 0;
-      element('previewButton').disabled = state.building || !state.templateReady || !hasWorkspace;
+      const allowed = hasWorkspace && canBuildWorkspace();
+      element('previewButton').disabled = state.building || !state.templateReady || !allowed;
+      element('previewButton').title = hasWorkspace && !canBuildWorkspace() ? 'Viewer access is read-only. Ask an Architect for Maintainer access.' : '';
     }
 
     function currentWorkspaceID() {
@@ -918,11 +1366,7 @@
     }
 
     function selectedModules() {
-      return MODULE_IDS.filter((id) => {
-        if (id === 'iftar-registration') return element('moduleRegistration').checked;
-        if (id === 'announcements') return element('moduleAnnouncements').checked;
-        return element('moduleDonation').checked;
-      });
+      return [...document.querySelectorAll('#moduleList input[name="selectedModule"]:checked')].map((input) => input.value);
     }
 
     function buildPayload() {
@@ -934,7 +1378,7 @@
         organizationName: element('organizationName').value.trim(),
         city: element('city').value.trim(),
         madhhab: element('madhhab').value,
-        templateId: TEMPLATE_ID,
+        templateId: state.selectedTemplateId,
         theme: { accentColor: element('accentColor').value.toUpperCase() },
         modules: selectedModules(),
         requestedOrigins: {
@@ -948,7 +1392,7 @@
       if (!element('builderForm').reportValidity()) return false;
       if (!selectedModules().length) {
         setNotice(element('builderAlert'), 'Choose at least one approved module.', 'error');
-        element('moduleRegistration').focus();
+        document.querySelector('#moduleList input[name="selectedModule"]')?.focus();
         return false;
       }
       if (!Number.isInteger(Number(element('workspaceSelect').value)) || Number(element('workspaceSelect').value) <= 0) {
@@ -1290,6 +1734,400 @@
       }
     }
 
+    async function ensureShuraCapability() {
+      const workspaceID = currentWorkspaceID();
+      if (!workspaceID || !state.productRole || !SHURA_ROLE_SCOPES[state.productRole]) throw new Error('Select an authorized workspace first.');
+      const marker = workspaceMarker();
+      const now = Math.floor(Date.now() / 1000);
+      if (state.shuraToken && state.shuraClaims && Number(state.shuraClaims.exp) > now + 30) return state.shuraToken;
+      const result = await api('/shura/v1/capabilities', {
+        method: 'POST',
+        body: { workspace_id: workspaceID, role: state.productRole, scopes: SHURA_ROLE_SCOPES[state.productRole], audience: 'taawun-shura', ttl_seconds: 900 },
+      });
+      if (!currentWorkspace(marker)) throw new StaleWorkspaceView();
+      if (!result || !result.token || !result.claims) throw new Error('Shura capability response was incomplete.');
+      state.shuraToken = String(result.token);
+      state.shuraClaims = result.claims;
+      renderWorkspaceAccess();
+      return state.shuraToken;
+    }
+
+    function renderInvitations() {
+      const workspaceID = currentWorkspaceID();
+      const visible = state.invitations.filter((invitation) => Number(invitation && invitation.workspace_id) === workspaceID);
+      renderRecordList(element('invitationList'), visible, (invitation) => ({
+        title: `${invitation.role || 'Unknown role'} · ${invitation.status || 'UNKNOWN'}`,
+        meta: `${invitation.id || 'Invitation'} · workspace ${invitation.workspace_id || 'unknown'}`,
+      }));
+    }
+
+    async function createInvitation() {
+      const invitee = element('invitee').value.trim();
+      if (!invitee || !currentWorkspaceID()) {
+        setNotice(element('inviteResult'), 'Select a workspace and enter an invitee.', 'error');
+        return;
+      }
+      const marker = workspaceMarker();
+      const button = element('createInviteButton');
+      setBusy(button, true, 'Creating…', 'Create invitation');
+      try {
+        const result = await api('/shura/v1/invitations', { method: 'POST', body: { workspace_id: currentWorkspaceID(), invitee, role: element('inviteRole').value, ttl_seconds: 604800 } });
+        if (!currentWorkspace(marker)) return;
+        if (!result || !result.invitation || !result.token) throw new Error('Invitation response was incomplete.');
+        state.invitations.unshift(result.invitation);
+        element('inviteTokenOutput').value = String(result.token);
+        element('inviteGrant').hidden = false;
+        renderInvitations();
+        setNotice(element('inviteResult'), 'Invitation created. Share the acceptance token through a trusted channel; it is shown only in this session.', 'success');
+        announce('Invitation created.');
+      } catch (error) {
+        if (!currentWorkspace(marker)) return;
+        setNotice(element('inviteResult'), error.message || 'Invitation could not be created.', 'error');
+      } finally {
+        if (currentWorkspace(marker)) {
+          setBusy(button, false, 'Creating…', 'Create invitation');
+          renderWorkspaceAccess();
+        }
+      }
+    }
+
+    async function acceptInvitation() {
+      const token = element('acceptInviteToken').value.trim();
+      if (!token) {
+        setNotice(element('acceptInviteResult'), 'Paste an invitation token first.', 'error');
+        return;
+      }
+      const sessionEpoch = state.sessionEpoch;
+      const button = element('acceptInviteButton');
+      setBusy(button, true, 'Joining…', 'Accept and join');
+      try {
+        const invitation = await api('/shura/v1/invitations/accept', { method: 'POST', body: { token } });
+        if (!currentSession(sessionEpoch)) return;
+        state.invitations.unshift(invitation);
+        element('acceptInviteToken').value = '';
+        renderInvitations();
+        setNotice(element('acceptInviteResult'), `Invitation accepted as ${invitation.role}. Loading workspace ${invitation.workspace_id}.`, 'success');
+        await loadWorkspaces(invitation.workspace_id);
+        if (!currentSession(sessionEpoch)) return;
+        announce(`Joined workspace ${invitation.workspace_id} as ${invitation.role}.`);
+      } catch (error) {
+        if (!currentSession(sessionEpoch)) return;
+        setNotice(element('acceptInviteResult'), error.message || 'Invitation could not be accepted.', 'error');
+      } finally {
+        if (currentSession(sessionEpoch)) setBusy(button, false, 'Joining…', 'Accept and join');
+      }
+    }
+
+    function renderProposals() {
+      const unique = [...new Map(state.proposals.filter(Boolean).map((proposal) => [proposal.id, proposal])).values()];
+      state.proposals = unique;
+      const workspaceID = currentWorkspaceID();
+      const visible = unique.filter((proposal) => Number(proposal.workspace_id) === workspaceID);
+      renderRecordList(element('proposalList'), visible, (proposal) => ({ title: proposal.title || proposal.id, meta: `${proposal.status || 'UNKNOWN'} · version ${proposal.version || '?'}` }));
+    }
+
+    function renderProposalRecord(record) {
+      const proposal = record && record.proposal;
+      state.proposalRecord = record || null;
+      element('proposalRecord').hidden = !proposal;
+      if (!proposal) return;
+      element('proposalRecordTitle').textContent = String(proposal.title || proposal.id);
+      element('proposalRecordMeta').textContent = `${proposal.status} · version ${proposal.version} · ${Array.isArray(record.votes) ? record.votes.length : 0} vote(s)${record.decision ? ` · decision ${record.decision.outcome}` : ''}`;
+      element('proposalRecordBody').textContent = String(proposal.body || 'No proposal body.');
+      element('proposalLookup').value = proposal.id;
+      state.proposals.unshift(proposal);
+      renderProposals();
+      renderWorkspaceAccess();
+    }
+
+    async function loadProposal(proposalID = element('proposalLookup').value.trim()) {
+      if (!proposalID) {
+        setNotice(element('proposalAlert'), 'Enter a proposal ID.', 'error');
+        return;
+      }
+      const marker = workspaceMarker();
+      try {
+        const capability = await ensureShuraCapability();
+        const record = await api(`/shura/v1/proposals/${encodeURIComponent(proposalID)}`, { bearer: capability });
+        if (!currentWorkspace(marker)) return;
+        renderProposalRecord(record);
+        setNotice(element('proposalAlert'), 'Proposal loaded from durable Shura state.', 'success');
+      } catch (error) {
+        if (ignoreStaleWorkspace(error) || !currentWorkspace(marker)) return;
+        renderProposalRecord(null);
+        setNotice(element('proposalAlert'), `${error.message || 'Proposal could not be loaded.'} Check the ID and workspace, then retry.`, 'error');
+      }
+    }
+
+    async function createProposal() {
+      const title = element('proposalTitle').value.trim();
+      const body = element('proposalBody').value.trim();
+      const quorum = Number(element('proposalQuorum').value);
+      const threshold = Number(element('proposalThreshold').value);
+      if (!title || !body || !Number.isInteger(quorum) || !Number.isInteger(threshold) || threshold > quorum) {
+        setNotice(element('proposalAlert'), 'Enter a title/body and a valid approval threshold no greater than quorum.', 'error');
+        return;
+      }
+      const marker = workspaceMarker();
+      const button = element('createProposalButton');
+      setBusy(button, true, 'Creating…', 'Create proposal');
+      try {
+        const capability = await ensureShuraCapability();
+        const proposal = await api(`/shura/v1/workspaces/${currentWorkspaceID()}/proposals`, { method: 'POST', bearer: capability, body: { title, body, policy: { quorum, approval_threshold: threshold, required_approvers: [] } } });
+        if (!currentWorkspace(marker)) return;
+        element('proposalLookup').value = proposal.id;
+        await loadProposal(proposal.id);
+        if (!currentWorkspace(marker)) return;
+        announce('Shura proposal created and opened.');
+      } catch (error) {
+        if (ignoreStaleWorkspace(error) || !currentWorkspace(marker)) return;
+        setNotice(element('proposalAlert'), error.message || 'Proposal could not be created.', 'error');
+      } finally {
+        if (currentWorkspace(marker)) {
+          setBusy(button, false, 'Creating…', 'Create proposal');
+          renderWorkspaceAccess();
+        }
+      }
+    }
+
+    async function mutateProposal(kind, value) {
+      const proposal = state.proposalRecord && state.proposalRecord.proposal;
+      if (!proposal) return;
+      const marker = workspaceMarker();
+      try {
+        const capability = await ensureShuraCapability();
+        const endpoint = kind === 'vote' ? 'votes' : 'decision';
+        const body = kind === 'vote'
+          ? { expected_version: proposal.version, choice: value, rationale: 'Recorded through the workspace cockpit.' }
+          : { expected_version: proposal.version, outcome: value, rationale: 'Explicit decision recorded through the workspace cockpit.' };
+        await api(`/shura/v1/proposals/${encodeURIComponent(proposal.id)}/${endpoint}`, { method: 'POST', bearer: capability, body });
+        if (!currentWorkspace(marker)) return;
+        await loadProposal(proposal.id);
+        if (!currentWorkspace(marker)) return;
+        announce(kind === 'vote' ? 'Vote recorded.' : 'Final decision recorded.');
+      } catch (error) {
+        if (ignoreStaleWorkspace(error) || !currentWorkspace(marker)) return;
+        setNotice(element('proposalAlert'), error.message || `Proposal ${kind} could not be recorded.`, 'error');
+      }
+    }
+
+    async function loadFinance() {
+      const sessionEpoch = state.sessionEpoch;
+      element('financeState').hidden = false;
+      element('financeState').textContent = 'Loading the vetted sandbox flow catalog…';
+      try {
+        const payload = await api('/financial/flows');
+        if (!currentSession(sessionEpoch)) return;
+        state.flows = normalizeCollection(payload, 'flows');
+        const select = element('financeFlow');
+        select.replaceChildren();
+        renderRecordList(element('flowList'), state.flows, (flow) => ({ title: String(flow.title || flow.id), meta: `${flow.id} · ${flow.defaultApprovals} approval(s) · ${flow.minimumParties} party minimum` }));
+        for (const flow of state.flows) {
+          const option = document.createElement('option');
+          option.value = flow.id;
+          option.textContent = flow.title || flow.id;
+          select.append(option);
+        }
+        element('financeState').textContent = state.flows.length ? `${state.flows.length} vetted sandbox flows. No balances or fake transactions.` : 'No vetted financial flows are available.';
+      } catch (error) {
+        if (!currentSession(sessionEpoch)) return;
+        state.flows = [];
+        element('flowList').replaceChildren();
+        element('financeState').textContent = `Financial flow catalog unavailable: ${error.message || 'request failed'}. Retry without creating data.`;
+      } finally {
+        if (currentSession(sessionEpoch)) renderWorkspaceAccess();
+      }
+    }
+
+    function renderQuest(quest) {
+      state.quest = quest || null;
+      element('questRecord').hidden = !quest;
+      if (!quest) {
+        renderWorkspaceAccess();
+        return;
+      }
+      element('questLookup').value = quest.id;
+      element('questRecordTitle').textContent = `${quest.flowId} · ${quest.status}`;
+      element('questRecordMeta').textContent = `${quest.id} · version ${quest.version} · ${quest.approvalsReceived}/${quest.approvalsRequired} approvals · sandbox orchestration only`;
+      renderWorkspaceAccess();
+    }
+
+    async function loadQuest(questID = element('questLookup').value.trim()) {
+      if (!questID) {
+        setNotice(element('questAlert'), 'Enter a quest ID.', 'error');
+        return;
+      }
+      const marker = workspaceMarker();
+      try {
+        const quest = await api(`/financial/quests/${encodeURIComponent(questID)}`);
+        if (!currentWorkspace(marker)) return;
+        renderQuest(quest);
+        setNotice(element('questAlert'), 'Durable sandbox quest loaded. This status is not a balance or settlement receipt.', 'success');
+      } catch (error) {
+        if (!currentWorkspace(marker)) return;
+        renderQuest(null);
+        setNotice(element('questAlert'), `${error.message || 'Quest could not be loaded.'} Check workspace access and retry.`, 'error');
+      }
+    }
+
+    async function createQuest() {
+      const flow = state.flows.find((entry) => entry.id === element('financeFlow').value);
+      const decision = element('financeDecision').value.trim();
+      const parties = element('financeParties').value.split(',').map((party) => party.trim()).filter(Boolean);
+      const actorParty = `taawun:user:${state.user && state.user.id}`;
+      if (!parties.includes(actorParty)) parties.unshift(actorParty);
+      if (!flow || !decision) {
+        setNotice(element('questAlert'), 'Select a vetted flow and enter a final approved Shura decision ID.', 'error');
+        return;
+      }
+      const marker = workspaceMarker();
+      try {
+        const result = await api('/financial/quests', { method: 'POST', body: {
+          workspaceId: marker.workspaceID, idempotencyKey: `cockpit-${crypto.randomUUID()}`, flowId: flow.id,
+          currency: element('financeCurrency').value.trim().toUpperCase(), amountMinor: Number(element('financeAmount').value), feeMinor: 0,
+          parties, approvalsRequired: Number(flow.defaultApprovals || 1), memo: 'Private-beta cockpit sandbox quest', shuraDecisionRef: decision,
+        } });
+        if (!currentWorkspace(marker)) return;
+        renderQuest(result.quest);
+        setNotice(element('questAlert'), `Sandbox quest ${result.created ? 'created' : 'replayed'} from durable state. No funds moved.`, 'success');
+        announce('Sandbox quest opened. No funds moved.');
+      } catch (error) {
+        if (!currentWorkspace(marker)) return;
+        setNotice(element('questAlert'), error.message || 'Sandbox quest could not be created.', 'error');
+      }
+    }
+
+    async function mutateQuest(action) {
+      if (!state.quest) return;
+      const marker = workspaceMarker();
+      const questID = state.quest.id;
+      const expectedVersion = state.quest.version;
+      const shuraDecisionRef = element('financeDecision').value.trim();
+      try {
+        const updated = await api(`/financial/quests/${encodeURIComponent(questID)}/${action}`, { method: 'POST', body: { expectedVersion, shuraDecisionRef } });
+        if (!currentWorkspace(marker)) return;
+        renderQuest(updated);
+        setNotice(element('questAlert'), `Sandbox quest updated to ${updated.status}. This is orchestration status, not settlement.`, 'success');
+      } catch (error) {
+        if (!currentWorkspace(marker)) return;
+        setNotice(element('questAlert'), `${error.message || 'Quest update failed.'} Reload the quest before retrying.`, 'error');
+      }
+    }
+
+    function renderBazaar() {
+      const list = element('bazaarList');
+      list.replaceChildren();
+      for (const listing of state.listings) {
+        const item = document.createElement('li');
+        item.className = 'surface-record';
+        const title = document.createElement('strong');
+        title.textContent = String(listing.revision?.title || listing.id);
+        const meta = document.createElement('span');
+        const revision = listing.revision || {};
+        meta.textContent = `${revision.summary || 'Published template'} · ${revision.currency || ''} ${Number(revision.priceMinor || 0) / 100} · ${revision.license || 'license not supplied'}`;
+        const actions = document.createElement('div');
+        actions.className = 'surface-actions';
+        const testDrive = document.createElement('a');
+        testDrive.className = 'button secondary';
+        testDrive.href = `/api/bazaar/listings/${encodeURIComponent(listing.id)}/test-drive`;
+        testDrive.target = '_blank';
+        testDrive.rel = 'noopener noreferrer';
+        testDrive.textContent = 'Test drive';
+        const purchase = document.createElement('button');
+        purchase.className = 'button';
+        purchase.type = 'button';
+        purchase.textContent = 'Start sandbox purchase';
+        purchase.disabled = !currentWorkspaceID() || !canBuildWorkspace();
+        purchase.title = currentWorkspaceID() && !canBuildWorkspace() ? 'Viewer access is read-only. Ask an Architect for Maintainer access to purchase into this workspace.' : '';
+        purchase.addEventListener('click', () => purchaseListing(listing));
+        actions.append(testDrive, purchase);
+        item.append(title, meta, actions);
+        list.append(item);
+      }
+      element('bazaarState').textContent = state.listings.length
+        ? `${state.listings.length} real published listing${state.listings.length === 1 ? '' : 's'}. Test-drive before any sandbox purchase.`
+        : 'No published Bazaar listings yet. Controlled DNS, an authorized reviewer, and cleanup-safe fixture remain external dependencies; no listing has been fabricated.';
+    }
+
+    async function loadBazaar() {
+      const sessionEpoch = state.sessionEpoch;
+      element('bazaarState').hidden = false;
+      element('bazaarState').textContent = 'Loading the published-only catalog…';
+      try {
+        const payload = await api('/bazaar/listings', { auth: false });
+        if (!currentSession(sessionEpoch)) return;
+        state.listings = normalizeCollection(payload, 'listings').filter((listing) => listing && listing.state === 'published');
+        renderBazaar();
+      } catch (error) {
+        if (!currentSession(sessionEpoch)) return;
+        state.listings = [];
+        element('bazaarList').replaceChildren();
+        element('bazaarState').textContent = `Published Bazaar catalog unavailable: ${error.message || 'request failed'}. Retry without creating data.`;
+      }
+    }
+
+    async function purchaseListing(listing) {
+      const marker = workspaceMarker();
+      try {
+        const purchase = await api(`/bazaar/listings/${encodeURIComponent(listing.id)}/purchases`, { method: 'POST', body: { targetWorkspaceId: marker.workspaceID, idempotencyKey: `bazaar-${crypto.randomUUID()}` } });
+        if (!currentWorkspace(marker)) return;
+        state.purchase = purchase;
+        renderPurchaseActions();
+      } catch (error) {
+        if (!currentWorkspace(marker)) return;
+        setNotice(element('bazaarAlert'), error.message || 'Sandbox purchase could not be created.', 'error');
+      }
+    }
+
+    function renderPurchaseActions() {
+      const purchase = state.purchase;
+      if (!purchase) return;
+      setNotice(element('bazaarAlert'), `Sandbox purchase ${purchase.id}: ${purchase.questStatus}. No settlement or entitlement is claimed until reconciled.`, purchase.entitlementId ? 'success' : 'gold');
+      const container = element('bazaarAlert');
+      const actions = document.createElement('div');
+      actions.className = 'surface-actions';
+      const refresh = document.createElement('button');
+      refresh.className = 'button secondary'; refresh.type = 'button'; refresh.textContent = 'Refresh sandbox status';
+      refresh.addEventListener('click', refreshPurchase);
+      actions.append(refresh);
+      if (purchase.entitlementId) {
+        const install = document.createElement('button');
+        install.className = 'button'; install.type = 'button'; install.textContent = 'Install reconciled entitlement';
+        install.addEventListener('click', installEntitlement);
+        actions.append(install);
+      }
+      container.append(actions);
+    }
+
+    async function refreshPurchase() {
+      const marker = workspaceMarker();
+      const purchaseID = state.purchase && state.purchase.id;
+      if (!purchaseID) return;
+      try {
+        const purchase = await api(`/bazaar/purchases/${encodeURIComponent(purchaseID)}/refresh`, { method: 'POST', body: {} });
+        if (!currentWorkspace(marker)) return;
+        state.purchase = purchase;
+        renderPurchaseActions();
+      } catch (error) {
+        if (!currentWorkspace(marker)) return;
+        setNotice(element('bazaarAlert'), error.message || 'Sandbox purchase status could not be refreshed.', 'error');
+      }
+    }
+
+    async function installEntitlement() {
+      const marker = workspaceMarker();
+      const entitlementID = state.purchase && state.purchase.entitlementId;
+      if (!entitlementID) return;
+      try {
+        const installation = await api(`/bazaar/entitlements/${encodeURIComponent(entitlementID)}/install`, { method: 'POST', body: { expectedVersion: 0 } });
+        if (!currentWorkspace(marker)) return;
+        setNotice(element('bazaarAlert'), `Entitlement installed as ${installation.id}, pinned to revision ${installation.revision}.`, 'success');
+      } catch (error) {
+        if (!currentWorkspace(marker)) return;
+        setNotice(element('bazaarAlert'), error.message || 'Entitlement could not be installed.', 'error');
+      }
+    }
+
     function syncAccent(source) {
       const color = source.value.trim();
       if (/^#[0-9a-fA-F]{6}$/.test(color)) {
@@ -1310,6 +2148,25 @@
         else return;
         event.preventDefault();
         switchAuthTab(authTabs[nextIndex].dataset.authTab, { focusTab: true });
+      });
+    });
+
+    const workspaceTabs = [...document.querySelectorAll('[data-workspace-tab]')];
+    workspaceTabs.forEach((button, index) => {
+      button.addEventListener('click', () => switchWorkspaceTab(button.dataset.workspaceTab));
+      button.addEventListener('keydown', (event) => {
+        let nextIndex = index;
+        if (event.key === 'ArrowRight') nextIndex = (index + 1) % workspaceTabs.length;
+        else if (event.key === 'ArrowLeft') nextIndex = (index - 1 + workspaceTabs.length) % workspaceTabs.length;
+        else if (event.key === 'Home') nextIndex = 0;
+        else if (event.key === 'End') nextIndex = workspaceTabs.length - 1;
+        else if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          switchWorkspaceTab(button.dataset.workspaceTab, { focusPanel: true });
+          return;
+        } else return;
+        event.preventDefault();
+        switchWorkspaceTab(workspaceTabs[nextIndex].dataset.workspaceTab, { focusTab: true });
       });
     });
 
@@ -1389,12 +2246,17 @@
 
     element('logoutButton').addEventListener('click', () => showAuth());
     element('retryWorkspaces').addEventListener('click', () => loadWorkspaces());
-    element('retryTemplate').addEventListener('click', loadTemplate);
+    element('retryTemplate').addEventListener('click', loadCatalog);
+    element('templateSelect').addEventListener('change', () => {
+      state.selectedTemplateId = element('templateSelect').value;
+      renderSelectedTemplate();
+    });
     element('createWorkspaceButton').addEventListener('click', createWorkspace);
-    element('workspaceSelect').addEventListener('change', () => {
+    element('workspaceSelect').addEventListener('change', async () => {
       seedOrganizationFromWorkspace();
       resetDomainClaim();
       markPreviewDirty();
+      await loadWorkspaceContext();
     });
     element('builderForm').addEventListener('submit', createPreview);
     element('builderForm').addEventListener('input', markPreviewDirty);
@@ -1404,6 +2266,34 @@
     element('deployButton').addEventListener('click', publishVerifiedDomain);
     element('accentColor').addEventListener('input', () => syncAccent(element('accentColor')));
     element('accentHex').addEventListener('input', () => syncAccent(element('accentHex')));
+    element('retryPeople').addEventListener('click', loadWorkspaceContext);
+    element('createInviteButton').addEventListener('click', createInvitation);
+    element('acceptInviteButton').addEventListener('click', acceptInvitation);
+    element('copyInviteButton').addEventListener('click', async () => {
+      const output = element('inviteTokenOutput');
+      try {
+        await navigator.clipboard.writeText(output.value);
+        setNotice(element('inviteResult'), 'Invitation token copied. Share it through a trusted channel.', 'success');
+      } catch {
+        output.focus();
+        output.select();
+        setNotice(element('inviteResult'), 'Copy is unavailable in this browser. The token is selected for manual copy.', 'gold');
+      }
+    });
+    element('createProposalButton').addEventListener('click', createProposal);
+    element('loadProposalButton').addEventListener('click', () => loadProposal());
+    element('approveVoteButton').addEventListener('click', () => mutateProposal('vote', 'APPROVE'));
+    element('rejectVoteButton').addEventListener('click', () => mutateProposal('vote', 'REJECT'));
+    element('approveDecisionButton').addEventListener('click', () => mutateProposal('decision', 'APPROVED'));
+    element('rejectDecisionButton').addEventListener('click', () => mutateProposal('decision', 'REJECTED'));
+    element('retryFinance').addEventListener('click', loadFinance);
+    element('createQuestButton').addEventListener('click', createQuest);
+    element('loadQuestButton').addEventListener('click', () => loadQuest());
+    element('questApproveButton').addEventListener('click', () => mutateQuest('approve'));
+    element('questExecuteButton').addEventListener('click', () => mutateQuest('execute'));
+    element('questReconcileButton').addEventListener('click', () => mutateQuest('reconcile'));
+    element('questCancelButton').addEventListener('click', () => mutateQuest('cancel'));
+    element('retryBazaar').addEventListener('click', loadBazaar);
 
     showAuth();
   </script>

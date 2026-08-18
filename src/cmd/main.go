@@ -302,6 +302,7 @@ func main() {
 	api.HandleFunc("/workspaces", workspaceHandler.CreateWorkspace).Methods("POST")
 	api.HandleFunc("/workspaces", workspaceHandler.GetWorkspaces).Methods("GET")
 	api.HandleFunc("/workspaces/{id}", workspaceHandler.GetWorkspace).Methods("GET")
+	api.HandleFunc("/workspaces/{id}/people", workspaceHandler.GetWorkspacePeople).Methods(http.MethodGet)
 	api.HandleFunc("/workspaces/{id}", workspaceHandler.UpdateWorkspace).Methods("PUT")
 	api.HandleFunc("/workspaces/{id}", workspaceHandler.DeleteWorkspace).Methods("DELETE")
 	api.HandleFunc("/workspaces/{id}/users", workspaceHandler.AddUserToWorkspace).Methods("POST")

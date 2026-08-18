@@ -80,6 +80,40 @@ func (h *WorkspaceHandler) GetWorkspace(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(workspace)
 }
 
+func (h *WorkspaceHandler) GetWorkspacePeople(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	user, ok := CurrentUser(r.Context())
+	if !ok {
+		writeWorkspacePeopleError(w, http.StatusUnauthorized, "authentication_required", "Authentication is required.")
+		return
+	}
+	id, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil || id <= 0 {
+		writeWorkspacePeopleError(w, http.StatusBadRequest, "invalid_workspace", "Workspace ID must be positive.")
+		return
+	}
+	members, err := h.service.GetWorkspaceMembers(user, id)
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrWorkspaceForbidden):
+			writeWorkspacePeopleError(w, http.StatusForbidden, "workspace_forbidden", "This account is not authorized to view this workspace.")
+		case errors.Is(err, services.ErrWorkspaceNotFound):
+			writeWorkspacePeopleError(w, http.StatusNotFound, "workspace_not_found", "Workspace was not found.")
+		default:
+			writeWorkspacePeopleError(w, http.StatusInternalServerError, "workspace_people_unavailable", "Workspace people could not be loaded.")
+		}
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"members": members})
+}
+
+func writeWorkspacePeopleError(w http.ResponseWriter, status int, code, message string) {
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": code, "message": message}})
+}
+
 func (h *WorkspaceHandler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 	user, ok := CurrentUser(r.Context())
 	if !ok {
