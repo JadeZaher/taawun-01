@@ -20,6 +20,8 @@ RUN apk add --no-cache ca-certificates su-exec tzdata \
 WORKDIR /app
 COPY --from=builder --chown=taawun:taawun /out/taawun /app/taawun
 COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN test "$(head -c 9 /usr/local/bin/docker-entrypoint.sh)" = '#!/bin/sh' \
+    && ! grep -q "$(printf '\r')" /usr/local/bin/docker-entrypoint.sh
 
 ENV PORT=8080 \
     APP_DB_PATH=/data/taawun.db \
