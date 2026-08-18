@@ -355,8 +355,8 @@
           </div>
           <div class="field">
             <label class="required" for="registerPassword">Password</label>
-            <input id="registerPassword" name="password" type="password" autocomplete="new-password" minlength="8" required>
-            <div class="field-help">Use at least 8 characters.</div>
+            <input id="registerPassword" name="password" type="password" autocomplete="new-password" minlength="12" required>
+            <div class="field-help">Use at least 12 characters.</div>
           </div>
           <button id="registerButton" class="button" type="submit">Create account</button>
         </form>
@@ -1196,21 +1196,43 @@
     element('registerForm').addEventListener('submit', async (event) => {
       event.preventDefault();
       const button = element('registerButton');
+      const username = element('registerUsername').value.trim();
+      const email = element('registerEmail').value.trim();
+      let password = element('registerPassword').value;
+      let accountCreated = false;
       setBusy(button, true, 'Creating…', 'Create account');
       setNotice(element('authAlert'), '');
       try {
         await api('/register', {
           method: 'POST',
           auth: false,
-          body: { username: element('registerUsername').value.trim(), email: element('registerEmail').value.trim(), password: element('registerPassword').value },
+          body: { username, email, password },
         });
-        element('loginEmail').value = element('registerEmail').value.trim();
+        accountCreated = true;
         element('registerForm').reset();
-        switchAuthTab('login');
-        setNotice(element('authAlert'), 'Account created. Sign in to continue.', 'success');
+        const response = await api('/login', {
+          method: 'POST',
+          auth: false,
+          body: { email, password },
+        });
+        password = '';
+        if (!response || !response.token || !response.user) throw new Error('The sign-in response was incomplete.');
+        state.token = String(response.token);
+        await enterBuilder(response.user);
+        element('loginForm').reset();
       } catch (error) {
-        setNotice(element('authAlert'), error.message || 'Account creation failed.', 'error');
+        if (accountCreated) {
+          showAuth();
+          switchAuthTab('login');
+          element('loginEmail').value = email;
+          element('loginPassword').value = '';
+          const reason = error.message || 'Automatic sign-in failed.';
+          setNotice(element('authAlert'), `Your account was created, but automatic sign-in failed: ${reason} Please sign in again.`, 'error');
+        } else {
+          setNotice(element('authAlert'), error.message || 'Account creation failed.', 'error');
+        }
       } finally {
+        password = '';
         setBusy(button, false, 'Creating…', 'Create account');
       }
     });

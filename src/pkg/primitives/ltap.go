@@ -1,9 +1,12 @@
 package primitives
 
 import (
-	"database/sql"
 	"fmt"
 	"sync"
+
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // Document represents an LTAP (Hybrid Transactional/Analytical Processing) record.
@@ -18,13 +21,13 @@ type Document struct {
 type LTAPStorageService struct {
 	mu        sync.RWMutex
 	dataDir   string
-	databases map[string]*sql.DB
+	databases map[string]*gorm.DB
 }
 
 func NewLTAPStorageService(dataDir string) *LTAPStorageService {
 	return &LTAPStorageService{
 		dataDir:   dataDir,
-		databases: make(map[string]*sql.DB),
+		databases: make(map[string]*gorm.DB),
 	}
 }
 
@@ -46,21 +49,20 @@ func (s *LTAPStorageService) CreateCollection(artifactID, collectionName string)
 		payload JSON NOT NULL
 	);`, collectionName)
 
-	_, err = db.Exec(query)
-	if err != nil {
+	if err := db.Exec(query).Error; err != nil {
 		return fmt.Errorf("failed to create collection %s: %w", collectionName, err)
 	}
 
 	return nil
 }
 
-func (s *LTAPStorageService) getOrCreateDB(artifactID string) (*sql.DB, error) {
+func (s *LTAPStorageService) getOrCreateDB(artifactID string) (*gorm.DB, error) {
 	if db, ok := s.databases[artifactID]; ok {
 		return db, nil
 	}
 
 	dbPath := fmt.Sprintf("%s/%s_ltap.db", s.dataDir, artifactID)
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		return nil, err
 	}

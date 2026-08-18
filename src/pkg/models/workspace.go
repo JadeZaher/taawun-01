@@ -5,7 +5,7 @@ import (
 )
 
 type Workspace struct {
-	ID          int       `json:"id" db:"id"`
+	ID          int       `json:"id" db:"id" gorm:"primaryKey;autoIncrement"`
 	Name        string    `json:"name" db:"name"`
 	Description string    `json:"description" db:"description"`
 	OwnerID     int       `json:"owner_id" db:"owner_id"`
@@ -15,10 +15,10 @@ type Workspace struct {
 }
 
 type WorkspaceUser struct {
-	WorkspaceID int       `json:"workspace_id" db:"workspace_id"`
-	UserID      int       `json:"user_id" db:"user_id"`
-	Role        string    `json:"role" db:"role"`
-	JoinedAt    time.Time `json:"joined_at" db:"joined_at"`
+	WorkspaceID int       `json:"workspace_id" db:"workspace_id" gorm:"primaryKey"`
+	UserID      int       `json:"user_id" db:"user_id" gorm:"primaryKey"`
+	Role        string    `json:"role" db:"role" gorm:"not null;default:member"`
+	JoinedAt    time.Time `json:"joined_at" db:"joined_at" gorm:"not null;default:CURRENT_TIMESTAMP"`
 }
 
 type CreateWorkspaceRequest struct {

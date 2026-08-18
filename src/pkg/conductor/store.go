@@ -15,7 +15,11 @@ import (
 	"reflect"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+
+	"taawun/pkg/database"
 )
 
 type Repository struct {
@@ -40,7 +44,11 @@ func OpenRepository(databasePath string) (*Repository, error) {
 	if err := os.MkdirAll(filepath.Dir(absPath), 0o700); err != nil {
 		return nil, err
 	}
-	db, err := sql.Open("sqlite3", absPath+"?_foreign_keys=on&_busy_timeout=5000&_journal_mode=WAL&_synchronous=FULL")
+	orm, err := gorm.Open(sqlite.Open(absPath+"?_foreign_keys=on&_busy_timeout=5000&_journal_mode=WAL&_synchronous=FULL"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	if err != nil {
+		return nil, err
+	}
+	db, err := database.SQLDB(orm)
 	if err != nil {
 		return nil, err
 	}

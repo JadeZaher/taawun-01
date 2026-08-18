@@ -63,7 +63,7 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req models.UpdateUserRequest
-	if !decodeBoundedJSON(w, r, &req, maximumPublicAuthBodyBytes) {
+	if accepted, _ := decodeBoundedJSON(w, r, &req, maximumPublicAuthBodyBytes); !accepted {
 		return
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"taawun/pkg/models"
 )
@@ -29,6 +30,13 @@ func TestWorkspaceServiceEnforcesMembershipAndManagementRoles(t *testing.T) {
 	}
 	if err := workspaceRepo.AddUser(workspace.ID, users[1].ID, models.WorkspaceRoleAdmin); err != nil {
 		t.Fatal(err)
+	}
+	var joinedAt time.Time
+	if err := db.QueryRow(`SELECT joined_at FROM workspace_users WHERE workspace_id = ? AND user_id = ?`, workspace.ID, users[1].ID).Scan(&joinedAt); err != nil {
+		t.Fatal(err)
+	}
+	if joinedAt.IsZero() {
+		t.Fatal("GORM membership creation did not preserve the joined_at default")
 	}
 	if err := workspaceRepo.AddUser(workspace.ID, users[2].ID, models.WorkspaceRoleMember); err != nil {
 		t.Fatal(err)

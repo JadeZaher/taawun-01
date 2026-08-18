@@ -5,13 +5,13 @@ import (
 )
 
 type User struct {
-	ID             int       `json:"id" db:"id"`
-	Username       string    `json:"username" db:"username"`
-	Email          string    `json:"email" db:"email"`
-	Password       string    `json:"-" db:"password"`
-	Role           string    `json:"role" db:"role"`
-	Status         string    `json:"status" db:"status"`
-	SessionVersion int64     `json:"-" db:"session_version"`
+	ID             int       `json:"id" db:"id" gorm:"primaryKey;autoIncrement"`
+	Username       string    `json:"username" db:"username" gorm:"not null"`
+	Email          string    `json:"email" db:"email" gorm:"not null"`
+	Password       string    `json:"-" db:"password" gorm:"not null"`
+	Role           string    `json:"role" db:"role" gorm:"not null;default:user"`
+	Status         string    `json:"status" db:"status" gorm:"not null;default:active"`
+	SessionVersion int64     `json:"-" db:"session_version" gorm:"not null;default:1"`
 	CreatedAt      time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
 }

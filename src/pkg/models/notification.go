@@ -5,7 +5,7 @@ import (
 )
 
 type Notification struct {
-	ID        int       `json:"id" db:"id"`
+	ID        int       `json:"id" db:"id" gorm:"primaryKey;autoIncrement"`
 	UserID    int       `json:"user_id" db:"user_id"`
 	Type      string    `json:"type" db:"type"`
 	Title     string    `json:"title" db:"title"`
@@ -23,8 +23,8 @@ type CreateNotificationRequest struct {
 }
 
 const (
-	NotificationTypeWorkspace    = "workspace"
-	NotificationTypeUser         = "user"
-	NotificationTypeSystem       = "system"
-	NotificationTypeInvitation   = "invitation"
+	NotificationTypeWorkspace  = "workspace"
+	NotificationTypeUser       = "user"
+	NotificationTypeSystem     = "system"
+	NotificationTypeInvitation = "invitation"
 )

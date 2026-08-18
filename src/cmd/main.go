@@ -65,7 +65,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	defer db.Close()
+	sqlDB, err := database.SQLDB(db)
+	if err != nil {
+		log.Fatalf("Failed to access database connection pool: %v", err)
+	}
+	defer sqlDB.Close()
 
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(db)
@@ -99,7 +103,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to configure signed artifact builder: %v", err)
 	}
-	domainService, err := domains.NewService(db, workspaceService, domains.Options{Artifacts: artifactBuilder, PreviewOrigins: appOrigins})
+	domainService, err := domains.NewService(sqlDB, workspaceService, domains.Options{Artifacts: artifactBuilder, PreviewOrigins: appOrigins})
 	if err != nil {
 		log.Fatalf("Failed to configure verified domains: %v", err)
 	}
@@ -109,7 +113,7 @@ func main() {
 	}
 	ethicsEngine := ethics.NewHaramCheckEngine()
 	complianceCorpus := ethics.NewSeedComplianceCorpus()
-	conductorRepository, err := conductor.NewRepository(db)
+	conductorRepository, err := conductor.NewRepository(sqlDB)
 	if err != nil {
 		log.Fatalf("Failed to initialize Conductor storage: %v", err)
 	}
@@ -129,7 +133,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to configure relay ticket API: %v", err)
 	}
-	shuraRepository, err := shura.NewRepository(db)
+	shuraRepository, err := shura.NewRepository(sqlDB)
 	if err != nil {
 		log.Fatalf("Failed to initialize Shura storage: %v", err)
 	}
@@ -165,7 +169,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to configure financial HTTP API: %v", err)
 	}
-	bazaarService, err := bazaar.NewService(db, bazaar.Dependencies{
+	bazaarService, err := bazaar.NewService(sqlDB, bazaar.Dependencies{
 		Workspaces: workspaceService, Artifacts: artifactBuilder, Publications: domainService,
 		Compliance: referenceBazaarComplianceReviewer{corpus: complianceCorpus},
 		Shura:      bazaarShuraDecisionResolver{service: shuraService},
@@ -178,7 +182,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to configure Bazaar HTTP API: %v", err)
 	}
-	oauthRepository, err := oauth.NewRepository(db)
+	oauthRepository, err := oauth.NewRepository(sqlDB)
 	if err != nil {
 		log.Fatalf("Failed to initialize OAuth storage: %v", err)
 	}

@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"mime"
 	"net"
 	"net/http"
+	"net/netip"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,12 +26,14 @@ const (
 	maximumPublicAuthClients   = 4096
 	registrationAttemptLimit   = 5
 	loginAttemptLimit          = 10
+	maximumRealIPBytes         = 64
 )
 
 type AuthHandler struct {
 	authService   *services.AuthService
 	userService   *services.UserService
 	publicLimiter *authRateLimiter
+	logger        *slog.Logger
 }
 
 func NewAuthHandler(authService *services.AuthService, userService *services.UserService) *AuthHandler {
@@ -36,6 +41,7 @@ func NewAuthHandler(authService *services.AuthService, userService *services.Use
 		authService:   authService,
 		userService:   userService,
 		publicLimiter: newAuthRateLimiter(publicAuthWindow, maximumPublicAuthClients),
+		logger:        slog.Default(),
 	}
 }
 
@@ -44,12 +50,14 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req models.RegisterRequest
-	if !decodeBoundedJSON(w, r, &req, maximumPublicAuthBodyBytes) {
+	if accepted, status := decodeBoundedJSON(w, r, &req, maximumPublicAuthBodyBytes); !accepted {
+		h.logPublicAuthOutcome("register", "invalid_request", status)
 		return
 	}
 
 	user, err := h.userService.CreateUser(&req)
 	if err != nil {
+		h.logPublicAuthOutcome("register", "rejected", http.StatusBadRequest)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -57,6 +65,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(user)
+	h.logPublicAuthOutcome("register", "accepted", http.StatusCreated)
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -64,17 +73,20 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req models.LoginRequest
-	if !decodeBoundedJSON(w, r, &req, maximumPublicAuthBodyBytes) {
+	if accepted, status := decodeBoundedJSON(w, r, &req, maximumPublicAuthBodyBytes); !accepted {
+		h.logPublicAuthOutcome("login", "invalid_request", status)
 		return
 	}
 
 	response, err := h.authService.Login(req.Email, req.Password)
 	if err != nil {
+		h.logPublicAuthOutcome("login", "rejected", http.StatusUnauthorized)
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+	h.logPublicAuthOutcome("login", "accepted", http.StatusOK)
 }
 
 func (h *AuthHandler) AuthMiddleware(next http.Handler) http.Handler {
@@ -150,19 +162,20 @@ func (h *AuthHandler) allowPublicAttempt(w http.ResponseWriter, r *http.Request,
 	}
 	w.Header().Set("Retry-After", strconv.Itoa(seconds))
 	http.Error(w, "Too many authentication attempts. Please try again later.", http.StatusTooManyRequests)
+	h.logPublicAuthOutcome(operation, "rate_limited", http.StatusTooManyRequests)
 	return false
 }
 
 // decodeBoundedJSON accepts one strict JSON object with a small endpoint-specific limit.
-func decodeBoundedJSON(w http.ResponseWriter, r *http.Request, target any, maximumBytes int64) bool {
+func decodeBoundedJSON(w http.ResponseWriter, r *http.Request, target any, maximumBytes int64) (bool, int) {
 	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || mediaType != "application/json" {
 		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
-		return false
+		return false, http.StatusUnsupportedMediaType
 	}
 	if r.ContentLength > maximumBytes {
 		http.Error(w, "Request body is too large", http.StatusRequestEntityTooLarge)
-		return false
+		return false, http.StatusRequestEntityTooLarge
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maximumBytes)
 	decoder := json.NewDecoder(r.Body)
@@ -174,14 +187,17 @@ func decodeBoundedJSON(w http.ResponseWriter, r *http.Request, target any, maxim
 		} else {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 		}
-		return false
+		if errors.As(err, &tooLarge) {
+			return false, http.StatusRequestEntityTooLarge
+		}
+		return false, http.StatusBadRequest
 	}
 	var trailing any
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return false
+		return false, http.StatusBadRequest
 	}
-	return true
+	return true, 0
 }
 
 type authRateLimitEntry struct {
@@ -231,10 +247,56 @@ func (l *authRateLimiter) Allow(operation, source string, maximumAttempts int) (
 func requestSource(r *http.Request) string {
 	remote := strings.TrimSpace(r.RemoteAddr)
 	if host, _, err := net.SplitHostPort(remote); err == nil && host != "" {
+		if peer, parseErr := netip.ParseAddr(host); parseErr == nil {
+			peer = peer.Unmap()
+			if trustedRailwayProxyPeer(peer) {
+				if client, ok := railwayRealClient(r.Header.Get("X-Real-IP")); ok {
+					return client.String()
+				}
+			}
+			return peer.String()
+		}
 		return host
 	}
 	if remote != "" {
+		if peer, err := netip.ParseAddr(strings.Trim(remote, "[]")); err == nil {
+			return peer.Unmap().String()
+		}
 		return remote
 	}
 	return "unknown"
+}
+
+// Railway's edge is trusted only when the direct peer is private and the runtime marker is present.
+func trustedRailwayProxyPeer(peer netip.Addr) bool {
+	return strings.TrimSpace(os.Getenv("RAILWAY_ENVIRONMENT_ID")) != "" && (peer.IsPrivate() || peer.IsLoopback())
+}
+
+// railwayRealClient accepts Railway's documented single-address client header.
+func railwayRealClient(value string) (netip.Addr, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" || len(value) > maximumRealIPBytes || strings.Contains(value, ",") {
+		return netip.Addr{}, false
+	}
+	address, err := netip.ParseAddr(value)
+	if err != nil {
+		return netip.Addr{}, false
+	}
+	address = address.Unmap()
+	if !address.IsGlobalUnicast() || address.IsPrivate() || address.IsLoopback() || address.IsLinkLocalUnicast() {
+		return netip.Addr{}, false
+	}
+	return address, true
+}
+
+func (h *AuthHandler) logPublicAuthOutcome(operation, outcome string, status int) {
+	logger := h.logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	logger.Info("public_auth_outcome",
+		slog.String("operation", operation),
+		slog.String("outcome", outcome),
+		slog.Int("status", status),
+	)
 }

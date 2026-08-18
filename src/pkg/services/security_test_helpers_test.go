@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 
 	"taawun/pkg/models"
 	"taawun/pkg/repositories"
@@ -53,7 +55,11 @@ func newSecurityTestRepositories(t *testing.T) (*sql.DB, *repositories.UserRepos
 			t.Fatal(err)
 		}
 	}
-	return db, repositories.NewUserRepository(db), repositories.NewWorkspaceRepository(db)
+	orm, err := gorm.Open(sqlite.Dialector{Conn: db}, &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return db, repositories.NewUserRepository(orm), repositories.NewWorkspaceRepository(orm)
 }
 
 func insertSecurityTestUser(t *testing.T, db *sql.DB, user *models.User) {

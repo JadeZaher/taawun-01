@@ -12,7 +12,11 @@ import (
 	"path/filepath"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+
+	"taawun/pkg/database"
 )
 
 const questSelect = `SELECT
@@ -39,9 +43,13 @@ func openAzoaDatabase(databasePath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("create AZOA database directory: %w", err)
 	}
 	dsn := absPath + "?_foreign_keys=on&_busy_timeout=5000&_journal_mode=WAL&_synchronous=FULL"
-	db, err := sql.Open("sqlite3", dsn)
+	orm, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		return nil, fmt.Errorf("open AZOA database: %w", err)
+	}
+	db, err := database.SQLDB(orm)
+	if err != nil {
+		return nil, fmt.Errorf("open AZOA SQL pool: %w", err)
 	}
 	db.SetMaxOpenConns(1)
 	if err := db.Ping(); err != nil {
