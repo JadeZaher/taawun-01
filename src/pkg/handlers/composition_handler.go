@@ -9,8 +9,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"mime"
+	"net"
 	"net/http"
+	"net/netip"
 	"path"
 	"strings"
 
@@ -47,6 +50,7 @@ type CompositionHTTPHandler struct {
 	artifacts      compositionArtifactReader
 	currentUser    currentPrincipal
 	previewOrigins []string
+	logger         *slog.Logger
 }
 
 // NewCompositionHTTPHandler requires a service that independently enforces workspace authority.
@@ -56,7 +60,7 @@ func NewCompositionHTTPHandler(service CompositionService, store compositionArti
 	}
 	return &CompositionHTTPHandler{
 		service: service, artifacts: store, currentUser: currentUser,
-		previewOrigins: append([]string(nil), previewOrigins...),
+		previewOrigins: append([]string(nil), previewOrigins...), logger: slog.Default(),
 	}, nil
 }
 
@@ -111,6 +115,8 @@ type previewCompositionInput struct {
 
 // Preview composes a signed preview under the authenticated actor and workspace capability.
 func (h *CompositionHTTPHandler) Preview(w http.ResponseWriter, r *http.Request) {
+	requestID := compositionRequestID(r)
+	w.Header().Set("X-Request-ID", requestID)
 	actor, ok := h.actor(w, r)
 	if !ok {
 		return
@@ -144,6 +150,9 @@ func (h *CompositionHTTPHandler) Preview(w http.ResponseWriter, r *http.Request)
 		Modules: append([]string(nil), input.Modules...), RequestedOrigins: input.RequestedOrigins, TTLHours: input.TTLHours,
 	})
 	if err != nil {
+		if errors.Is(err, conductor.ErrPreviewOriginDenied) {
+			h.logPreviewOutcome(requestID, "denied", "origin_not_verified", http.StatusUnprocessableEntity)
+		}
 		writeCompositionServiceError(w, err)
 		return
 	}
@@ -173,6 +182,50 @@ func (h *CompositionHTTPHandler) Preview(w http.ResponseWriter, r *http.Request)
 		},
 		"preview": preview, "previewUrl": preview.DocumentURL,
 	})
+}
+
+func (h *CompositionHTTPHandler) logPreviewOutcome(requestID, outcome, reason string, status int) {
+	logger := h.logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	logger.Info("composition_preview_outcome",
+		slog.String("request_id", requestID),
+		slog.String("outcome", outcome),
+		slog.String("reason", reason),
+		slog.Int("status", status),
+	)
+}
+
+func compositionRequestID(r *http.Request) string {
+	if r != nil {
+		host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+		if err == nil {
+			peer, parseErr := netip.ParseAddr(host)
+			candidate := strings.TrimSpace(r.Header.Get("X-Railway-Request-Id"))
+			if parseErr == nil && trustedRailwayProxyPeer(peer.Unmap()) && safeCorrelationID(candidate) {
+				return candidate
+			}
+		}
+	}
+	requestID, err := compositionID("request")
+	if err != nil {
+		return "request-unavailable"
+	}
+	return requestID
+}
+
+func safeCorrelationID(value string) bool {
+	if value == "" || len(value) > 128 {
+		return false
+	}
+	for _, character := range value {
+		if character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z' || character >= '0' && character <= '9' || strings.ContainsRune("-_.", character) {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // GetTrack returns a workspace-authorized composition track.

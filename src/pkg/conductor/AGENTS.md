@@ -18,3 +18,8 @@ Production construction requires injected workspace authorization, subject
 resolution, curated validation, compliance auditing, a stable-signer artifact
 builder, lifecycle-aware preview-origin authorization, and domain publication.
 The legacy constructor is deliberately unconfigured and fails closed.
+
+Requested preview origins are preflighted and normalized before a durable draft
+or idempotency key is consumed. Conductor re-authorizes them again while
+advancing a staged track; a denial at that race boundary leaves the track
+resumable and never proceeds to validation or signing.

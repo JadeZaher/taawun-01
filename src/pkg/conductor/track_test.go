@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -102,6 +103,97 @@ func TestInvalidOrRejectedCompositionFailsBeforeArtifactBuild(t *testing.T) {
 	result, err = harness2.service.Compose(context.Background(), harness2.owner, request)
 	if err == nil || result.Track.Status != TrackFailed || result.Track.Compliance == nil || result.Track.Compliance.Disposition != ComplianceReject || harness2.builder.buildCalls != 0 {
 		t.Fatalf("rejected compliance: result=%+v builds=%d err=%v", result, harness2.builder.buildCalls, err)
+	}
+}
+
+func TestUnverifiedPreviewOriginsDoNotConsumeDurableIdempotency(t *testing.T) {
+	tests := []struct {
+		name   string
+		policy artifacts.OriginPolicy
+	}{
+		{name: "surfaces", policy: artifacts.OriginPolicy{Surfaces: []string{"https://unverified-surface.example"}}},
+		{name: "embedders", policy: artifacts.OriginPolicy{Surfaces: []string{"https://preview.taawun.example"}, Embedders: []string{"https://unverified-embedder.example"}}},
+		{name: "connections", policy: artifacts.OriginPolicy{Surfaces: []string{"https://preview.taawun.example"}, Connections: []string{"https://unverified-connection.example"}}},
+		{name: "resources", policy: artifacts.OriginPolicy{Surfaces: []string{"https://preview.taawun.example"}, Resources: []string{"https://unverified-resource.example"}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			harness := newConductorHarness(t)
+			harness.origins.authorizeErr = fmt.Errorf("%s origin denied: %w", test.name, domains.ErrOriginNotVerified)
+			request := validCompositionRequest()
+			request.IdempotencyKey = "unverified-" + test.name
+			request.RequestedOrigins = test.policy
+
+			for attempt := 0; attempt < 2; attempt++ {
+				result, err := harness.service.Compose(context.Background(), harness.owner, request)
+				if result != nil || !errors.Is(err, ErrInvalidComposition) || !errors.Is(err, ErrPreviewOriginDenied) || harness.builder.buildCalls != 0 {
+					t.Fatalf("attempt %d result=%+v builds=%d err=%v", attempt+1, result, harness.builder.buildCalls, err)
+				}
+			}
+			var tracks int
+			if err := harness.repository.db.QueryRow(`SELECT COUNT(*) FROM conductor_tracks`).Scan(&tracks); err != nil || tracks != 0 {
+				t.Fatalf("denial persisted %d tracks: %v", tracks, err)
+			}
+
+			harness.origins.authorizeErr = nil
+			retried, err := harness.service.Compose(context.Background(), harness.owner, request)
+			if err != nil || !retried.Created || retried.Track.Status != TrackPreviewReady {
+				t.Fatalf("retry after verification = %+v err=%v", retried, err)
+			}
+		})
+	}
+}
+
+func TestPreviewOriginRevocationRaceLeavesTrackResumable(t *testing.T) {
+	harness := newConductorHarness(t)
+	harness.origins.denyAtCall = 2
+	request := validCompositionRequest()
+
+	first, err := harness.service.Compose(context.Background(), harness.owner, request)
+	if !errors.Is(err, ErrPreviewOriginDenied) || first == nil || first.Track.Status != TrackStaged || !first.Created || harness.builder.buildCalls != 0 || first.Track.BuildRequest != nil || first.Track.Artifact != nil {
+		t.Fatalf("revocation race = %+v err=%v", first, err)
+	}
+	replayed, err := harness.service.Compose(context.Background(), harness.owner, request)
+	if err != nil || replayed.Created || replayed.Track.ID != first.Track.ID || replayed.Track.Status != TrackPreviewReady {
+		t.Fatalf("resumable replay = %+v err=%v", replayed, err)
+	}
+}
+
+func TestPreviewOriginErrorClassificationPreservesOperationalFailures(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     error
+		want      error
+		clientErr bool
+	}{
+		{name: "unknown dependency", input: errors.New("database unavailable"), want: ErrDependencyUnavailable},
+		{name: "canceled", input: context.Canceled, want: context.Canceled},
+		{name: "deadline", input: context.DeadlineExceeded, want: context.DeadlineExceeded},
+		{name: "workspace forbidden", input: domains.ErrForbidden, want: ErrWorkspaceForbidden},
+		{name: "unverified origin", input: domains.ErrOriginNotVerified, want: ErrPreviewOriginDenied, clientErr: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := classifyPreviewOriginError(test.input)
+			if !errors.Is(err, test.want) {
+				t.Fatalf("classification error = %v, want %v", err, test.want)
+			}
+			if got := errors.Is(err, ErrInvalidComposition) || errors.Is(err, ErrPreviewOriginDenied); got != test.clientErr {
+				t.Fatalf("client classification = %t, want %t: %v", got, test.clientErr, err)
+			}
+		})
+	}
+}
+
+func TestDefaultPreviewOriginIsPreflightedAndReauthorized(t *testing.T) {
+	harness := newConductorHarness(t)
+	request := validCompositionRequest()
+	result, err := harness.service.Compose(context.Background(), harness.owner, request)
+	if err != nil || result.Track.Status != TrackPreviewReady || harness.origins.calls != 2 {
+		t.Fatalf("default preview origin = result:%+v calls:%d err:%v", result, harness.origins.calls, err)
+	}
+	if result.Track.BuildRequest == nil || len(result.Track.BuildRequest.AllowedOrigins.Surfaces) != 1 || result.Track.BuildRequest.AllowedOrigins.Surfaces[0] != "https://preview.taawun.example" {
+		t.Fatalf("authorized default origin = %+v", result.Track.BuildRequest)
 	}
 }
 
@@ -243,11 +335,22 @@ func (b *fakeSignedBuilder) Build(_ context.Context, request artifacts.BuildRequ
 	return artifacts.BuildResult{ArtifactID: artifactID, ContentHash: contentHash, Manifest: manifest}, nil
 }
 
-type fakeOriginAuthority struct{}
+type fakeOriginAuthority struct {
+	calls        int
+	authorizeErr error
+	denyAtCall   int
+}
 
-func (*fakeOriginAuthority) AuthorizeOriginsForLifecycle(_ context.Context, _ *models.User, _ *models.Workspace, lifecycle artifacts.BundleLifecycle, requested artifacts.OriginPolicy) (artifacts.OriginPolicy, error) {
-	if lifecycle != artifacts.BundleLifecyclePreview || len(requested.Surfaces) != 1 || requested.Surfaces[0] != "https://preview.taawun.example" {
-		return artifacts.OriginPolicy{}, errors.New("origin denied")
+func (a *fakeOriginAuthority) AuthorizeOriginsForLifecycle(_ context.Context, _ *models.User, _ *models.Workspace, lifecycle artifacts.BundleLifecycle, requested artifacts.OriginPolicy) (artifacts.OriginPolicy, error) {
+	a.calls++
+	if lifecycle != artifacts.BundleLifecyclePreview {
+		return artifacts.OriginPolicy{}, domains.ErrOriginNotVerified
+	}
+	if a.authorizeErr != nil {
+		return artifacts.OriginPolicy{}, a.authorizeErr
+	}
+	if a.denyAtCall > 0 && a.calls == a.denyAtCall {
+		return artifacts.OriginPolicy{}, fmt.Errorf("revoked between checks: %w", domains.ErrOriginNotVerified)
 	}
 	return requested, nil
 }

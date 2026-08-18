@@ -102,6 +102,21 @@ func TestConfiguredPreviewOriginDoesNotGrantPublication(t *testing.T) {
 		artifacts.OriginPolicy{Surfaces: []string{"https://attacker.example"}}); !errors.Is(err, ErrOriginNotVerified) {
 		t.Fatalf("unconfigured preview origin error = %v", err)
 	}
+	for _, test := range []struct {
+		name   string
+		policy artifacts.OriginPolicy
+	}{
+		{name: "surface", policy: artifacts.OriginPolicy{Surfaces: []string{"https://unverified-surface.example"}}},
+		{name: "embedder", policy: artifacts.OriginPolicy{Surfaces: []string{"https://preview.taawun.example"}, Embedders: []string{"https://unverified-embedder.example"}}},
+		{name: "connection", policy: artifacts.OriginPolicy{Surfaces: []string{"https://preview.taawun.example"}, Connections: []string{"https://unverified-connection.example"}}},
+		{name: "resource", policy: artifacts.OriginPolicy{Surfaces: []string{"https://preview.taawun.example"}, Resources: []string{"https://unverified-resource.example"}}},
+	} {
+		t.Run("rejects unverified "+test.name, func(t *testing.T) {
+			if _, err := service.AuthorizeOriginsForLifecycle(context.Background(), member, workspace, artifacts.BundleLifecyclePreview, test.policy); !errors.Is(err, ErrOriginNotVerified) {
+				t.Fatalf("unverified %s error = %v", test.name, err)
+			}
+		})
+	}
 }
 
 func (s *fakeArtifacts) Open(_ context.Context, contentHash string) (artifacts.BuildResult, error) {

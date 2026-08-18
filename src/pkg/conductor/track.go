@@ -21,6 +21,7 @@ import (
 
 var (
 	ErrInvalidComposition     = errors.New("invalid Conductor composition")
+	ErrPreviewOriginDenied    = errors.New("Conductor preview origin authorization denied")
 	ErrTrackNotFound          = errors.New("Conductor track not found")
 	ErrTrackVersionConflict   = errors.New("Conductor track version conflict")
 	ErrTrackTransition        = errors.New("invalid Conductor track transition")
@@ -221,6 +222,11 @@ func (s *Service) Compose(ctx context.Context, actor *models.User, request Compo
 		return nil, err
 	}
 	request = normalizeCompositionRequest(request)
+	authorizedOrigins, err := s.origins.AuthorizeOriginsForLifecycle(ctx, actor, workspace, artifacts.BundleLifecyclePreview, cloneOrigins(request.RequestedOrigins))
+	if err != nil {
+		return nil, classifyPreviewOriginError(err)
+	}
+	request.RequestedOrigins = cloneOrigins(authorizedOrigins)
 	requestHash, err := compositionHash(request, actor.ID)
 	if err != nil {
 		return nil, err
@@ -280,7 +286,7 @@ func (s *Service) advance(ctx context.Context, actor *models.User, workspace *mo
 			}
 			authorizedOrigins, err := s.origins.AuthorizeOriginsForLifecycle(ctx, actor, workspace, artifacts.BundleLifecyclePreview, cloneOrigins(track.Request.RequestedOrigins))
 			if err != nil {
-				return s.fail(ctx, track, actor.ID, "preview_origin_denied", err)
+				return track, classifyPreviewOriginError(err)
 			}
 			buildRequest := artifacts.BuildRequest{
 				WorkspaceID: track.WorkspaceID, AppName: track.Request.AppName, OrganizationName: track.Request.OrganizationName,
@@ -358,6 +364,22 @@ func (s *Service) advance(ctx context.Context, actor *models.User, workspace *mo
 			return track, nil
 		}
 	}
+}
+
+func classifyPreviewOriginError(err error) error {
+	if errors.Is(err, domains.ErrOriginNotVerified) || errors.Is(err, domains.ErrInvalidOrigin) {
+		return errors.Join(ErrInvalidComposition, ErrPreviewOriginDenied, err)
+	}
+	if errors.Is(err, domains.ErrForbidden) {
+		return errors.Join(ErrWorkspaceForbidden, err)
+	}
+	if errors.Is(err, context.Canceled) {
+		return context.Canceled
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return context.DeadlineExceeded
+	}
+	return fmt.Errorf("%w: authorize preview origins", ErrDependencyUnavailable)
 }
 
 func (s *Service) RequestPublication(ctx context.Context, actor *models.User, trackID string, expectedVersion int64, claimID string) (*Track, error) {

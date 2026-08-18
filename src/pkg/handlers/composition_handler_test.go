@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -16,6 +19,7 @@ import (
 
 	"taawun/pkg/artifacts"
 	"taawun/pkg/conductor"
+	"taawun/pkg/domains"
 	"taawun/pkg/models"
 )
 
@@ -154,6 +158,87 @@ func TestCompositionPreviewReturnsInvalidCompositionEnvelope(t *testing.T) {
 	handler.Preview(response, request)
 	if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), `"code":"invalid_composition"`) {
 		t.Fatalf("invalid composition = status:%d body:%s", response.Code, response.Body.String())
+	}
+}
+
+func TestCompositionOperationalFailuresDoNotUseClientDenialEnvelope(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus int
+		wantCode   string
+	}{
+		{name: "dependency unavailable", err: conductor.ErrDependencyUnavailable, wantStatus: http.StatusBadGateway, wantCode: "composition_dependency_unavailable"},
+		{name: "request canceled", err: context.Canceled, wantStatus: http.StatusInternalServerError, wantCode: "composition_operation_failed"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			writeCompositionServiceError(response, test.err)
+			if response.Code != test.wantStatus || !strings.Contains(response.Body.String(), `"code":"`+test.wantCode+`"`) || strings.Contains(response.Body.String(), `"code":"invalid_composition"`) {
+				t.Fatalf("operational error = status:%d body:%s", response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
+func TestCompositionPreviewOriginDenialIsSafeCorrelatedAndNever500(t *testing.T) {
+	t.Setenv("RAILWAY_ENVIRONMENT_ID", "production-environment")
+	for _, category := range []string{"surfaces", "embedders", "connections", "resources"} {
+		t.Run(category, func(t *testing.T) {
+			var logs bytes.Buffer
+			service := &compositionServiceStub{composeErr: errors.Join(conductor.ErrInvalidComposition, conductor.ErrPreviewOriginDenied, domains.ErrOriginNotVerified)}
+			handler, err := NewCompositionHTTPHandler(service, artifactReaderStub{}, CurrentUser, []string{"http://localhost:8080"})
+			if err != nil {
+				t.Fatalf("NewCompositionHTTPHandler() error = %v", err)
+			}
+			handler.logger = slog.New(slog.NewTextHandler(&logs, nil))
+			canaryOrigin := "https://private-" + category + ".example"
+			body, _ := json.Marshal(map[string]any{
+				"idempotencyKey": "denied-" + category, "workspaceId": 7,
+				"appName": "private-email@example.test", "organizationName": "Private organization", "city": "private-body-token",
+				"madhhab": "hanafi", "templateId": "community-iftar", "modules": []string{"iftar-registration"},
+				"requestedOrigins": map[string]any{category: []string{canaryOrigin}},
+			})
+			requestID := "railway-request-" + category
+			request := httptest.NewRequest(http.MethodPost, "/api/artifacts/preview", bytes.NewReader(body))
+			request.RemoteAddr = "100.64.0.8:4321"
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Authorization", "Bearer private-bearer-token")
+			request.Header.Set("X-Railway-Request-Id", requestID)
+			request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7, Email: "principal@example.test"}))
+			response := httptest.NewRecorder()
+
+			handler.Preview(response, request)
+
+			if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), `"code":"invalid_composition"`) || strings.Contains(response.Body.String(), "composition_operation_failed") {
+				t.Fatalf("origin denial = status:%d body:%s", response.Code, response.Body.String())
+			}
+			if response.Header().Get("X-Request-ID") != requestID {
+				t.Fatalf("request correlation = %q, want %q", response.Header().Get("X-Request-ID"), requestID)
+			}
+			output := logs.String()
+			for _, expected := range []string{"composition_preview_outcome", "request_id=" + requestID, "outcome=denied", "reason=origin_not_verified", "status=422"} {
+				if !strings.Contains(output, expected) {
+					t.Fatalf("telemetry missing %q: %s", expected, output)
+				}
+			}
+			for _, secret := range []string{canaryOrigin, "private-email@example.test", "private-body-token", "private-bearer-token", "principal@example.test"} {
+				if strings.Contains(output, secret) {
+					t.Fatalf("telemetry leaked %q: %s", secret, output)
+				}
+			}
+		})
+	}
+}
+
+func TestCompositionRequestIDRejectsUntrustedRailwayHeader(t *testing.T) {
+	t.Setenv("RAILWAY_ENVIRONMENT_ID", "production-environment")
+	request := httptest.NewRequest(http.MethodPost, "/api/artifacts/preview", nil)
+	request.RemoteAddr = "203.0.113.8:4321"
+	request.Header.Set("X-Railway-Request-Id", "forged-request-id")
+	if got := compositionRequestID(request); got == "forged-request-id" || !strings.HasPrefix(got, "request-") {
+		t.Fatalf("untrusted Railway request ID = %q", got)
 	}
 }
 
