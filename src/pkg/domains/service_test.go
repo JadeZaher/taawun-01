@@ -56,7 +56,7 @@ func TestVerifyTreatsMissingDNSNameAsMissingProof(t *testing.T) {
 	service, err := NewService(db, fakeWorkspaceAuthorizer{roles: map[int]string{1: models.WorkspaceRoleOwner}}, Options{
 		Artifacts:      &fakeArtifacts{results: map[string]artifacts.BuildResult{}, files: map[string]map[string]artifacts.ArtifactFile{}},
 		PreviewOrigins: []string{"https://preview.taawun.example"},
-		Resolver:       &fakeResolver{err: &net.DNSError{Err: "no such host", Name: "_taawun.missing.example", IsNotFound: true}},
+		Resolver:       &fakeResolver{err: &net.DNSError{Err: "name does not exist", Name: "_taawun.missing.example"}},
 	})
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
