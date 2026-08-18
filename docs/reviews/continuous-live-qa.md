@@ -9,8 +9,9 @@ cleanup. This lane does not implement or deploy source fixes.
 ## Acceptance state
 
 **BLOCKED — the technical baseline, first-session presentation, exact signed-
-receipt trust binding, and preview-origin denial boundary are live-green, but
-persona discoverability still has open P1s.**
+receipt trust binding, and preview-origin denial boundary are live-green. The
+new component-document low-code checkpoint is awaiting a deployed live gate,
+and the rollback baseline retains one Shura-to-Finance continuity P1.**
 Deployment `68914f4c-a916-43f7-b0bf-fbd578c25f43` fixed the raw-JavaScript
 preview, invalid composition, Railway-source throttle, publication state, account
 lifecycle, and ethics boundaries. Deployment
@@ -20,7 +21,10 @@ receipt details. Deployment `1bfa3008-319c-49ba-bd52-090da3dbfa5e` now binds the
 complete manifest and rejects mismatched or elapsed authorization evidence; that
 trust gate is accepted. Deployment `58d87a23-6037-4cc5-8151-09b37167cef5`
 correctly maps and safely correlates unauthorized requested preview origins.
-Acceptance remains blocked by persona discoverability.
+Application `09cd897` / Railway deployment `c2374acf-7102-4471-91fd-e568f7bdb5ce`
+is the last-known-good rollback baseline for component-document QA. Acceptance
+remains blocked until exact component documents round-trip through the signed
+contract in a fresh live browser pass.
 A roughly 30-second all-route 502 interval at
 05:10Z was correlated as a transient Railway edge/routing interruption rather
 than a confirmed application crash; independent and implementation-lane recovery
@@ -45,6 +49,7 @@ enterprise abstractions, fake activity, or misleading authority claims.
 | `fe372625-e35f-4490-a8de-d8647826e7d3` | `da5e136` (`a39e246` is docs-only PR head) | `SUCCESS` | Dashboard, mobile/auth semantics, contrast, and visible receipt detail retests are live-green. P1 receipt-attestation scope gap remains; discoverability batch has not started. |
 | `1bfa3008-319c-49ba-bd52-090da3dbfa5e` | `57d9fd1` (`f282aac` is docs-only PR head) | `SUCCESS` | Exact-manifest attestation trust gate accepted live. Complete digest/manifest binding, scalar and internal relationships, lifecycle/expiry, four origin categories, missing/corrupt evidence, sandbox/runtime, interaction, and signed-file boundaries are green. Separate P1: unauthorized requested preview origins return a generic application 500 instead of a deterministic client-error envelope. |
 | `58d87a23-6037-4cc5-8151-09b37167cef5` | `e269126` (`42a6a30` is docs-only PR head) | `SUCCESS` | Preview-origin boundary accepted live: four categories and identical replay return deterministic 422/no track, corrected same-key request creates a signed preview, safe Railway telemetry correlates all six denials, spoofed request ID is ignored, and immutable receipt/sandbox/signed-file boundaries remain green. |
+| `c2374acf-7102-4471-91fd-e568f7bdb5ce` | `09cd897` (`8b83d90` docs head; independent QA ledger `e8345ad`) | `SUCCESS` | Rollback baseline: real catalog, People/invitations, Viewer and Maintainer roles, Shura, finance and honest empty Bazaar surfaces are live. P1 continuity defect: an approved Shura decision is not exposed/carried into Finance, and the session proposal list remains stale. Component-document editing is not part of this release. |
 
 The prior accepted checkpoint `80feecc7-e5fe-49cc-8cfa-858a64e86cee`
 (`6a4d3a0`) is now `REMOVED` and is retained only as historical evidence in
@@ -187,6 +192,8 @@ Fresh browser principal `15`, workspace `11`, track
 | User `22`, workspace `17`, track `track_k-SFjjcMc1kJ8mX8m6Iy0UUA`, artifact `art_e68a7fb7d695e37e6ed01529c9f044b2` | Corrected live API digest, manifest, mutation, signed-file, and expiry matrix | Workspace and user both deleted with `204`; the old token returned `401`. |
 | User `23`, workspace `18`, track `track_KL3HSuls6Y7ezZtt63YXwvZd`, artifact `art_9d38ec588ae3f2a586016c76f9947ee9` | Four-category preview-origin denial and corrected same-key signed-preview retest | Workspace and user both deleted through supported routes with `204`; the old token returned `401`. |
 | User `24`, workspace `19`, track `track_j9ACIFlbwFHbL7INEe_kxwu1`, artifact `art_9ae54568d60a1da71df8db748b16dd42` | Identical denial replay and corrected same-key signed-preview retest | Workspace and user both deleted through supported routes with `204`; the old token returned `401`. |
+| Users `26` (Architect), `27` (Viewer), and `29` (Maintainer); workspace `22`; artifact `art_4a115ebd40f8c784139e3e5032746c6f`; proposal `proposal_a17beB3U_DYPbQvz0HpdZGb-` | Live rollback-baseline organizer → Viewer → Maintainer catalog, signed-preview, People, Shura, finance and Bazaar journey | Workspace `22` deleted with `204`; all three users deleted through supported self-lifecycle routes with `204`; every old token returned `401`. No quest or Bazaar listing was created. |
+| One bounded People API principal/workspace | Authorized/cross-workspace People contract, fields and response-hardening check | Workspace and user both deleted with `204`; old token returned `401`. The synthetic credentials/token were never recorded. |
 | Two intermediate in-memory API principals/workspaces | Unauthorized-origin 500 and relative-preview-URL harness correction | Supported workspace/user deletes ran from `finally`; operator read-back is requested because the deliberate harness exceptions suppressed their cleanup IDs/status output. No credential or token was persisted. |
 | User `8` | Earlier domain/OAuth self-delete repro | Pre-existing cleanup blocker; pending supported operator cleanup only. QA will not attempt credential recovery or raw database deletion. |
 
@@ -200,14 +207,15 @@ confirm the two exception-path API fixtures are absent.
 
 - Cleanup of users `8` and `19`, plus read-back of the two exception-path API
   fixtures, by a supported authorized path.
-- Maintainer-specific invitation permissions and activation-after-revoke remain
-  fixture-limited; Viewer isolation, Shura, financial sandbox, OAuth/MCP, relay,
-  session/password invalidation, exact CORS, and actor/workspace isolation are
-  live-green.
-- Discoverability/time-to-value, Maintainer persona coverage,
-  no-store/nosniff, request-ID logging beyond the accepted origin-denial path, consistent
-  errors, OpenAPI, and favicon. Signed-receipt binding, activity truthfulness,
-  responsive layout, default theme contrast, and auth-tab semantics are live-green.
+- Activation-after-revoke remains DNS-fixture-limited. Viewer and Maintainer
+  isolation, Shura authority, finance actor boundaries, OAuth/MCP, relay,
+  session/password invalidation, exact CORS, and workspace isolation are
+  live-green on the rollback baseline.
+- The component-document editor/contract is awaiting deployment. Shura-to-Finance
+  decision continuity is P1. Request-ID coverage beyond the accepted
+  origin-denial path, consistent errors, OpenAPI, and favicon remain P2. Signed-
+  receipt binding, activity truthfulness, default theme contrast and auth-tab
+  semantics are live-green; responsive layout must be rerun on the new editor.
 - Controlled DNS verification/publication/public serving remains fixture-gated;
   it must not be weakened or claimed complete without an external DNS fixture.
 
@@ -244,8 +252,10 @@ request for new platform primitives.
 |:---|:---|:---|:---|
 | P1 | Community organizer: understand value and reach a trustworthy preview | Fresh registration, workspace creation, concrete signed/local-first/sandbox copy, and an intact interactive signed preview are live-green at desktop, 400px, and 320px | Measure unsupported first-session time-to-preview and recovery friction in the next persona pass |
 | P1 | Organizer/operator: find the next action after preview | Domain controls exist, but broader publication state and recovery need a complete live pass | Clear exact next step, failure recovery, and honest external-DNS requirement; no dead-end or authority overclaim |
-| P1 | Invited Viewer/Maintainer and governance approver: find their work | Existing invitation/Shura APIs are not discoverable in the current cockpit snapshot | Small, role-aware entry points to accept/join, review, vote/decide, with Viewer denial explained safely |
-| P1 | Marketplace buyer/test-driver: evaluate before purchase | Bazaar capability is wired but absent from the observed authenticated cockpit | A published fixture can be found, test-driven before payment, and purchased only through disclosed sandbox escrow |
+| Closed | Invited Viewer/Maintainer and governance approver: find their work | Deployment `c2374acf` exposes real People/invitation and Shura surfaces. Viewer pre-invite isolation/read-only and Maintainer build/propose/vote boundaries passed live; session state cleared on principal switch. | Preserve role/workspace generation guards and safe capability explanations |
+| Closed for empty-fixture scope | Marketplace buyer/test-driver: evaluate before purchase | Deployment `c2374acf` queries the real published-only Bazaar catalog and presents the truthful empty/external-DNS+reviewer state; no listing was fabricated | Preserve published-only truthfulness; full purchase stays externally fixture-blocked |
+| P1 | Organizer: carry an approved Shura decision into sandbox finance | Live proposal reached `DECIDED · version 3 · 1 vote · decision APPROVED`, but no decision ID is displayed or carried into Finance's required blank field. The session proposal list remains stale at `OPEN · version 1`. | Show/copy and workspace-safely carry the durable approved decision ID; refresh session record after load/vote/decision; stale workspace/principal results must not carry it |
+| Gate | Organizer/Maintainer: build from exact component documents | The new checkpoint has no deployed live evidence yet. `09cd897` is rollback-only and has no component-document editor. | Multiple live templates/components; exact JSON document round-trip and signing; adversarial bounds; Viewer read-only; recovery without draft/verified-preview loss |
 | P1 | Private-beta operator: understand platform health and cleanup | Health exists, but request IDs/activity/support surfaces are incomplete | Correlatable safe errors, real activity or explicit empty state, and supported cleanup/recovery without database access |
 | Closed | Private-beta operator: trust displayed activity | Empty account returns zero scoped counts plus explicit empty messages; populated account returns one accessible workspace/user and one real `workspace_created` activity, with no fixed 2024 row | Preserve deterministic accessible-workspace scope and honest empty states |
 | Closed | Generated-card user: read buttons and trust the default theme | Live default/light/mid/dark accents all select readable foregrounds; measured minima are 6.07:1 default, 13.17:1 light, 6.45:1 mid, 11.95:1 dark, and 17.58:1 baseline badge | Preserve >=4.5:1 across arbitrary accepted accents |
@@ -364,6 +374,79 @@ only the trusted request ID plus `outcome=denied`,
 `reason=origin_not_verified`, and `status=422`. No origin, principal, email,
 token, payload, database cause, track, artifact, or client-spoofed request ID was
 logged. This technical gate is accepted.
+
+## Discoverability rollback baseline — deployment `c2374acf`
+
+Application commit `09cd897`; Railway deployment
+`c2374acf-7102-4471-91fd-e568f7bdb5ce` terminal `SUCCESS`; image
+`sha256:825e94375a0920bcb88a25406d59552ee269717b18cc57b4b0a8174a26fc00a4`.
+The implementation gate passed every Go package/command, 13/13 Node tests with
+the required real-Chromium journeys, a clean diff check, and independent review.
+This is the rollback baseline for the subsequent component-document checkpoint.
+
+Fresh live browser evidence:
+
+- Registration, workspace creation and signed preview took approximately 12.2
+  seconds of active network/action time. The UI exposed all three real templates
+  and eleven catalog modules; the Bazaar template displayed eight approved
+  modules, and switching among all templates reconciled the visible composition.
+- Browser artifact `art_4a115ebd40f8c784139e3e5032746c6f` rendered the styled
+  card first with an active exact receipt. The iframe retained sandbox
+  `allow-scripts allow-forms`, no `src`, 42,411-byte `srcdoc`, one inline and zero
+  external scripts, no visible Datastar source, and an interactive announcement
+  control.
+- People showed real selected-workspace usernames and roles only. An invitation
+  token was explicitly session-only and disappeared on sign-out. The Viewer saw
+  no workspace before acceptance, then read both members and the decided proposal
+  while build/propose/vote/decide/quest-mutation controls remained unavailable.
+  Principal switches exposed no prior invitation, proposal or quest state.
+- The Maintainer could build, propose and vote, but could not invite, decide,
+  publish or advance a quest. Workspace-tab ArrowRight, Home, End and ArrowDown
+  navigation selected the correct tab/panel and moved focus into the panel.
+- Finance advertised seven real vetted flows and consistently described durable
+  sandbox orchestration rather than balances, transactions, custody or settlement.
+  Bazaar returned the real published-only empty state and explicitly named the
+  controlled-DNS, reviewer and cleanup-safe-fixture dependencies.
+- The live People API returned `200`, `Cache-Control: no-store`, `nosniff`, one
+  member with only `joined_at`, `role`, `user_id` and `username`, and no email or
+  password. A cross-workspace request returned nested `403 workspace_forbidden`
+  with the same hardening. Its synthetic workspace/user cleaned with `204/204`;
+  the old token returned `401`.
+
+### Open P1 — Shura-to-Finance continuity
+
+The Architect created proposal `proposal_a17beB3U_DYPbQvz0HpdZGb-`, recorded one
+approval vote and finalized it approved. The authoritative card correctly showed
+`DECIDED · version 3 · 1 vote(s) · decision APPROVED`, and all mutation buttons
+disabled. However, the UI exposed no durable decision ID and Finance's required
+“Approved Shura decision ID” field remained blank, so a real organizer could not
+continue without out-of-band API knowledge. The session proposal list also
+remained stale at `OPEN · version 1`.
+
+Minimal acceptance: display a copyable durable decision ID and carry it into
+Finance only when it is final approved and bound to the selected workspace;
+refresh the session proposal record after every load/vote/decision; clear it on
+workspace/principal generation change. Viewer remains read-only and Maintainer
+remains unable to decide or advance Architect-only quest states.
+
+Responsive limitation: the in-app browser's advertised viewport override did not
+change the document layout viewport in this run (`innerWidth` remained 1280), so
+independent live 400/320/200%-reflow evidence is not claimed for this release.
+The promoted 13/13 real-Chromium suite covers those breakpoints. The temporary
+override was reset or invalidated when the browser-control session restarted.
+
+## Component-document checkpoint acceptance gate
+
+No component-document deployment has been handed to QA yet. Approval will require
+a fresh organizer/Maintainer/Viewer browser journey over multiple live templates
+and components; exact request → durable track/reload → render → manifest/digest/
+signature equality for declared and user-added JSON fields; adversarial JSON,
+reserved/prototype-like key, depth/size/key-count, Unicode/control-text and
+authority-injection bounds; fail-closed tamper/missing/stale/expired evidence;
+last-valid-draft and last-verified-preview recovery; and preservation of every
+accepted auth, receipt, origin, signed-file, role, Shura, finance, cleanup and
+service-health boundary. Custom DNS and Bazaar publication remain out of scope
+and must not be weakened.
 
 ## Acceptance rule
 
