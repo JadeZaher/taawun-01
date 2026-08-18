@@ -183,3 +183,35 @@ with image digest
 Independent public probes returned `200` for `/api/health` with `status=ok` and
 `200` for `/` with the Taawun cockpit. This remains an implementation handoff
 pending paired live-browser acceptance.
+
+## 2026-08-18 preview-origin denial boundary handoff
+
+Commit `e269126` keeps strict preview-origin authority while making expected
+denials deterministic at the HTTP boundary. Requested origins are authorized
+and normalized before a draft or idempotency key is persisted, then checked
+again before validation and signing. An unverified surface, embedder,
+connection, or resource returns nested `422 invalid_composition`; dependency,
+workspace, cancellation, and deadline failures retain their operational error
+classes. A revocation race leaves a staged track resumable and cannot produce a
+build request, artifact, or stale success.
+
+Outcome telemetry contains only a trusted/generated bounded request ID, fixed
+outcome and reason classes, and status. Railway request IDs are trusted only
+from the existing marked direct-proxy boundary; origins, principals, tokens,
+emails, bodies, and database errors are never logged.
+
+The integrated gate passed every Go package/command and 12/12 Node tests with
+required real Chromium; the verifier-requested focused Conductor/handler
+assertions also passed and independent review approved the final diff. Railway
+deployment `58d87a23-6037-4cc5-8151-09b37167cef5` reached terminal `SUCCESS`
+with image digest
+`sha256:9f6670b46c32637fa2052a58d7e09d05478b3922f0640dc72ff566822df145b3`.
+Public `/api/health` and `/` probes both returned `200`.
+
+Synthetic operator cleanup remains separately blocked on authority, not code:
+the supported admin routes exist, but the service has no configured bootstrap
+admin environment and this lane has no authenticated admin principal. The
+attempt stopped before reading or mutating fixture data. No database access,
+token minting, or inferred deletion was used; the control room was asked to
+supply an authorized admin session or explicitly authorize deliberate use of
+the existing bootstrap-admin provisioning primitive.

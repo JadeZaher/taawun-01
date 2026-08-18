@@ -315,3 +315,32 @@ review. Railway deployment `1bfa3008-319c-49ba-bd52-090da3dbfa5e` reached
 terminal `SUCCESS`; direct public probes returned `200` for `/api/health`
 (`status=ok`) and `/` with the Taawun cockpit title. QA acceptance and persona
 discoverability work remain paused until the independent live retest completes.
+
+## Origin-denial implementation handoff awaiting independent retest
+
+QA accepted the exact-manifest trust gate on application commit `57d9fd1` and
+Railway deployment `1bfa3008-319c-49ba-bd52-090da3dbfa5e`. The sole technical
+P1 then became the generic `500` returned for a correctly rejected unverified
+preview origin.
+
+Application commit `e269126` authorizes and normalizes requested preview origins
+before creating durable draft/idempotency state, rechecks authority before
+validation/signing, and maps expected surface/embedder/connection/resource
+denial to nested `422 invalid_composition`. A revocation race leaves a resumable
+staged track with no build request or artifact. Logs contain only a bounded
+trusted/generated request ID, fixed outcome/reason, and status; customer and
+credential fields are excluded.
+
+The implementation gate passed all Go packages/commands, 12/12 Node tests with
+required real Chromium, verifier-requested focused assertions, `git diff
+--check`, and independent approval. Railway deployment
+`58d87a23-6037-4cc5-8151-09b37167cef5` reached terminal `SUCCESS`; public health
+and cockpit probes returned `200`. Live denial/retry/telemetry acceptance remains
+pending.
+
+Supported cleanup has not been claimed: user `19`/workspace `14` is observed;
+users/workspaces `20`/`15` and `21`/`16` remain inference-only pending readback;
+user `22`/workspace `17` is observed clean. Existing admin lifecycle routes
+require an authenticated admin principal, but the deployment exposes no
+configured bootstrap-admin environment to this lane. No fixture data was read
+or changed, and no raw database or token-minting path was used.

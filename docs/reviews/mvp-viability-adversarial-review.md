@@ -406,3 +406,23 @@ missing evidence, and elapsed expiry. Railway deployment
 and cockpit probes both returned `200`. This is source/deployment evidence
 awaiting independent QA acceptance, not a second review or a broadened trust
 claim.
+
+QA accepted the exact-manifest trust gate on application commit `57d9fd1` and
+identified one separate boundary defect: correctly rejected unverified preview
+origins were surfaced as a generic `500`. Commit `e269126` preflights authority
+before durable idempotency state, preserves a second race check, maps expected
+denial to nested `422 invalid_composition`, and adds bounded request-correlated
+outcome telemetry without logging customer or credential data. All Go packages,
+12/12 Node tests with real Chromium, focused operational-classification tests,
+and independent review passed. Railway deployment
+`58d87a23-6037-4cc5-8151-09b37167cef5` reached terminal `SUCCESS`; public health
+and cockpit probes returned `200`. Live QA acceptance is pending, so this is not
+a second adversarial review or final MVP sign-off.
+
+The synthetic cleanup ledger is preserved with its evidence levels: user
+`19`/workspace `14` is observed remaining; user `20`/workspace `15` and user
+`21`/workspace `16` are sequence inferences whose exception handlers may already
+have deleted them; user `22`/workspace `17` is observed clean. Supported admin
+cleanup routes exist, but no authenticated admin principal or configured
+bootstrap-admin environment was available. No raw database cleanup or authority
+bypass was attempted.
