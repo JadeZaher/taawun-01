@@ -32,12 +32,26 @@ async function installedChromium() {
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+async function within(promise, label, timeout = 5_000) {
+  let timeoutID;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeoutID = setTimeout(() => reject(new Error(`${label} timed out`)), timeout);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeoutID);
+  }
+}
+
 async function waitFor(check, label, timeout = 8_000) {
   const deadline = Date.now() + timeout;
   let lastError;
   while (Date.now() < deadline) {
     try {
-      const value = await check();
+      const value = await within(Promise.resolve().then(check), `${label} check`, 1_000);
       if (value) return value;
     } catch (error) {
       lastError = error;
@@ -702,7 +716,14 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
   let viewerAccepted = false;
   let bazaarAttempts = 0;
   let delayedWorkspace41Responses = 0;
+  let delayedProposalResponses = 0;
+  let delayedRaceVoteResponses = 0;
+  let delayedDoubleVoteResponses = 0;
+  let decisionRelationshipOverride = null;
   let proposal = { id: 'proposal_browser_role', workspace_id: 41, title: 'Open the community pantry', body: 'Approve a bounded pantry pilot.', policy: { quorum: 1, approval_threshold: 1 }, status: 'OPEN', version: 1 };
+  let raceProposal = { id: 'proposal_race', workspace_id: 41, title: 'Race-safe proposal', body: 'Keep response ordering isolated.', policy: { quorum: 1, approval_threshold: 1 }, status: 'OPEN', version: 1 };
+  let doubleProposal = { id: 'proposal_double', workspace_id: 41, title: 'Double-activation proposal', body: 'Accept one deliberate mutation.', policy: { quorum: 1, approval_threshold: 1 }, status: 'OPEN', version: 1 };
+  const alternateProposal = { id: 'proposal_alternate', workspace_id: 41, title: 'Alternate proposal', body: 'Selected while another mutation is pending.', policy: { quorum: 1, approval_threshold: 1 }, status: 'OPEN', version: 1 };
   let votes = [];
   let decision = null;
   let quest = null;
@@ -793,7 +814,33 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
       votes = []; decision = null;
       return json(201, proposal);
     }
-    if (request.method === 'GET' && pathName === `/api/shura/v1/proposals/${proposal.id}` && bearer.startsWith('shura-')) return json(200, { proposal, deliberation: [], votes, decision });
+    if (request.method === 'GET' && pathName === '/api/shura/v1/proposals/proposal_race' && bearer.startsWith('shura-')) return json(200, { proposal: raceProposal, deliberation: [], votes: [], decision: null });
+    if (request.method === 'GET' && pathName === '/api/shura/v1/proposals/proposal_double' && bearer.startsWith('shura-')) return json(200, { proposal: doubleProposal, deliberation: [], votes: doubleProposal.version > 1 ? [{ id: 'vote-double', choice: 'APPROVE' }] : [], decision: null });
+    if (request.method === 'GET' && pathName === '/api/shura/v1/proposals/proposal_alternate' && bearer.startsWith('shura-')) return json(200, { proposal: alternateProposal, deliberation: [], votes: [], decision: null });
+    if (request.method === 'POST' && pathName === '/api/shura/v1/proposals/proposal_race/votes' && ['shura-Architect', 'shura-Maintainer'].includes(bearer)) {
+      if (delayedRaceVoteResponses > 0) {
+        delayedRaceVoteResponses -= 1;
+        await wait(180);
+      }
+      raceProposal = { ...raceProposal, version: raceProposal.version + 1 };
+      return json(201, { vote: { id: 'vote-race', choice: body.choice }, proposal: raceProposal });
+    }
+    if (request.method === 'POST' && pathName === '/api/shura/v1/proposals/proposal_double/votes' && ['shura-Architect', 'shura-Maintainer'].includes(bearer)) {
+      if (delayedDoubleVoteResponses > 0) {
+        delayedDoubleVoteResponses -= 1;
+        await wait(180);
+      }
+      doubleProposal = { ...doubleProposal, version: doubleProposal.version + 1 };
+      return json(201, { vote: { id: 'vote-double', choice: body.choice }, proposal: doubleProposal });
+    }
+    if (request.method === 'GET' && pathName === `/api/shura/v1/proposals/${proposal.id}` && bearer.startsWith('shura-')) {
+      const snapshot = structuredClone({ proposal, deliberation: [], votes, decision: decisionRelationshipOverride && decision ? { ...decision, ...decisionRelationshipOverride } : decision });
+      if (delayedProposalResponses > 0) {
+        delayedProposalResponses -= 1;
+        await wait(180);
+      }
+      return json(200, snapshot);
+    }
     if (request.method === 'POST' && pathName === `/api/shura/v1/proposals/${proposal.id}/votes` && ['shura-Architect', 'shura-Maintainer'].includes(bearer)) {
       proposal = { ...proposal, version: proposal.version + 1 };
       votes.push({ id: `vote-${votes.length + 1}`, choice: body.choice });
@@ -801,10 +848,12 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     }
     if (request.method === 'POST' && pathName === `/api/shura/v1/proposals/${proposal.id}/decision` && bearer === 'shura-Architect') {
       proposal = { ...proposal, version: proposal.version + 1, status: 'DECIDED' };
-      decision = { id: 'decision_browser', outcome: body.outcome };
+      decision = { id: 'decision_browser', proposal_id: proposal.id, proposal_version: proposal.version, outcome: body.outcome };
       return json(201, { decision, proposal });
     }
     if (request.method === 'POST' && pathName === '/api/financial/quests' && bearer === 'architect-token') {
+      if (!body.shuraDecisionRef) return json(422, { error: { code: 'decision_required', message: 'An approved Shura decision is required.' } });
+      if (body.shuraDecisionRef !== decision?.id || decision.outcome !== 'APPROVED') return json(422, { error: { code: 'decision_invalid', message: 'The Shura decision is not approved for this workspace.' } });
       quest = { id: 'quest_browser', workspaceId: 41, flowId: body.flowId, status: 'PENDING', version: 1, approvalsReceived: 0, approvalsRequired: body.approvalsRequired, providerReference: '', reconciliationReference: '', intent: { parties: body.parties } };
       return json(201, { quest, created: true });
     }
@@ -889,21 +938,91 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     await evaluate(client, `document.querySelector('#shuraTab').click()`);
     assert.equal(await evaluate(client, `document.querySelectorAll('#proposalList li').length`), 0, 'Shura must not synthesize a proposal feed');
     assert.match(await evaluate(client, `document.querySelector('#shuraSurface').innerText`), /There is no fabricated workspace proposal feed/u);
+    await evaluate(client, `document.querySelector('#proposalLookup').value = 'proposal_double'; document.querySelector('#loadProposalButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#proposalRecordTitle').textContent === 'Double-activation proposal' && !document.querySelector('#approveVoteButton').disabled`), 'double-activation proposal');
+    delayedDoubleVoteResponses = 1;
+    await evaluate(client, `document.querySelector('#approveVoteButton').click(); document.querySelector('#approveVoteButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#proposalRecordMeta').textContent === 'OPEN · version 2 · 1 vote(s)'`), 'single accepted double-activation vote');
+    assert.equal(requests.filter((request) => request.method === 'POST' && request.path === '/api/shura/v1/proposals/proposal_double/votes').length, 1, 'an in-flight proposal mutation must admit exactly one POST');
+    await evaluate(client, `document.querySelector('#proposalLookup').value = 'proposal_race'; document.querySelector('#loadProposalButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#proposalLookup').value === 'proposal_race' && document.querySelector('#proposalRecordTitle').textContent === 'Race-safe proposal'`), 'same-workspace mutation race source');
+    delayedRaceVoteResponses = 1;
+    await evaluate(client, `document.querySelector('#approveVoteButton').click()`);
+    await waitFor(() => requests.some((request) => request.method === 'POST' && request.path === '/api/shura/v1/proposals/proposal_race/votes'), 'delayed race vote dispatched');
+    await evaluate(client, `document.querySelector('#proposalLookup').value = 'proposal_alternate'; document.querySelector('#loadProposalButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#proposalLookup').value === 'proposal_alternate' && document.querySelector('#proposalRecordTitle').textContent === 'Alternate proposal'`), 'new same-workspace proposal selection');
+    await wait(240);
+    const mutationRace = await evaluate(client, `({ lookup: document.querySelector('#proposalLookup').value, title: document.querySelector('#proposalRecordTitle').textContent, meta: document.querySelector('#proposalRecordMeta').textContent })`);
+    assert.deepEqual(mutationRace, { lookup: 'proposal_alternate', title: 'Alternate proposal', meta: 'OPEN · version 1 · 0 vote(s)' }, 'a delayed mutation for proposal A must not overwrite or merge into selected proposal B');
     await evaluate(client, `(() => { document.querySelector('#proposalTitle').value = 'Open the community pantry'; document.querySelector('#proposalBody').value = 'Approve a bounded pantry pilot.'; document.querySelector('#createProposalButton').click(); })()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#proposalRecord').hidden && document.querySelector('#proposalLookup').value === 'proposal_browser_role'`), 'architect proposal');
     assert.equal(await evaluate(client, `document.querySelector('#approveDecisionButton').disabled`), false, 'Architect may explicitly decide');
-    await evaluate(client, `document.querySelector('#approveVoteButton').click()`);
+    delayedProposalResponses = 1;
+    await evaluate(client, `document.querySelector('#loadProposalButton').click(); document.querySelector('#approveVoteButton').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#proposalRecordMeta').textContent.includes('1 vote(s)') && document.querySelector('#proposalRecordMeta').textContent.includes('version 2')`), 'architect vote');
+    await wait(240);
+    assert.match(await evaluate(client, `document.querySelector('#proposalList').innerText`), /OPEN · version 2/u, 'a delayed version 1 read must not roll back the voted proposal');
     await evaluate(client, `document.querySelector('#approveDecisionButton').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#proposalRecordMeta').textContent.includes('DECIDED') && document.querySelector('#proposalRecordMeta').textContent.includes('decision APPROVED')`), 'architect decision');
+    const decidedProposal = await evaluate(client, `({
+      decision: document.querySelector('#proposalDecisionID').value,
+      decisionVisible: !document.querySelector('#proposalDecisionGrant').hidden,
+      sessionRecord: [...document.querySelectorAll('#proposalList li')].find((item) => item.querySelector('strong')?.textContent === 'Open the community pantry')?.querySelector('span')?.textContent || '',
+      financeDecision: document.querySelector('#financeDecision').value,
+      selectedDecision: document.querySelector('#approvedDecisionSelect').value,
+    })`);
+    assert.equal(decidedProposal.decision, 'decision_browser', 'the durable approved decision ID must be visible and copyable');
+    assert.equal(decidedProposal.decisionVisible, true);
+    assert.equal(decidedProposal.sessionRecord, 'DECIDED · version 3', 'the authoritative session record must replace OPEN version 1 for this proposal');
+    assert.equal(decidedProposal.financeDecision, 'decision_browser', 'the selected-workspace approved decision must flow into Finance');
+    assert.equal(decidedProposal.selectedDecision, 'decision_browser');
+
+    await within(client.send('Page.navigate', { url: origin }), 'session refresh navigation');
+    await waitFor(() => evaluate(client, `document.readyState === 'complete' && !document.querySelector('#loginForm').hidden`), 'session refresh login');
+    await login(client, 'architect@example.test');
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Architect'`), 'architect after refresh');
+    await evaluate(client, `document.querySelector('#shuraTab').click(); document.querySelector('#proposalLookup').value = 'proposal_browser_role'; document.querySelector('#loadProposalButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#proposalDecisionID').value === 'decision_browser' && document.querySelector('#financeDecision').value === 'decision_browser'`), 'decision recovery after page refresh');
+
+    decisionRelationshipOverride = { proposal_id: 'proposal_other' };
+    await evaluate(client, `document.querySelector('#loadProposalButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#proposalDecisionGrant').hidden && document.querySelector('#financeDecision').value === '' && document.querySelector('#approvedDecisionSelect').options.length === 1`), 'mismatched decision proposal rejection');
+    decisionRelationshipOverride = { proposal_id: 'proposal_browser_role', proposal_version: 2 };
+    await evaluate(client, `document.querySelector('#loadProposalButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#proposalDecisionGrant').hidden && document.querySelector('#financeDecision').value === ''`), 'mismatched decision version rejection');
+    decisionRelationshipOverride = null;
+    await evaluate(client, `document.querySelector('#loadProposalButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#proposalDecisionID').value === 'decision_browser' && document.querySelector('#financeDecision').value === 'decision_browser'`), 'decision relationship recovery');
+
+    delayedProposalResponses = 1;
+    await evaluate(client, `(() => {
+      document.querySelector('#loadProposalButton').click();
+      const select = document.querySelector('#workspaceSelect'); select.value = '42'; select.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '42' && document.querySelector('#peopleList').innerText.includes('workspace B')`), 'proposal workspace switch');
+    await wait(240);
+    const isolatedDecision = await evaluate(client, `({ recordHidden: document.querySelector('#proposalRecord').hidden, grantHidden: document.querySelector('#proposalDecisionGrant').hidden, financeDecision: document.querySelector('#financeDecision').value, choices: document.querySelector('#approvedDecisionSelect').options.length })`);
+    assert.deepEqual(isolatedDecision, { recordHidden: true, grantHidden: true, financeDecision: '', choices: 1 }, 'a delayed workspace-A proposal must not carry its decision into workspace B');
+    await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '41'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Architect' && document.querySelector('#workspaceSelect').value === '41'`), 'return to decision workspace');
+    await evaluate(client, `document.querySelector('#shuraTab').click(); document.querySelector('#proposalLookup').value = 'proposal_browser_role'; document.querySelector('#loadProposalButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#proposalDecisionID').value === 'decision_browser' && document.querySelector('#financeDecision').value === 'decision_browser'`), 'decision recovery after workspace return');
 
     await evaluate(client, `document.querySelector('#financeTab').click()`);
     await waitFor(() => evaluate(client, `document.querySelectorAll('#flowList li').length === 7`), 'real finance flow catalog');
     const financeCopy = await evaluate(client, `document.querySelector('#financeSurface').innerText`);
     assert.match(financeCopy, /Sandbox only · no custody/u);
     assert.match(financeCopy, /not balances or transactions/u);
+    assert.match(financeCopy, /server revalidates the final decision and exact workspace/u);
     assert.equal(await evaluate(client, `document.querySelector('#questRecord').hidden`), true, 'finance must not invent a quest');
-    await evaluate(client, `(() => { document.querySelector('#financeFlow').value = 'donation'; document.querySelector('#financeDecision').value = 'decision_browser'; document.querySelector('#createQuestButton').click(); })()`);
+    const questRequestsBeforeValidation = requests.filter((request) => request.method === 'POST' && request.path === '/api/financial/quests').length;
+    await evaluate(client, `(() => { document.querySelector('#financeFlow').value = 'donation'; document.querySelector('#financeDecision').value = ''; document.querySelector('#createQuestButton').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#questAlert').textContent.includes('enter a final approved Shura decision ID')`), 'missing decision client rejection');
+    assert.equal(requests.filter((request) => request.method === 'POST' && request.path === '/api/financial/quests').length, questRequestsBeforeValidation, 'missing decision must not reach the quest API');
+    await evaluate(client, `(() => { document.querySelector('#financeDecision').value = 'decision_wrong_workspace'; document.querySelector('#createQuestButton').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#questAlert').textContent.includes('not approved for this workspace')`), 'wrong decision server rejection');
+    assert.equal(await evaluate(client, `document.querySelector('#questRecord').hidden`), true, 'a rejected decision must not create a local quest');
+    await evaluate(client, `(() => { const select = document.querySelector('#approvedDecisionSelect'); select.value = 'decision_browser'; select.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('#createQuestButton').click(); })()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#questRecord').hidden && document.querySelector('#questRecordMeta').textContent.includes('version 1')`), 'sandbox quest create');
     let questActions = await evaluate(client, `({ approve: document.querySelector('#questApproveButton').disabled, execute: document.querySelector('#questExecuteButton').disabled, reconcile: document.querySelector('#questReconcileButton').disabled, cancel: document.querySelector('#questCancelButton').disabled })`);
     assert.deepEqual(questActions, { approve: false, execute: true, reconcile: true, cancel: false }, 'PENDING quest actions must match the durable state machine');
@@ -926,7 +1045,8 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     assert.equal(Object.hasOwn(createQuestRequest.body, 'actorId'), false, 'client must not select the financial actor');
     assert.ok(createQuestRequest.body.parties.includes('taawun:user:7'), 'the authenticated actor party is represented while the server remains authoritative');
 
-    await evaluate(client, `document.querySelector('#bazaarTab').click()`);
+    bazaarAttempts = 0;
+    await evaluate(client, `document.querySelector('#bazaarTab').click(); document.querySelector('#retryBazaar').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#bazaarState').textContent.includes('unavailable')`), 'Bazaar error state');
     await evaluate(client, `document.querySelector('#retryBazaar').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#bazaarState').textContent.includes('No published Bazaar listings yet')`), 'Bazaar honest empty retry');
@@ -948,12 +1068,13 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     await waitFor(() => evaluate(client, `document.querySelector('#bazaarAlert').textContent.includes('installation_browser')`), 'Bazaar installation');
 
     delayedWorkspace41Responses = 1;
-    await evaluate(client, `document.querySelector('#workspaceSelect').dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('#logoutButton').click()`);
+    delayedProposalResponses = 1;
+    await evaluate(client, `document.querySelector('#shuraTab').click(); document.querySelector('#proposalLookup').value = 'proposal_browser_role'; document.querySelector('#loadProposalButton').click(); document.querySelector('#workspaceSelect').dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('#logoutButton').click()`);
     await login(client, 'viewer@example.test');
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').options.length === 0 && !document.querySelector('#workspaceEmpty').hidden && document.querySelector('#workspaceLoading').hidden`), 'pre-invite Viewer isolation');
     await wait(240);
-    const principalBoundary = await evaluate(client, `({ grantHidden: document.querySelector('#inviteGrant').hidden, grantValue: document.querySelector('#inviteTokenOutput').value, sessionInvites: document.querySelectorAll('#invitationList li').length, people: document.querySelector('#peopleList').innerText, role: document.querySelector('#workspaceRole').textContent })`);
-    assert.deepEqual(principalBoundary, { grantHidden: true, grantValue: '', sessionInvites: 0, people: '', role: 'Select a workspace' }, 'sign-out must reject the delayed prior-principal response and clear its grants and records');
+    const principalBoundary = await evaluate(client, `({ grantHidden: document.querySelector('#inviteGrant').hidden, grantValue: document.querySelector('#inviteTokenOutput').value, decisionHidden: document.querySelector('#proposalDecisionGrant').hidden, financeDecision: document.querySelector('#financeDecision').value, sessionInvites: document.querySelectorAll('#invitationList li').length, people: document.querySelector('#peopleList').innerText, role: document.querySelector('#workspaceRole').textContent })`);
+    assert.deepEqual(principalBoundary, { grantHidden: true, grantValue: '', decisionHidden: true, financeDecision: '', sessionInvites: 0, people: '', role: 'Select a workspace' }, 'sign-out must reject delayed prior-principal responses and clear invitation and decision handoffs');
     const isolated = await fetch(`${origin}/api/workspaces/41/people`, { headers: { Authorization: 'Bearer viewer-token' } });
     assert.equal(isolated.status, 403, 'Viewer must not see a workspace before accepting its invitation');
     await evaluate(client, `document.querySelector('#peopleTab').click()`);
@@ -963,8 +1084,8 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     assert.match(await evaluate(client, `document.querySelector('#workspaceHelp').textContent`), /read-only/u);
     await evaluate(client, `document.querySelector('#shuraTab').click(); document.querySelector('#proposalLookup').value = 'proposal_browser_role'; document.querySelector('#loadProposalButton').click()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#proposalRecord').hidden`), 'Viewer proposal read');
-    const viewerControls = await evaluate(client, `({ vote: document.querySelector('#approveVoteButton').disabled, decide: document.querySelector('#approveDecisionButton').disabled, create: document.querySelector('#createProposalButton').disabled })`);
-    assert.deepEqual(viewerControls, { vote: true, decide: true, create: true }, 'Viewer governance controls must explain and enforce read-only access');
+    const viewerControls = await evaluate(client, `({ vote: document.querySelector('#approveVoteButton').disabled, decide: document.querySelector('#approveDecisionButton').disabled, create: document.querySelector('#createProposalButton').disabled, decision: document.querySelector('#proposalDecisionID').value, decisionVisible: !document.querySelector('#proposalDecisionGrant').hidden, financeDisabled: document.querySelector('#financeDecision').disabled, choiceDisabled: document.querySelector('#approvedDecisionSelect').disabled, questDisabled: document.querySelector('#createQuestButton').disabled })`);
+    assert.deepEqual(viewerControls, { vote: true, decide: true, create: true, decision: 'decision_browser', decisionVisible: true, financeDisabled: true, choiceDisabled: true, questDisabled: true }, 'Viewer may inspect the durable decision ID but receives no mutable finance or quest authority');
     const crossWorkspace = await fetch(`${origin}/api/workspaces/99/people`, { headers: { Authorization: 'Bearer viewer-token' } });
     assert.equal(crossWorkspace.status, 403, 'workspace people reads remain isolated');
 
@@ -1004,7 +1125,7 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     assert.ok(byRole.Architect.includes('shura:decide') && byRole.Architect.includes('shura:invite'));
   } finally {
     if (chromium) {
-      try { await chromium.client.send('Browser.close'); } catch {}
+      try { await within(chromium.client.send('Browser.close'), 'role-journey browser close', 1_000); } catch {}
       chromium.client.close();
       await Promise.race([new Promise((resolve) => chromium.processHandle.once('exit', resolve)), wait(1_000)]);
       if (chromium.processHandle.exitCode === null) chromium.processHandle.kill();

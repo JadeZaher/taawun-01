@@ -702,6 +702,7 @@
                 <div id="proposalAlert" class="notice" role="status" hidden></div>
                 <article id="proposalRecord" class="surface-record" hidden>
                   <strong id="proposalRecordTitle"></strong><span id="proposalRecordMeta"></span><p id="proposalRecordBody" class="muted"></p>
+                  <div id="proposalDecisionGrant" class="copy-field" hidden><input id="proposalDecisionID" readonly aria-label="Approved Shura decision ID"><button id="copyDecisionButton" class="button secondary" type="button">Copy decision ID</button></div>
                   <div class="surface-actions"><button id="approveVoteButton" class="button secondary" type="button">Vote approve</button><button id="rejectVoteButton" class="button secondary" type="button">Vote reject</button><button id="approveDecisionButton" class="button" type="button">Decide approved</button><button id="rejectDecisionButton" class="button secondary" type="button">Decide rejected</button></div>
                 </article>
                 <div class="capability-note">Viewers receive read-only capability. Maintainers may deliberate, vote, and propose. Only Architects may record the explicit final decision.</div>
@@ -728,6 +729,7 @@
                   <div class="field"><label for="financeFlow">Vetted flow</label><select id="financeFlow"></select></div>
                   <div class="field-row"><div class="field"><label for="financeAmount">Amount (minor units)</label><input id="financeAmount" type="number" min="1" value="1000"></div><div class="field"><label for="financeCurrency">Currency</label><input id="financeCurrency" maxlength="3" value="USD"></div></div>
                   <div class="field"><label for="financeParties">Declared parties, comma-separated</label><input id="financeParties" placeholder="taawun:user:123"></div>
+                  <div class="field"><label for="approvedDecisionSelect">Approved decision opened in this workspace</label><select id="approvedDecisionSelect"><option value="">Load an approved Shura proposal first</option></select><span class="field-help">This selection is a convenience only. The server revalidates the final decision and exact workspace.</span></div>
                   <div class="field"><label for="financeDecision">Approved Shura decision ID</label><input id="financeDecision" placeholder="decision_…"></div>
                   <button id="createQuestButton" class="button" type="button" disabled>Create sandbox quest</button>
                   <div class="field"><label for="questLookup">Existing quest ID</label><input id="questLookup" placeholder="quest_…"></div>
@@ -780,6 +782,8 @@
       invitations: [],
       proposals: [],
       proposalRecord: null,
+      proposalMutation: null,
+      approvedDecisions: [],
       flows: [],
       quest: null,
       listings: [],
@@ -787,6 +791,7 @@
       sessionEpoch: 0,
       workspacesEpoch: 0,
       workspaceEpoch: 0,
+      proposalEpoch: 0,
       previewReady: false,
       building: false,
       publishing: false,
@@ -889,6 +894,8 @@
       state.invitations = [];
       state.proposals = [];
       state.proposalRecord = null;
+      state.proposalMutation = null;
+      state.approvedDecisions = [];
       state.flows = [];
       state.quest = null;
       state.listings = [];
@@ -929,8 +936,11 @@
       element('proposalBody').value = '';
       element('proposalLookup').value = '';
       element('proposalRecord').hidden = true;
+      element('proposalDecisionID').value = '';
+      element('proposalDecisionGrant').hidden = true;
       element('financeParties').value = '';
       element('financeDecision').value = '';
+      element('approvedDecisionSelect').replaceChildren(new Option('Load an approved Shura proposal first', ''));
       element('questLookup').value = '';
       element('questRecord').hidden = true;
       for (const id of ['inviteResult', 'acceptInviteResult', 'proposalAlert', 'questAlert', 'bazaarAlert']) setNotice(element(id), '');
@@ -1064,11 +1074,13 @@
       element('createProposalButton').disabled = !workspaceID || !['Architect', 'Maintainer'].includes(state.productRole);
       element('loadProposalButton').disabled = !workspaceID;
       element('createQuestButton').disabled = !buildAllowed || !state.flows.length;
+      element('financeDecision').disabled = !buildAllowed;
       const record = state.proposalRecord && state.proposalRecord.proposal;
       const open = record && record.status === 'OPEN';
-      element('approveVoteButton').disabled = !open || !['Architect', 'Maintainer'].includes(state.productRole);
+      const proposalBusy = Boolean(state.proposalMutation);
+      element('approveVoteButton').disabled = proposalBusy || !open || !['Architect', 'Maintainer'].includes(state.productRole);
       element('rejectVoteButton').disabled = element('approveVoteButton').disabled;
-      element('approveDecisionButton').disabled = !open || !publishAllowed;
+      element('approveDecisionButton').disabled = proposalBusy || !open || !publishAllowed;
       element('rejectDecisionButton').disabled = element('approveDecisionButton').disabled;
       const questStatus = String(state.quest && state.quest.status || '').toUpperCase();
       const questParties = Array.isArray(state.quest && state.quest.intent && state.quest.intent.parties) ? state.quest.intent.parties : [];
@@ -1085,6 +1097,7 @@
         element(id).title = allowed ? '' : (!publishAllowed ? 'Only an Architect may advance a sandbox quest.' : 'This action is not available in the quest’s current durable state.');
       }
       element('shuraCapability').textContent = state.shuraToken ? `${state.productRole} capability active` : (workspaceID ? `${roleLabel} · capability on demand` : 'No workspace capability');
+      renderApprovedDecisions();
       if (!buildAllowed && workspaceID) {
         element('workspaceHelp').textContent = 'This workspace is read-only for your Viewer role. Ask an Architect to assign Maintainer access to build.';
       } else {
@@ -1118,12 +1131,20 @@
       state.shuraToken = '';
       state.shuraClaims = null;
       state.proposalRecord = null;
+      state.proposalMutation = null;
+      state.proposalEpoch += 1;
+      state.approvedDecisions = [];
       state.quest = null;
       state.purchase = null;
       element('proposalRecord').hidden = true;
+      element('proposalDecisionID').value = '';
+      element('proposalDecisionGrant').hidden = true;
+      element('financeDecision').value = '';
+      renderApprovedDecisions();
       element('questRecord').hidden = true;
       element('inviteTokenOutput').value = '';
       element('inviteGrant').hidden = true;
+      renderWorkspaceAccess();
       setNotice(element('proposalAlert'), '');
       setNotice(element('questAlert'), '');
       setNotice(element('bazaarAlert'), '');
@@ -1818,24 +1839,100 @@
       }
     }
 
+    function proposalVersion(proposal) {
+      const version = Number(proposal && proposal.version);
+      return Number.isFinite(version) ? version : 0;
+    }
+
+    function upsertProposal(proposal) {
+      if (!proposal || !proposal.id) return;
+      const existing = state.proposals.find((candidate) => candidate && candidate.id === proposal.id);
+      if (existing && proposalVersion(existing) > proposalVersion(proposal)) return;
+      state.proposals = [proposal, ...state.proposals.filter((candidate) => candidate && candidate.id !== proposal.id)];
+    }
+
     function renderProposals() {
-      const unique = [...new Map(state.proposals.filter(Boolean).map((proposal) => [proposal.id, proposal])).values()];
+      const byID = new Map();
+      for (const proposal of state.proposals.filter(Boolean)) {
+        const existing = byID.get(proposal.id);
+        if (!existing || proposalVersion(proposal) > proposalVersion(existing)) byID.set(proposal.id, proposal);
+      }
+      const unique = [...byID.values()];
       state.proposals = unique;
       const workspaceID = currentWorkspaceID();
       const visible = unique.filter((proposal) => Number(proposal.workspace_id) === workspaceID);
       renderRecordList(element('proposalList'), visible, (proposal) => ({ title: proposal.title || proposal.id, meta: `${proposal.status || 'UNKNOWN'} · version ${proposal.version || '?'}` }));
     }
 
-    function renderProposalRecord(record) {
+    function preferredProposalRecord(incoming) {
+      const current = state.proposalRecord;
+      if (!incoming || !incoming.proposal || !current || !current.proposal || current.proposal.id !== incoming.proposal.id) return incoming;
+      const currentVersion = proposalVersion(current.proposal);
+      const incomingVersion = proposalVersion(incoming.proposal);
+      if (incomingVersion < currentVersion) return current;
+      if (incomingVersion > currentVersion) return incoming;
+      const currentScore = (current.decision ? 1000 : 0) + (Array.isArray(current.votes) ? current.votes.length : 0);
+      const incomingScore = (incoming.decision ? 1000 : 0) + (Array.isArray(incoming.votes) ? incoming.votes.length : 0);
+      return incomingScore >= currentScore ? incoming : current;
+    }
+
+    function approvedDecisionFromRecord(record) {
       const proposal = record && record.proposal;
-      state.proposalRecord = record || null;
+      const decision = record && record.decision;
+      if (!proposal || !decision || !decision.id) return null;
+      const workspaceID = currentWorkspaceID();
+      if (Number(proposal.workspace_id) !== workspaceID) return null;
+      if (String(decision.proposal_id || '') !== String(proposal.id || '')) return null;
+      if (Number(decision.proposal_version) !== proposalVersion(proposal)) return null;
+      if (String(proposal.status || '').toUpperCase() !== 'DECIDED' || String(decision.outcome || '').toUpperCase() !== 'APPROVED') return null;
+      return { id: String(decision.id), proposalId: String(proposal.id), workspaceId: workspaceID, title: String(proposal.title || proposal.id) };
+    }
+
+    function renderApprovedDecisions(preferredID = '') {
+      const workspaceID = currentWorkspaceID();
+      const decisions = state.approvedDecisions.filter((decision) => decision.workspaceId === workspaceID);
+      const select = element('approvedDecisionSelect');
+      const previous = select.value;
+      select.replaceChildren(new Option(decisions.length ? 'Choose an approved decision' : 'Load an approved Shura proposal first', ''));
+      for (const decision of decisions) select.append(new Option(`${decision.title} · ${decision.id}`, decision.id));
+      const selected = preferredID || (decisions.some((decision) => decision.id === previous) ? previous : '');
+      select.value = decisions.some((decision) => decision.id === selected) ? selected : '';
+      select.disabled = !canBuildWorkspace() || decisions.length === 0;
+      if (preferredID && canBuildWorkspace() && decisions.some((decision) => decision.id === preferredID)) element('financeDecision').value = preferredID;
+    }
+
+    function rememberApprovedDecision(record) {
+      const proposalID = String(record && record.proposal && record.proposal.id || '');
+      const removed = state.approvedDecisions.filter((decision) => decision.proposalId === proposalID);
+      if (proposalID) state.approvedDecisions = state.approvedDecisions.filter((decision) => decision.proposalId !== proposalID);
+      const approved = approvedDecisionFromRecord(record);
+      if (approved) state.approvedDecisions.unshift(approved);
+      if (!approved && removed.some((decision) => decision.id === element('financeDecision').value)) element('financeDecision').value = '';
+      renderApprovedDecisions(approved ? approved.id : '');
+      return approved;
+    }
+
+    function renderProposalRecord(record) {
+      const selectedRecord = preferredProposalRecord(record);
+      const proposal = selectedRecord && selectedRecord.proposal;
+      state.proposalRecord = selectedRecord || null;
       element('proposalRecord').hidden = !proposal;
-      if (!proposal) return;
+      element('proposalDecisionID').value = '';
+      element('proposalDecisionGrant').hidden = true;
+      if (!proposal) {
+        renderWorkspaceAccess();
+        return;
+      }
       element('proposalRecordTitle').textContent = String(proposal.title || proposal.id);
-      element('proposalRecordMeta').textContent = `${proposal.status} · version ${proposal.version} · ${Array.isArray(record.votes) ? record.votes.length : 0} vote(s)${record.decision ? ` · decision ${record.decision.outcome}` : ''}`;
+      element('proposalRecordMeta').textContent = `${proposal.status} · version ${proposal.version} · ${Array.isArray(selectedRecord.votes) ? selectedRecord.votes.length : 0} vote(s)${selectedRecord.decision ? ` · decision ${selectedRecord.decision.outcome}` : ''}`;
       element('proposalRecordBody').textContent = String(proposal.body || 'No proposal body.');
       element('proposalLookup').value = proposal.id;
-      state.proposals.unshift(proposal);
+      upsertProposal(proposal);
+      const approved = rememberApprovedDecision(selectedRecord);
+      if (approved) {
+        element('proposalDecisionID').value = approved.id;
+        element('proposalDecisionGrant').hidden = false;
+      }
       renderProposals();
       renderWorkspaceAccess();
     }
@@ -1846,14 +1943,15 @@
         return;
       }
       const marker = workspaceMarker();
+      const requestEpoch = ++state.proposalEpoch;
       try {
         const capability = await ensureShuraCapability();
         const record = await api(`/shura/v1/proposals/${encodeURIComponent(proposalID)}`, { bearer: capability });
-        if (!currentWorkspace(marker)) return;
+        if (!currentWorkspace(marker) || requestEpoch !== state.proposalEpoch) return;
         renderProposalRecord(record);
         setNotice(element('proposalAlert'), 'Proposal loaded from durable Shura state.', 'success');
       } catch (error) {
-        if (ignoreStaleWorkspace(error) || !currentWorkspace(marker)) return;
+        if (ignoreStaleWorkspace(error) || !currentWorkspace(marker) || requestEpoch !== state.proposalEpoch) return;
         renderProposalRecord(null);
         setNotice(element('proposalAlert'), `${error.message || 'Proposal could not be loaded.'} Check the ID and workspace, then retry.`, 'error');
       }
@@ -1891,23 +1989,49 @@
     }
 
     async function mutateProposal(kind, value) {
-      const proposal = state.proposalRecord && state.proposalRecord.proposal;
+      const sourceRecord = state.proposalRecord;
+      const proposal = sourceRecord && sourceRecord.proposal;
       if (!proposal) return;
+      if (state.proposalMutation) {
+        setNotice(element('proposalAlert'), 'A proposal update is already in progress. Wait for the authoritative state to reload.', 'gold');
+        return;
+      }
       const marker = workspaceMarker();
+      const mutationEpoch = ++state.proposalEpoch;
+      const mutation = { proposalId: proposal.id, epoch: mutationEpoch };
+      state.proposalMutation = mutation;
+      renderWorkspaceAccess();
+      const stillSelected = () => mutationEpoch === state.proposalEpoch && state.proposalRecord && state.proposalRecord.proposal && state.proposalRecord.proposal.id === proposal.id;
+      const selectedProposal = () => currentWorkspace(marker) && state.proposalRecord && state.proposalRecord.proposal && state.proposalRecord.proposal.id === proposal.id;
+      let dispatched = false;
       try {
         const capability = await ensureShuraCapability();
+        if (!currentWorkspace(marker) || !stillSelected()) return;
         const endpoint = kind === 'vote' ? 'votes' : 'decision';
         const body = kind === 'vote'
           ? { expected_version: proposal.version, choice: value, rationale: 'Recorded through the workspace cockpit.' }
           : { expected_version: proposal.version, outcome: value, rationale: 'Explicit decision recorded through the workspace cockpit.' };
-        await api(`/shura/v1/proposals/${encodeURIComponent(proposal.id)}/${endpoint}`, { method: 'POST', bearer: capability, body });
-        if (!currentWorkspace(marker)) return;
+        dispatched = true;
+        const result = await api(`/shura/v1/proposals/${encodeURIComponent(proposal.id)}/${endpoint}`, { method: 'POST', bearer: capability, body });
+        if (!currentWorkspace(marker) || !stillSelected()) return;
+        const updatedRecord = {
+          ...sourceRecord,
+          proposal: result && result.proposal ? result.proposal : proposal,
+          votes: kind === 'vote' && result && result.vote ? [...(Array.isArray(sourceRecord.votes) ? sourceRecord.votes : []), result.vote] : sourceRecord.votes,
+          decision: kind === 'decision' && result && result.decision ? result.decision : sourceRecord.decision,
+        };
+        renderProposalRecord(updatedRecord);
         await loadProposal(proposal.id);
-        if (!currentWorkspace(marker)) return;
+        if (!selectedProposal()) return;
         announce(kind === 'vote' ? 'Vote recorded.' : 'Final decision recorded.');
       } catch (error) {
         if (ignoreStaleWorkspace(error) || !currentWorkspace(marker)) return;
+        if (dispatched && selectedProposal()) await loadProposal(proposal.id);
+        if (!selectedProposal()) return;
         setNotice(element('proposalAlert'), error.message || `Proposal ${kind} could not be recorded.`, 'error');
+      } finally {
+        if (state.proposalMutation === mutation) state.proposalMutation = null;
+        if (currentWorkspace(marker)) renderWorkspaceAccess();
       }
     }
 
@@ -2286,6 +2410,22 @@
     element('rejectVoteButton').addEventListener('click', () => mutateProposal('vote', 'REJECT'));
     element('approveDecisionButton').addEventListener('click', () => mutateProposal('decision', 'APPROVED'));
     element('rejectDecisionButton').addEventListener('click', () => mutateProposal('decision', 'REJECTED'));
+    element('copyDecisionButton').addEventListener('click', async () => {
+      const output = element('proposalDecisionID');
+      try {
+        await navigator.clipboard.writeText(output.value);
+        setNotice(element('proposalAlert'), 'Approved decision ID copied. Finance still revalidates its workspace and final state.', 'success');
+      } catch {
+        output.focus();
+        output.select();
+        setNotice(element('proposalAlert'), 'Copy is unavailable in this browser. The approved decision ID is selected for manual copy.', 'gold');
+      }
+    });
+    element('approvedDecisionSelect').addEventListener('change', () => {
+      const decisionID = element('approvedDecisionSelect').value;
+      const approved = state.approvedDecisions.some((decision) => decision.workspaceId === currentWorkspaceID() && decision.id === decisionID);
+      if (approved && canBuildWorkspace()) element('financeDecision').value = decisionID;
+    });
     element('retryFinance').addEventListener('click', loadFinance);
     element('createQuestButton').addEventListener('click', createQuest);
     element('loadQuestButton').addEventListener('click', () => loadQuest());
