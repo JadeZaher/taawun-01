@@ -350,6 +350,8 @@ func writeCompositionServiceError(w http.ResponseWriter, err error) {
 		writeCompositionError(w, http.StatusUnprocessableEntity, "invalid_composition", "The composition is not a valid curated request.")
 	case errors.Is(err, conductor.ErrTrackVersionConflict), errors.Is(err, conductor.ErrIdempotencyConflict), errors.Is(err, conductor.ErrTrackTransition):
 		writeCompositionError(w, http.StatusConflict, "composition_conflict", err.Error())
+	case errors.Is(err, conductor.ErrPublicationClaimState):
+		writeCompositionError(w, http.StatusConflict, "publication_claim_unavailable", "The domain claim must be currently verified before publication can continue.")
 	case errors.Is(err, conductor.ErrDependencyUnavailable):
 		writeCompositionError(w, http.StatusBadGateway, "composition_dependency_unavailable", "A required composition dependency is unavailable.")
 	default:

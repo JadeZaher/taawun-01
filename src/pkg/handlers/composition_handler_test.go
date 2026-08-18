@@ -87,14 +87,42 @@ func TestCompositionPreviewRejectsUnknownRequestFields(t *testing.T) {
 	}
 }
 
+func TestCompositionPublicationClaimStateIsActionable(t *testing.T) {
+	response := httptest.NewRecorder()
+	writeCompositionServiceError(response, conductor.ErrPublicationClaimState)
+	if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), `"code":"publication_claim_unavailable"`) {
+		t.Fatalf("publication claim error = status:%d body:%s", response.Code, response.Body.String())
+	}
+}
+
+func TestCompositionPreviewReturnsInvalidCompositionEnvelope(t *testing.T) {
+	service := &compositionServiceStub{composeErr: conductor.ErrInvalidComposition}
+	handler, err := NewCompositionHTTPHandler(service, artifactReaderStub{}, CurrentUser, []string{"http://localhost:8080"})
+	if err != nil {
+		t.Fatalf("NewCompositionHTTPHandler() error = %v", err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/artifacts/preview", strings.NewReader(`{"workspaceId":7}`))
+	request.Header.Set("Content-Type", "application/json")
+	request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7}))
+	response := httptest.NewRecorder()
+	handler.Preview(response, request)
+	if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), `"code":"invalid_composition"`) {
+		t.Fatalf("invalid composition = status:%d body:%s", response.Code, response.Body.String())
+	}
+}
+
 type compositionServiceStub struct {
-	track   *conductor.Track
-	actor   *models.User
-	request conductor.CompositionRequest
+	track      *conductor.Track
+	actor      *models.User
+	request    conductor.CompositionRequest
+	composeErr error
 }
 
 func (s *compositionServiceStub) Compose(_ context.Context, actor *models.User, request conductor.CompositionRequest) (*conductor.ComposeResult, error) {
 	s.actor, s.request = actor, request
+	if s.composeErr != nil {
+		return nil, s.composeErr
+	}
 	return &conductor.ComposeResult{Track: s.track, Created: true}, nil
 }
 

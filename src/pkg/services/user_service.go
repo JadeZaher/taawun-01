@@ -1,13 +1,22 @@
 package services
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 	"taawun/pkg/models"
 	"taawun/pkg/repositories"
+)
+
+var (
+	ErrUserNotFound          = errors.New("user not found")
+	ErrAccountDeletionFailed = errors.New("account deletion failed")
 )
 
 type UserService struct {
@@ -134,8 +143,20 @@ func (s *UserService) UpdateUser(id int, req *models.UpdateUserRequest) (*models
 }
 
 func (s *UserService) DeleteUser(id int) error {
-	if err := s.repo.Delete(id); err != nil {
-		return fmt.Errorf("failed to delete user: %v", err)
+	random := make([]byte, 24)
+	if _, err := rand.Read(random); err != nil {
+		return fmt.Errorf("%w: prepare account tombstone", ErrAccountDeletionFailed)
+	}
+	suffix := hex.EncodeToString(random[:12])
+	hashedPassword, err := bcrypt.GenerateFromPassword(random, bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("%w: prepare account credentials", ErrAccountDeletionFailed)
+	}
+	if err := s.repo.DeactivateAndAnonymize(id, "deleted-"+suffix, "deleted-"+suffix+"@deleted.invalid", string(hashedPassword), time.Now().UTC()); err != nil {
+		if errors.Is(err, repositories.ErrUserNotFound) {
+			return ErrUserNotFound
+		}
+		return fmt.Errorf("%w: %v", ErrAccountDeletionFailed, err)
 	}
 	return nil
 }

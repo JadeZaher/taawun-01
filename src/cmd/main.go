@@ -112,6 +112,7 @@ func main() {
 		log.Fatalf("Failed to configure verified-domain HTTP API: %v", err)
 	}
 	ethicsEngine := ethics.NewHaramCheckEngine()
+	ethicsHandler := handlers.NewEthicsHTTPHandler(ethicsEngine)
 	complianceCorpus := ethics.NewSeedComplianceCorpus()
 	conductorRepository, err := conductor.NewRepository(sqlDB)
 	if err != nil {
@@ -262,24 +263,6 @@ func main() {
 	// P2P WebRTC Signaling & WebSocket Relay endpoint (Local-first browser artifacts)
 	r.HandleFunc("/api/p2p/stream", p2pHub.HandleP2PStream)
 
-	// Taqwa Compliance Audit endpoint
-	r.HandleFunc("/api/ethics/audit", func(w http.ResponseWriter, r *http.Request) {
-		var req struct {
-			Prompt string `json:"prompt"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
-			return
-		}
-		result, err := ethicsEngine.AuditPrompt(req.Prompt)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
-	}).Methods("POST")
-
 	// Conductor Open Platform Specification & Developer Ergonomics Endpoint
 	r.HandleFunc("/api/conductor/spec", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -306,6 +289,7 @@ func main() {
 	// Protected routes
 	api := r.PathPrefix("/api").Subrouter()
 	api.Use(authHandler.AuthMiddleware)
+	api.HandleFunc("/ethics/audit", ethicsHandler.Audit).Methods(http.MethodPost)
 
 	// User routes
 	api.HandleFunc("/users", userHandler.GetUsers).Methods("GET")

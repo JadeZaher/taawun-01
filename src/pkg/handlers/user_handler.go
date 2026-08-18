@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -88,10 +89,22 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.DeleteUser(id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if errors.Is(err, services.ErrUserNotFound) {
+			writeUserError(w, http.StatusNotFound, "user_not_found", "User not found.")
+			return
+		}
+		writeUserError(w, http.StatusInternalServerError, "account_deletion_failed", "Account deletion could not be completed.")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func writeUserError(w http.ResponseWriter, status int, code, message string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": code, "message": message}})
 }
 
 func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {

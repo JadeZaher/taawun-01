@@ -96,6 +96,35 @@ func TestPublicAttemptRejectionSetsRetryAfter(t *testing.T) {
 	}
 }
 
+func TestRegisterThrottleUsesRailwayClientAcrossEdgePeers(t *testing.T) {
+	t.Setenv("RAILWAY_ENVIRONMENT_ID", "production-environment")
+	handler := &AuthHandler{publicLimiter: newAuthRateLimiter(time.Minute, 8)}
+	peers := []string{
+		"100.64.0.11:4100",
+		"100.65.0.12:4101",
+		"100.66.0.13:4102",
+		"100.67.0.14:4103",
+		"100.68.0.15:4104",
+		"100.69.0.16:4105",
+	}
+	for index, peer := range peers {
+		request := httptest.NewRequest(http.MethodPost, "/api/register", strings.NewReader(`{"unexpected":true}`))
+		request.RemoteAddr = peer
+		request.Header.Set("X-Real-IP", "198.51.100.77")
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		handler.Register(response, request)
+		if index < registrationAttemptLimit && response.Code != http.StatusBadRequest {
+			t.Fatalf("Railway registration attempt %d status = %d, want strict-body 400", index+1, response.Code)
+		}
+		if index == registrationAttemptLimit {
+			if response.Code != http.StatusTooManyRequests {
+				t.Fatalf("Railway registration attempt %d status:%d, want 429", index+1, response.Code)
+			}
+		}
+	}
+}
+
 func TestRegisterThenImmediateLoginThroughHTTP(t *testing.T) {
 	var logOutput bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&logOutput, nil))
@@ -170,8 +199,14 @@ func TestRequestSourceUsesOnlyRailwayRealIPFromTrustedPeer(t *testing.T) {
 		t.Fatalf("Railway real IP source = %q, want documented client header", got)
 	}
 
+	request.RemoteAddr = "100.64.12.8:4567"
+	request.Header.Set("X-Real-IP", "203.0.113.56")
+	if got := requestSource(request); got != "203.0.113.56" {
+		t.Fatalf("Railway 100/8 proxy source = %q, want documented client header", got)
+	}
+
 	request.Header.Del("X-Real-IP")
-	if got := requestSource(request); got != "10.20.30.40" {
+	if got := requestSource(request); got != "100.64.12.8" {
 		t.Fatalf("spoofed X-Forwarded-For source = %q, want direct peer", got)
 	}
 

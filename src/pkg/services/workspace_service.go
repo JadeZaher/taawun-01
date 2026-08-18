@@ -272,6 +272,11 @@ func (s *WorkspaceService) authorize(actor *models.User, workspaceID int, allowe
 	if actor == nil || actor.ID <= 0 {
 		return nil, ErrWorkspaceForbidden
 	}
+	persistedActor, err := s.userRepo.GetByID(actor.ID)
+	if err != nil || persistedActor == nil || persistedActor.Status != models.StatusActive {
+		return nil, ErrWorkspaceForbidden
+	}
+	actor = persistedActor
 	workspace, err := s.workspaceRepo.GetByID(workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workspace: %v", err)

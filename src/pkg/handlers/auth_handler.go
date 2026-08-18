@@ -29,6 +29,8 @@ const (
 	maximumRealIPBytes         = 64
 )
 
+var railwayProxyRange = netip.MustParsePrefix("100.0.0.0/8")
+
 type AuthHandler struct {
 	authService   *services.AuthService
 	userService   *services.UserService
@@ -269,7 +271,8 @@ func requestSource(r *http.Request) string {
 
 // Railway's edge is trusted only when the direct peer is private and the runtime marker is present.
 func trustedRailwayProxyPeer(peer netip.Addr) bool {
-	return strings.TrimSpace(os.Getenv("RAILWAY_ENVIRONMENT_ID")) != "" && (peer.IsPrivate() || peer.IsLoopback())
+	return strings.TrimSpace(os.Getenv("RAILWAY_ENVIRONMENT_ID")) != "" &&
+		(peer.IsPrivate() || peer.IsLoopback() || railwayProxyRange.Contains(peer))
 }
 
 // railwayRealClient accepts Railway's documented single-address client header.

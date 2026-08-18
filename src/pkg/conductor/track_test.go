@@ -92,7 +92,7 @@ func TestInvalidOrRejectedCompositionFailsBeforeArtifactBuild(t *testing.T) {
 	request := validCompositionRequest()
 	request.TemplateID = "arbitrary-code-template"
 	result, err := harness.service.Compose(context.Background(), harness.owner, request)
-	if err == nil || result.Track.Status != TrackFailed || result.Track.FailureCode != "composition_validation_failed" || harness.builder.buildCalls != 0 {
+	if !errors.Is(err, ErrInvalidComposition) || result.Track.Status != TrackFailed || result.Track.FailureCode != "composition_validation_failed" || harness.builder.buildCalls != 0 {
 		t.Fatalf("invalid composition: result=%+v builds=%d err=%v", result, harness.builder.buildCalls, err)
 	}
 
@@ -102,6 +102,29 @@ func TestInvalidOrRejectedCompositionFailsBeforeArtifactBuild(t *testing.T) {
 	result, err = harness2.service.Compose(context.Background(), harness2.owner, request)
 	if err == nil || result.Track.Status != TrackFailed || result.Track.Compliance == nil || result.Track.Compliance.Disposition != ComplianceReject || harness2.builder.buildCalls != 0 {
 		t.Fatalf("rejected compliance: result=%+v builds=%d err=%v", result, harness2.builder.buildCalls, err)
+	}
+}
+
+func TestPublicationRequiresCurrentlyVerifiedClaim(t *testing.T) {
+	harness := newConductorHarness(t)
+	result, err := harness.service.Compose(context.Background(), harness.owner, validCompositionRequest())
+	if err != nil {
+		t.Fatalf("compose preview: %v", err)
+	}
+	harness.publisher.claimStatus = domains.StatusPending
+	if _, err := harness.service.RequestPublication(context.Background(), harness.owner, result.Track.ID, result.Track.Version, "claim-community"); !errors.Is(err, ErrPublicationClaimState) {
+		t.Fatalf("pending claim request error = %v", err)
+	}
+
+	harness.publisher.claimStatus = domains.StatusVerified
+	requested, err := harness.service.RequestPublication(context.Background(), harness.owner, result.Track.ID, result.Track.Version, "claim-community")
+	if err != nil {
+		t.Fatalf("request verified publication: %v", err)
+	}
+	harness.publisher.publishErr = domains.ErrOriginNotVerified
+	activated, err := harness.service.ActivatePublication(context.Background(), harness.owner, result.Track.ID, requested.Version)
+	if !errors.Is(err, ErrPublicationClaimState) || activated == nil || activated.Status != TrackPublicationRequested {
+		t.Fatalf("revoked activation = track:%+v err:%v", activated, err)
 	}
 }
 
@@ -232,10 +255,24 @@ func (*fakeOriginAuthority) AuthorizeOriginsForLifecycle(_ context.Context, _ *m
 type fakePublicationService struct {
 	publishCalls int
 	history      []domains.Publication
+	claimStatus  domains.Status
+	publishErr   error
+}
+
+func (p *fakePublicationService) Inspect(_ context.Context, _ *models.User, workspaceID int, claimID string) (domains.Claim, error) {
+	status := p.claimStatus
+	if status == "" {
+		status = domains.StatusVerified
+	}
+	expiresAt := time.Now().UTC().Add(time.Hour)
+	return domains.Claim{ID: claimID, WorkspaceID: workspaceID, Status: status, VerificationExpiresAt: &expiresAt}, nil
 }
 
 func (p *fakePublicationService) Publish(_ context.Context, _ *models.User, workspaceID int, claimID, contentHash string) (domains.Publication, error) {
 	p.publishCalls++
+	if p.publishErr != nil {
+		return domains.Publication{}, p.publishErr
+	}
 	publication := domains.Publication{ID: "publication-1", WorkspaceID: workspaceID, ClaimID: claimID, Origin: "https://community.example", Host: "community.example", ContentHash: contentHash, ArtifactID: "artifact_signed_1", Active: true, ActivatedAt: time.Now().UTC()}
 	p.history = []domains.Publication{publication}
 	return publication, nil

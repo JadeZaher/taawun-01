@@ -943,8 +943,8 @@
       const source = document
         .replace(/<meta http-equiv="Content-Security-Policy"[^>]*>\s*/, '')
         .replace(/<link rel="stylesheet" href="\.\/theme\.css">/, '')
-        .replace(/<link rel="stylesheet" href="\.\/app\.css">/, inlineStyles)
-        .replace(runtimeTag[0], `<script type="module">${runtime}<${'/script>'}`);
+        .replace(/<link rel="stylesheet" href="\.\/app\.css">/, () => inlineStyles)
+        .replace(runtimeTag[0], () => `<script type="module">${runtime}<${'/script>'}`);
       frame.removeAttribute('src');
       frame.srcdoc = source;
     }

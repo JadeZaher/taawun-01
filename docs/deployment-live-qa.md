@@ -68,6 +68,36 @@ The Go sweep passed every package; the browser tests passed 8/8. Railway then
 built the same checkpoint through the repository Dockerfile and promoted it
 only after `/api/health` passed.
 
+## 2026-08-18 private-beta remediation batch
+
+The paired live-QA task reproduced staging iframe corruption on successful
+Railway deployment `04f32db0-72e9-4364-82c6-bee0796ab161`. Track
+`track_FmQqBlt2gkWKjJ2Q3ikQ8T3n` and artifact
+`art_f0291aef6bf1fb2d7bc745dfebb5ed05` were served successfully, but the
+cockpit's `srcdoc` assembly treated Datastar's literal `$&` as a JavaScript
+replacement token and exposed runtime source before the signed card.
+
+The first remediation batch now:
+
+- inserts preview CSS and the pinned Datastar runtime through replacement
+  callbacks, with a real-Chromium regression covering intact runtime parsing,
+  first-visible card content, and an interactive card control;
+- classifies invalid curated compositions as `422 invalid_composition`;
+- requires a currently verified domain claim before publication request or
+  activation and returns `409 publication_claim_unavailable` after revocation;
+- attributes Railway registration attempts through the documented
+  `X-Real-IP` header only from an environment-marked trusted proxy peer,
+  including Railway's internal `100.0.0.0/8` range;
+- anonymizes account identity, revokes first-party and OAuth authority, removes
+  non-audit grants, and preserves referenced governance/domain records; and
+- moves the ethics audit behind private-beta authentication with strict bounded
+  JSON, per-principal throttling, hardened response headers, and safe errors.
+
+Integrated source verification passed 11/11 Node tests (including headless
+Chrome), all Go package/command tests, both production binary builds, and
+`git diff --check`. Railway deployment and paired live retest are the next gate;
+their identifiers will be appended without replacing the original baseline.
+
 ## Acceptance boundary
 
 No customer-controlled DNS zone was provided for this QA session. The live run

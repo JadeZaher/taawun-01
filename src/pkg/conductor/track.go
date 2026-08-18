@@ -27,6 +27,7 @@ var (
 	ErrIdempotencyConflict    = errors.New("Conductor idempotency key conflict")
 	ErrWorkspaceForbidden     = errors.New("Conductor workspace authorization denied")
 	ErrDependencyUnavailable  = errors.New("Conductor dependency unavailable")
+	ErrPublicationClaimState  = errors.New("Conductor publication claim is not currently verified")
 	ErrLegacyWorkflowDisabled = errors.New("legacy Docker/LTAP Conductor workflow is disabled")
 )
 
@@ -172,6 +173,7 @@ type StagingOriginAuthority interface {
 }
 
 type DomainPublicationService interface {
+	Inspect(context.Context, *models.User, int, string) (domains.Claim, error)
 	Publish(context.Context, *models.User, int, string, string) (domains.Publication, error)
 	PublicationHistory(context.Context, *models.User, int, string) ([]domains.Publication, error)
 }
@@ -287,7 +289,7 @@ func (s *Service) advance(ctx context.Context, actor *models.User, workspace *mo
 				Subject: subject, ExpiresAt: s.now().UTC().Add(time.Duration(track.Request.TTLHours) * time.Hour), Lifecycle: artifacts.BundleLifecyclePreview,
 			}
 			if err := s.validator.ValidateComposition(ctx, buildRequest); err != nil {
-				return s.fail(ctx, track, actor.ID, "composition_validation_failed", err)
+				return s.fail(ctx, track, actor.ID, "composition_validation_failed", errors.Join(ErrInvalidComposition, err))
 			}
 			updated := cloneTrack(track)
 			updated.BuildRequest = &buildRequest
@@ -372,6 +374,9 @@ func (s *Service) RequestPublication(ctx context.Context, actor *models.User, tr
 	if !validIdentifier(claimID) {
 		return nil, ErrInvalidComposition
 	}
+	if err := s.requireVerifiedPublicationClaim(ctx, actor, track.WorkspaceID, claimID); err != nil {
+		return nil, err
+	}
 	if track.Status == TrackPublicationRequested && track.ClaimID == claimID {
 		return track, nil
 	}
@@ -397,6 +402,9 @@ func (s *Service) ActivatePublication(ctx context.Context, actor *models.User, t
 	if track.Status != TrackPublicationRequested || track.Artifact == nil || !validIdentifier(track.ClaimID) {
 		return nil, ErrTrackTransition
 	}
+	if err := s.requireVerifiedPublicationClaim(ctx, actor, track.WorkspaceID, track.ClaimID); err != nil {
+		return track, err
+	}
 	reserved := cloneTrack(track)
 	track, err = s.repository.transition(ctx, track, reserved, TrackPublicationRequested, "PUBLICATION_ACTIVATION_STARTED", actor.ID, map[string]any{"claimId": track.ClaimID}, s.now())
 	if err != nil {
@@ -409,6 +417,9 @@ func (s *Service) ActivatePublication(ctx context.Context, actor *models.User, t
 		if transitionErr != nil {
 			return track, errors.Join(err, transitionErr)
 		}
+		if publicationClaimStateError(err) {
+			return blocked, errors.Join(ErrPublicationClaimState, err)
+		}
 		return blocked, fmt.Errorf("%w: %v", ErrDependencyUnavailable, err)
 	}
 	if publication.WorkspaceID != track.WorkspaceID || publication.ClaimID != track.ClaimID || publication.ContentHash != track.Artifact.ContentHash || publication.ArtifactID != track.Artifact.ArtifactID || !publication.Active {
@@ -417,6 +428,29 @@ func (s *Service) ActivatePublication(ctx context.Context, actor *models.User, t
 	updated := cloneTrack(track)
 	updated.Publication = &publication
 	return s.repository.transition(ctx, track, updated, TrackPublished, "PUBLICATION_ACTIVATED", actor.ID, map[string]any{"publicationId": publication.ID, "origin": publication.Origin}, s.now())
+}
+
+func publicationClaimStateError(err error) bool {
+	return errors.Is(err, domains.ErrClaimNotFound) || errors.Is(err, domains.ErrInvalidState) ||
+		errors.Is(err, domains.ErrChallengeExpired) || errors.Is(err, domains.ErrOriginNotVerified)
+}
+
+func (s *Service) requireVerifiedPublicationClaim(ctx context.Context, actor *models.User, workspaceID int, claimID string) error {
+	claim, err := s.publications.Inspect(ctx, actor, workspaceID, claimID)
+	if err != nil {
+		if publicationClaimStateError(err) {
+			return errors.Join(ErrPublicationClaimState, err)
+		}
+		if contextErr := contextError(ctx); contextErr != nil {
+			return contextErr
+		}
+		return fmt.Errorf("%w: inspect publication claim: %v", ErrDependencyUnavailable, err)
+	}
+	if claim.WorkspaceID != workspaceID || claim.Status != domains.StatusVerified ||
+		claim.VerificationExpiresAt == nil || !claim.VerificationExpiresAt.After(s.now().UTC()) {
+		return ErrPublicationClaimState
+	}
+	return nil
 }
 
 func (s *Service) recoverOrPublish(ctx context.Context, actor *models.User, track *Track) (domains.Publication, error) {

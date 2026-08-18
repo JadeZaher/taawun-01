@@ -18,3 +18,12 @@ rebuild a table to alter a column. Use explicit `Migrator` existence checks and
 only create missing tables, columns, constraints, or indexes so `/data/taawun.db`
 can be adopted in place without copying or rewriting customer records. GORM SQL
 logging stays disabled because interpolated identity values are sensitive.
+
+## Account tombstones
+
+Account deletion retains the `users.id` tombstone because verified-domain,
+publication, OAuth, and other audit rows intentionally reference it. The
+lifecycle transaction replaces identity and credential material, marks the user
+deleted, rotates the first-party session version, revokes OAuth credentials and
+consents, and removes non-audit membership/notification rows. Do not restore a
+hard delete or weaken those audit foreign keys.

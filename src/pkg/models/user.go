@@ -52,4 +52,5 @@ const (
 	StatusActive    = "active"
 	StatusInactive  = "inactive"
 	StatusSuspended = "suspended"
+	StatusDeleted   = "deleted"
 )

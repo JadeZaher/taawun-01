@@ -336,3 +336,43 @@ remaining gaps matter: they are the difference between "the mechanism is correct
 exposure/availability defects, drill backup/restore, and this is a defensible
 vendor-operated private beta. Until the first real domain has been published and
 served, do not market it as a self-service domain-publishing product.
+
+---
+
+## Remediation and viability backlog addendum — 2026-08-18
+
+This is a cumulative implementation/live-QA addendum, not a second adversarial
+review. The original checkpoint, method, and conditional verdict above remain
+historical evidence.
+
+Current remediation status:
+
+- **Locally verified, awaiting Railway live retest:** iframe/runtime corruption,
+  invalid-composition classification, Railway registration attribution,
+  account deletion lifecycle, verified-claim publication state, and the private
+  authenticated ethics-audit boundary.
+- **Still green and protected:** identity/workspace isolation, signed preview and
+  event integrity, invitation membership, Shura decisions, financial actor
+  injection defense, sandbox quest lifecycle, exact-origin claims, customer CORS,
+  relay identity/origin binding, and pinned CIMD snapshots.
+- **Fixture-dependent:** controlled DNS verification, public custom-host serving,
+  and Bazaar purchase need an operator-provided live domain and suitable published
+  listing/decision fixtures. These boundaries must not be weakened to manufacture
+  a green result.
+
+Ranked next increments after baseline QA signs off:
+
+1. **First-session differentiated journey:** surface the existing broader catalog,
+   invitations/Shura, sandbox finance, and Bazaar/test-drive APIs through the
+   smallest cohesive Swiss cockpit UI, with honest sandbox/review labels.
+2. **Recovery and domain guidance:** resumable progress, actionable publication
+   state, visible signed-manifest trust cues, expiry/renewal guidance, and clear
+   empty/error states.
+3. **HTTP trust polish:** consistent first-party error envelopes, no-store/nosniff,
+   Railway request-ID-correlated safe 5xx logging, real OpenAPI, durable recent
+   activity, and favicon/metadata polish.
+4. **Operator proof:** controlled-domain publish/serve smoke test followed by a
+   backup/restore drill and explicit single-instance relay guardrail.
+5. **Measured private-beta checkpoint:** use only lightweight, boundary-safe funnel
+   diagnostics already available from request/track events; do not add surveillance
+   or a separate analytics platform.
