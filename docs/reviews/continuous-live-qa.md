@@ -8,16 +8,20 @@ cleanup. This lane does not implement or deploy source fixes.
 
 ## Acceptance state
 
-**BLOCKED — the technical baseline and first-session presentation are live-green,
-but signed-receipt trust binding and persona discoverability still have open P1s.**
+**BLOCKED — the technical baseline, first-session presentation, exact signed-
+receipt trust binding, and preview-origin denial boundary are live-green, but
+persona discoverability still has open P1s.**
 Deployment `68914f4c-a916-43f7-b0bf-fbd578c25f43` fixed the raw-JavaScript
 preview, invalid composition, Railway-source throttle, publication state, account
 lifecycle, and ethics boundaries. Deployment
 `fe372625-e35f-4490-a8de-d8647826e7d3` made dashboard evidence truthful,
 preserved mobile value/custody copy, corrected theme contrast, and exposed signed
-receipt details. Its client verification attestation still does not bind every
-rendered signed authorization field or reject expiry, so acceptance remains
-blocked. A roughly 30-second all-route 502 interval at
+receipt details. Deployment `1bfa3008-319c-49ba-bd52-090da3dbfa5e` now binds the
+complete manifest and rejects mismatched or elapsed authorization evidence; that
+trust gate is accepted. Deployment `58d87a23-6037-4cc5-8151-09b37167cef5`
+correctly maps and safely correlates unauthorized requested preview origins.
+Acceptance remains blocked by persona discoverability.
+A roughly 30-second all-route 502 interval at
 05:10Z was correlated as a transient Railway edge/routing interruption rather
 than a confirmed application crash; independent and implementation-lane recovery
 soaks passed without redeployment. Any recurrence remains an immediate P0, but
@@ -39,6 +43,8 @@ enterprise abstractions, fake activity, or misleading authority claims.
 | `db2bf81c-c68d-4ecf-a949-f3fa240c69af` | `a484bfe` | Failed before health promotion | Container could not execute `/usr/local/bin/docker-entrypoint.sh`; deploy logs repeatedly reported `No such file or directory`, consistent with CRLF shebang packaging. Prior `SUCCESS` deployment remained active; no live regression was run. |
 | `68914f4c-a916-43f7-b0bf-fbd578c25f43` | `9748666` | `SUCCESS` | P0 preview and prioritized contract fixes live-green. Full-site Railway 502 window at 05:10Z recovered without QA intervention and was classified as a transient edge/routing interruption after a 120/120 five-minute soak. Acceptance remains blocked on role/product viability. |
 | `fe372625-e35f-4490-a8de-d8647826e7d3` | `da5e136` (`a39e246` is docs-only PR head) | `SUCCESS` | Dashboard, mobile/auth semantics, contrast, and visible receipt detail retests are live-green. P1 receipt-attestation scope gap remains; discoverability batch has not started. |
+| `1bfa3008-319c-49ba-bd52-090da3dbfa5e` | `57d9fd1` (`f282aac` is docs-only PR head) | `SUCCESS` | Exact-manifest attestation trust gate accepted live. Complete digest/manifest binding, scalar and internal relationships, lifecycle/expiry, four origin categories, missing/corrupt evidence, sandbox/runtime, interaction, and signed-file boundaries are green. Separate P1: unauthorized requested preview origins return a generic application 500 instead of a deterministic client-error envelope. |
+| `58d87a23-6037-4cc5-8151-09b37167cef5` | `e269126` (`42a6a30` is docs-only PR head) | `SUCCESS` | Preview-origin boundary accepted live: four categories and identical replay return deterministic 422/no track, corrected same-key request creates a signed preview, safe Railway telemetry correlates all six denials, spoofed request ID is ignored, and immutable receipt/sandbox/signed-file boundaries remain green. |
 
 The prior accepted checkpoint `80feecc7-e5fe-49cc-8cfa-858a64e86cee`
 (`6a4d3a0`) is now `REMOVED` and is retained only as historical evidence in
@@ -47,7 +53,7 @@ The prior accepted checkpoint `80feecc7-e5fe-49cc-8cfa-858a64e86cee`
 ## Baseline journey — deployment `04f32db0`
 
 Tested in the Codex in-app browser against
-&lt;https://taawun-production.up.railway.app&gt; with a fresh synthetic principal.
+<https://taawun-production.up.railway.app> with a fresh synthetic principal.
 
 | Step | Result | Evidence |
 |:---|:---|:---|
@@ -74,9 +80,9 @@ Structural evidence from the live iframe `srcdoc`:
 - The intended inline runtime starts at byte/index 5,822 and should close at
   40,062.
 - A second external runtime tag is injected into the JavaScript at 12,907 and
-  contributes an early `&lt;/script&gt;` at 13,030.
+  contributes an early `</script>` at 13,030.
 - The injection occurs at Datastar source containing JavaScript replacement token
-  `$&amp;`. The cockpit uses `String.replace` with the entire runtime as the
+  `$&`. The cockpit uses `String.replace` with the entire runtime as the
   replacement string, so replacement-token expansion substitutes the matched
   external script tag inside the runtime.
 - Railway confirms every supporting request returned success, proving the fault is
@@ -135,7 +141,7 @@ Fresh browser principal `15`, workspace `11`, track
 | Exact CORS | **Green for origin isolation** | Configured production origin receives exact ACAO; `https://evil.example` receives none. No credentialed wildcard observed. |
 | Invitation and Viewer boundary | **Green** | User `16` was denied workspace, track, and file access before invitation. After accepting Viewer invitation `invite_mCghWgajW5yXG42aH1lNh-OI`, workspace, signed file, and decided proposal reads returned 200 while preview/build and proposal creation returned 403. |
 | Shura lifecycle | **Green** | Architect capability, proposal `proposal_JAZ6eTts7XkIcM4PuZD-7L6s`, vote, and APPROVED decision `decision_VuWnH1Ubwd0dkg2kfsSdv1d3` completed; proposal reached DECIDED version 3. Decision request `6wo5-Eu_Sy6u8NZCY53eZw`. |
-| Financial sandbox | **Green for bounded sandbox lifecycle** | Seven flows advertised. Client-supplied actor was rejected 400. Synthetic donation quest `quest_ARbpv-_FLgOwBYwgG7C0t41l` progressed CREATED -&gt; APPROVED -&gt; EXECUTING -&gt; RECONCILIATION_PENDING; all five expected events formed a valid hash chain. No real settlement or custody was implied. Request `A6laXQepR8eyxw6P9o6EoQ`. |
+| Financial sandbox | **Green for bounded sandbox lifecycle** | Seven flows advertised. Client-supplied actor was rejected 400. Synthetic donation quest `quest_ARbpv-_FLgOwBYwgG7C0t41l` progressed CREATED -> APPROVED -> EXECUTING -> RECONCILIATION_PENDING; all five expected events formed a valid hash chain. No real settlement or custody was implied. Request `A6laXQepR8eyxw6P9o6EoQ`. |
 | Password/session invalidation | **Green** | Password update returned 200; the old JWT and old password immediately returned 401, and the new password logged in. Response hardening remains incomplete because the successful update lacked `no-store` and `nosniff`. |
 | OAuth/MCP authorization | **Green** | Public PKCE client registration, authorize/consent redirect, token exchange, and MCP initialize succeeded. The authorization cookie was Secure, HttpOnly, and SameSite=Lax. Token request `EdV63M0rSzqL7_nbWUN5dQ`. |
 | OAuth/domain-referenced self-delete | **Green** | User `15` deleted with 204 after signed artifact, pending domain, OAuth, Shura, finance, and invitation activity. JWT and OAuth access returned 401, refresh returned `invalid_grant`, and the old authorization cookie returned to login. Audit events remained readable with actor `15`; no raw FK/database error appeared. Delete request `bxxaUcbNRwa8GNnWnPRhug`. |
@@ -153,7 +159,7 @@ Fresh browser principal `15`, workspace `11`, track
   Railway request ID for crash/restart/log correlation. The same instance remained
   RUNNING with zero application-observed restarts and no panic, exit, OOM,
   shutdown, second container start, new deployment, or matching application HTTP
-  &gt;=500 record. Railway does not expose a true internal restart counter, so this
+  >=500 record. Railway does not expose a true internal restart counter, so this
   is not presented as a platform-level zero.
 - Independent and control-room recovery gates produced fourteen consecutive
   health/root 200 responses over overlapping 40-second soaks. The implementation
@@ -177,24 +183,31 @@ Fresh browser principal `15`, workspace `11`, track
 | OAuth public client `taawun_client_2dEPrJWKeYFmghlk-CV9xS3EOkoxJw4D3Ew5oCyCFm8` | PKCE authorization and MCP challenge/invalidation | Retained synthetic identifier because the public-client API has no supported deletion route. No secret, credential, access token, refresh token, or authorization code is recorded. |
 | User `17`, workspace `13`, track `track_kSAC9qY_o8hFnb1iFhT5Jv1x`, pending claim `Rg7llNYN3kCziQqYVLYIyzPIM` | Trust-batch browser/API, responsive, signed receipt, contrast, publication, invitation, Shura, and financial regression | Workspace `13` deleted with `204` (`bB-5QnKRQHKK41_anpoFkQ`), then user `17` deleted with `204` (`d0uDN88V6TEK-w087WUN5dQ`); old token returned 401. Workspace deletion made the retained track inaccessible. |
 | User `18`, Viewer membership in workspace `13`, invitation `invite_O3Z8DzHIEVM_lC3uXUs1_mk5` | Honest empty dashboard, pre/post-invite isolation, and Viewer denial | User deleted with `204` (`B-rcSchXTMGpEN_q2h0iww`); old token returned 401. |
+| User `19`, workspace `14`, artifact `art_b62908753cc1548a6329b118c49bb5e6` | Fresh real-browser exact-manifest receipt, sandbox, and interaction retest | Pending supported operator cleanup. The in-app browser retains the authenticated session but exposes no supported account-delete UI or response-body/session bridge; QA will not extract credentials or use raw database deletion. |
+| User `22`, workspace `17`, track `track_k-SFjjcMc1kJ8mX8m6Iy0UUA`, artifact `art_e68a7fb7d695e37e6ed01529c9f044b2` | Corrected live API digest, manifest, mutation, signed-file, and expiry matrix | Workspace and user both deleted with `204`; the old token returned `401`. |
+| User `23`, workspace `18`, track `track_KL3HSuls6Y7ezZtt63YXwvZd`, artifact `art_9d38ec588ae3f2a586016c76f9947ee9` | Four-category preview-origin denial and corrected same-key signed-preview retest | Workspace and user both deleted through supported routes with `204`; the old token returned `401`. |
+| User `24`, workspace `19`, track `track_j9ACIFlbwFHbL7INEe_kxwu1`, artifact `art_9ae54568d60a1da71df8db748b16dd42` | Identical denial replay and corrected same-key signed-preview retest | Workspace and user both deleted through supported routes with `204`; the old token returned `401`. |
+| Two intermediate in-memory API principals/workspaces | Unauthorized-origin 500 and relative-preview-URL harness correction | Supported workspace/user deletes ran from `finally`; operator read-back is requested because the deliberate harness exceptions suppressed their cleanup IDs/status output. No credential or token was persisted. |
 | User `8` | Earlier domain/OAuth self-delete repro | Pre-existing cleanup blocker; pending supported operator cleanup only. QA will not attempt credential recovery or raw database deletion. |
 
 No credentials or bearer tokens are recorded. Synthetic records will be removed
-only through supported lifecycle routes. User `8` cannot be removed by this lane
-without its credentials or an authorized admin principal; the implementation or
-control-room lane must perform that final supported cleanup.
+only through supported lifecycle routes. Users `8` and `19` cannot be removed by
+this lane without their credentials or an authorized admin principal; the
+implementation or control-room lane must perform that supported cleanup and
+confirm the two exception-path API fixtures are absent.
 
 ## Remaining coverage for the current deployment family
 
-- Cleanup of pre-existing user `8` by a supported authorized path.
+- Cleanup of users `8` and `19`, plus read-back of the two exception-path API
+  fixtures, by a supported authorized path.
 - Maintainer-specific invitation permissions and activation-after-revoke remain
   fixture-limited; Viewer isolation, Shura, financial sandbox, OAuth/MCP, relay,
   session/password invalidation, exact CORS, and actor/workspace isolation are
   live-green.
-- Signed-receipt attestation binding, discoverability/time-to-value, Maintainer
-  persona coverage, no-store/nosniff, request-ID logging, consistent errors,
-  OpenAPI, and favicon. Activity truthfulness, responsive layout, default theme
-  contrast, and auth-tab semantics are live-green.
+- Discoverability/time-to-value, Maintainer persona coverage,
+  no-store/nosniff, request-ID logging beyond the accepted origin-denial path, consistent
+  errors, OpenAPI, and favicon. Signed-receipt binding, activity truthfulness,
+  responsive layout, default theme contrast, and auth-tab semantics are live-green.
 - Controlled DNS verification/publication/public serving remains fixture-gated;
   it must not be weakened or claimed complete without an external DNS fixture.
 
@@ -235,10 +248,11 @@ request for new platform primitives.
 | P1 | Marketplace buyer/test-driver: evaluate before purchase | Bazaar capability is wired but absent from the observed authenticated cockpit | A published fixture can be found, test-driven before payment, and purchased only through disclosed sandbox escrow |
 | P1 | Private-beta operator: understand platform health and cleanup | Health exists, but request IDs/activity/support surfaces are incomplete | Correlatable safe errors, real activity or explicit empty state, and supported cleanup/recovery without database access |
 | Closed | Private-beta operator: trust displayed activity | Empty account returns zero scoped counts plus explicit empty messages; populated account returns one accessible workspace/user and one real `workspace_created` activity, with no fixed 2024 row | Preserve deterministic accessible-workspace scope and honest empty states |
-| Closed | Generated-card user: read buttons and trust the default theme | Live default/light/mid/dark accents all select readable foregrounds; measured minima are 6.07:1 default, 13.17:1 light, 6.45:1 mid, 11.95:1 dark, and 17.58:1 baseline badge | Preserve &gt;=4.5:1 across arbitrary accepted accents |
-| P1 | Organizer: rely on the signed receipt's exact scope | Visible signature/key, workspace, lifecycle/expiry, exact origins, and reference-only review facts match the positive manifest, but the client verifier compares only artifact/hash/workspace/signature fields; it does not recompute/bind the full manifest or reject expiration | A server attestation or client verification step must bind every displayed signed field, including lifecycle/expiry and all origin categories; missing, altered, mismatched, or expired evidence must never render `Verified` |
+| Closed | Generated-card user: read buttons and trust the default theme | Live default/light/mid/dark accents all select readable foregrounds; measured minima are 6.07:1 default, 13.17:1 light, 6.45:1 mid, 11.95:1 dark, and 17.58:1 baseline badge | Preserve >=4.5:1 across arbitrary accepted accents |
+| Closed | Organizer: rely on the signed receipt's exact scope | Live app `57d9fd1` returns exact `manifestJson` plus SHA-256 digest; the browser and independent mutation matrix bind complete manifest equality, scalar/internal relationships, lifecycle/expiry, and every origin category. Elapsed authorization is attested-expired, never active Verified; missing/corrupt evidence fails closed. | Preserve the exact binding, honest evidence wording, and real-Chromium negative matrix |
 | Closed | Mobile first-session visitor: understand value and custody | Concrete signed/local-first/sandbox and accurate central-retention/Amanah/zero-custody/no-settlement copy remain visible at 400/320px with no overflow; authenticated boundary also remains visible | Preserve compact copy and true 200% reflow regression coverage |
-| P2 | All personas: keyboard, zoom, mobile, and trust comprehension | Semantic landmarks and labels are present in the baseline snapshot; full focus/contrast/reflow testing remains | WCAG 2.1 AA keyboard path, visible focus, 200% zoom/reflow, &gt;=44px targets, and no misleading compliance/custody copy |
+| P2 | All personas: keyboard, zoom, mobile, and trust comprehension | Semantic landmarks and labels are present in the baseline snapshot; full focus/contrast/reflow testing remains | WCAG 2.1 AA keyboard path, visible focus, 200% zoom/reflow, >=44px targets, and no misleading compliance/custody copy |
+| Closed | API integrator/operator: diagnose rejected preview origins safely | Deployment `58d87a23` returned nested `422 invalid_composition` for surface, embedder, connection, and resource denials plus identical replay; no denied response contained a track or raw origin/error, and the same key created a corrected signed preview. All six Railway/application records correlated by trusted edge ID with only `outcome=denied reason=origin_not_verified status=422`; a spoofed client ID was absent. | Preserve strict authority, pre-persistence denial, reusable idempotency, safe trusted request correlation, and non-sensitive telemetry |
 | P2 | API integrator/operator: diagnose and integrate safely | Application responses do not emit their own request ID; sensitive profile/password/dashboard responses inconsistently omit `no-store`/`nosniff`; `/openapi.json` and `/favicon.ico` are real 404s | Consistent safe envelopes and request correlation, sensitive-response hardening, accurate live OpenAPI, and a real favicon |
 
 ### Pre-fix first-session and accessibility evidence — deployment `68914f4c`
@@ -291,56 +305,69 @@ returned 200; no edge 502 recurrence was observed.
 | Preview runtime | **Green** | Exact sandbox `allow-scripts allow-forms`, no `src`, one inline/zero external runtimes, no visible raw-JavaScript pattern; clicking Compose changed the live notice. |
 | Surrounding boundaries | **Green** | Signed file anonymous 401/bearer 200 no-store; Viewer pre-invite 403/post-invite read 200/build 403; Architect and Viewer-read Shura capability 201/Viewer-propose 403; seven financial flows; pending claim publication 409 `publication_claim_unavailable` with track version 6 unchanged; supported workspace/user cleanup 204 and revoked tokens 401. |
 
+## Exact-manifest trust retest — deployment `1bfa3008`
+
+Application commit `57d9fd1`; Railway deployment
+`1bfa3008-319c-49ba-bd52-090da3dbfa5e` terminal `SUCCESS`; image
+`sha256:30bfd3f9eac2037ed991d9194630b38a95aabcc0de74e2b5387e0a7318a9b79b`.
+The implementation gate passed every Go package, 12/12 Node tests including the
+required real-Chromium receipt matrix, clean diff check, and independent review.
+QA accepts the signed-receipt trust gate on this release.
+
+| Area | Result | Evidence |
+|:---|:---|:---|
+| Fresh browser receipt | **Green** | User `19` / workspace `14` built browser artifact `art_b62908753cc1548a6329b118c49bb5e6`. The styled card appeared first and the visible receipt exactly matched raw artifact/hash/workspace, Ed25519 key `railway-artifact-v1`, preview lifecycle/future expiry, the configured surface, and both Hanafi seed references marked reference-only/no scholar approval. |
+| Exact server attestation | **Green** | A separate corrected live API build returned `201`, track `track_k-SFjjcMc1kJ8mX8m6Iy0UUA`, artifact `art_e68a7fb7d695e37e6ed01529c9f044b2`. Independently recomputed SHA-256 of the exact returned `manifestJson` equalled `manifestDigest`; parsing that string produced complete equality with the returned manifest. The positive state was attested, active, and not expired. |
+| Scalar and relationship negatives | **Green** | Artifact ID, content hash, workspace, signature value, algorithm, and key mismatches all withheld active verification. Re-attested source variants with mismatched authorization subject workspace or authorization signer key also withheld it. |
+| Complete authorization negatives | **Green** | Altered lifecycle, changed future expiry, and altered surface/embedder/connection/resource categories all withheld active verification. A consistent elapsed-expiry variant remained attested-expired but not active. Missing attestation, missing digest, corrupt digest, and missing receipt fields all failed closed. |
+| Origin-fixture limit | **Explicit** | Live positive evidence covers the sole configured platform preview surface; there is no verified custom-domain fixture for positive embedder/connection/resource values. The deployed real-Chromium suite supplies positive four-category display plus altered-category rendering coverage. QA does not claim a live verified four-category origin fixture. |
+| Preview runtime and controls | **Green** | Browser iframe sandbox is exactly `allow-scripts allow-forms`; `src` is absent; `srcdoc` is 42,407 bytes with one inline and zero external scripts. The first visible content is the signed card, no raw Datastar appears, Compose announcement reports an approved-host binding, and browser warning/error count is zero. |
+| Signed files | **Green** | Anonymous preview-document GET returned `401`; bearer GET returned `200 text/html`. |
+| Corrected API cleanup | **Green** | Workspace `17` and user `22` both deleted through supported routes with `204`; the old token returned `401`. |
+
+### Closed P1 — preview-origin error mapping
+
+An authenticated otherwise valid preview request supplied syntactically valid
+HTTPS `.example.invalid` values in all four requested-origin categories. The
+authority correctly denied them because preview composition permits only the
+configured platform origin plus currently verified workspace origins. The
+response mapping is defective: it returned generic
+`500 composition_operation_failed` rather than a deterministic client-error
+envelope.
+
+Railway correlation: request `jOSPCuB7RquAXedUnPRhug`,
+`2026-08-18T07:00:15.097285737Z`, `POST /api/artifacts/preview`, HTTP 500,
+4 ms total/upstream, deployment `1bfa3008-319c-49ba-bd52-090da3dbfa5e`,
+instance `e882c02b-11f8-4edd-8d33-290171740787`, edge `us-west2`, no upstream
+error. It reached the Go service at port 8080; no edge failure, panic, restart,
+or deploy anomaly occurred. Bounded runtime logs had no request-correlated
+composition reason. Source correlation supports the path:
+`AuthorizeOriginsForLifecycle` returns `ErrOriginNotVerified`, conductor records
+`preview_origin_denied`, and `writeCompositionServiceError` lacks a mapping, so
+the default 500 is selected.
+
+Deployment `58d87a23-6037-4cc5-8151-09b37167cef5` closes the defect. Fresh live
+surface, embedder, connection, and resource denials returned nested `422
+invalid_composition`, no raw origin/error and no track. An identical denial
+replay returned the same result without conflict; correcting that same
+idempotency key created a `201` signed preview, proving denial did not consume
+durable idempotency. The corrected previews retained exact digest/manifest
+attestation, future active authorization, anonymous file `401`, and bearer file
+`200`.
+
+Railway/application correlation covered six denial request IDs:
+`ksBVqyneRiKSaNIF2h0iww`, `ZsqIokUqTjyW7WV22h0iww`,
+`oucc7CmTRWyM6rukYqVb7A`, `GNmwx0NxSt6IUbAvYqVb7A`,
+`qP_sHpd1Qm-KUBG7xtoGcA`, and `zAtxCfb2Rky1F6C50_TJvA`. Each edge response was
+`422` in 3–6 ms without upstream error; the matching application event contained
+only the trusted request ID plus `outcome=denied`,
+`reason=origin_not_verified`, and `status=422`. No origin, principal, email,
+token, payload, database cause, track, artifact, or client-spoofed request ID was
+logged. This technical gate is accepted.
+
 ## Acceptance rule
 
 Sign-off requires zero open P0/P1 findings, a real-browser sellable journey, green
 deployment/tests, a final comprehensive regression pass with no new failures, and
 explicit limitation of remaining gaps to external DNS or the documented
 federation/TURN/E2EE deferrals.
-
-## Implementation handoff awaiting independent retest
-
-Application commit `57d9fd1` addresses the receipt-attestation scope finding by
-binding the trusted server's exact serialized manifest to a SHA-256 digest and
-requiring the browser to recompute and compare the complete rendered manifest.
-The active verified state additionally requires matching artifact, content,
-workspace, signature algorithm/key/value, internal subject/signer relationships,
-and a future authorization expiry. Expired authentic evidence is labelled
-signed-and-expired; missing, altered, inconsistent, or expired authorization does
-not display the active `Verified` claim.
-
-The implementation gate passed all Go package/command tests, 12/12 Node tests
-including required real Chromium, `git diff --check`, and independent source/test
-review. Railway deployment `1bfa3008-319c-49ba-bd52-090da3dbfa5e` reached
-terminal `SUCCESS`; direct public probes returned `200` for `/api/health`
-(`status=ok`) and `/` with the Taawun cockpit title. QA acceptance and persona
-discoverability work remain paused until the independent live retest completes.
-
-## Origin-denial implementation handoff awaiting independent retest
-
-QA accepted the exact-manifest trust gate on application commit `57d9fd1` and
-Railway deployment `1bfa3008-319c-49ba-bd52-090da3dbfa5e`. The sole technical
-P1 then became the generic `500` returned for a correctly rejected unverified
-preview origin.
-
-Application commit `e269126` authorizes and normalizes requested preview origins
-before creating durable draft/idempotency state, rechecks authority before
-validation/signing, and maps expected surface/embedder/connection/resource
-denial to nested `422 invalid_composition`. A revocation race leaves a resumable
-staged track with no build request or artifact. Logs contain only a bounded
-trusted/generated request ID, fixed outcome/reason, and status; customer and
-credential fields are excluded.
-
-The implementation gate passed all Go packages/commands, 12/12 Node tests with
-required real Chromium, verifier-requested focused assertions, `git diff
---check`, and independent approval. Railway deployment
-`58d87a23-6037-4cc5-8151-09b37167cef5` reached terminal `SUCCESS`; public health
-and cockpit probes returned `200`. Live denial/retry/telemetry acceptance remains
-pending.
-
-Supported cleanup has not been claimed: user `19`/workspace `14` is observed;
-users/workspaces `20`/`15` and `21`/`16` remain inference-only pending readback;
-user `22`/workspace `17` is observed clean. Existing admin lifecycle routes
-require an authenticated admin principal, but the deployment exposes no
-configured bootstrap-admin environment to this lane. No fixture data was read
-or changed, and no raw database or token-minting path was used.
