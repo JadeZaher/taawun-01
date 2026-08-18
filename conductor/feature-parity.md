@@ -12,13 +12,13 @@ but it is not silently removed from the product workflow.
 
 | Product capability | MVP experience that must ship | Current implementation state | Ship gate |
 |:---|:---|:---|:---|
-| Vibecoding builder | Prompt/select, compose modules, theme, audit, preview, publish, and deploy | Authenticated cockpit is wired to the real catalog, Conductor preview, domain, and publication APIs; local browser QA passes through signed preview | Complete controlled DNS verification and public-host publish smoke test |
+| Vibecoding builder | Prompt/select, compose modules, theme, audit, preview, publish, and deploy | Authenticated cockpit is wired to the real catalog, Conductor preview, domain, and publication APIs; local browser QA and live Railway API QA pass through signed preview and TXT challenge issuance | Complete controlled DNS verification and public-host publish smoke test |
 | Declarative composition | LLM configures pages, ordered slots, primitive instances, safe content, and theme tokens without arbitrary server code | Catalog and fixed compositions implemented | Signed composition spec must round-trip through MCP, preview, card, embed, and monolith outputs |
 | Immutable artifacts | Versioned manifest, content-addressed assets, staging preview, tamper detection | Signed builder, preview-file adapter, bundled pinned Datastar runtime, and HTTP/MCP verification implemented | Hosted lifecycle verification against a customer-controlled hostname |
 | Modular delivery | Signed cards served on approved domains, isolated embeds, and monolithic composition | Card/embed/monolith outputs and Host-bound public serving implemented | Connect every primitive to its runtime/server adapter |
 | Theming | Swiss geometric default with validated organization tokens | Builder manifest and central UI in progress | Accessible validated tokens across all adapters |
 | Approved domains | Workspace owner claims a hostname, proves control, and can revoke it; cards are host-bound | DNS proof, revocation, activation history, rollback, and verified public delivery implemented | External TLS/custom-host routing runbook and integrated test |
-| Taawun identity | Registration, login, workspace membership, secure sessions | Registration/login/workspaces work in the cockpit; strict bounded public JSON, throttles, session versions, and password invalidation are implemented | Deploy with production secrets and operator account policy |
+| Taawun identity | Registration, login, workspace membership, secure sessions | Registration/login/workspaces work in the cockpit and on the live Railway service; strict bounded public JSON, throttles, session versions, and password invalidation are implemented | Define private-beta operator account and retention policy |
 | LLM access | User authorizes our LLM or a third-party MCP client through OAuth 2.1/PKCE; optional named tokens support developer automation | OAuth discovery, CIMD/DCR, consent, token rotation/revocation, and MCP scope gates implemented | Real external MCP-client authorization smoke test |
 | Shura governance | Architect/Maintainer/Viewer invitations, signed capabilities, revocation, audit trail | Signed capabilities, invitations, quorum, votes, decisions, JWKS, audit, and invite-to-workspace membership are composed into the service root | Add customer-facing governance UI/card workflows |
 | Local-first state | IndexedDB-backed convergent collections, offline edits, deterministic merge | Runtime, replay, merge, BroadcastChannel, WebRTC, and encrypted relay fallback implemented | Live two-device signed relay demonstration |
@@ -38,7 +38,7 @@ but it is not silently removed from the product workflow.
 | Relay federation | Independent nodes exchange authenticated opaque relay coordination | Local signed relay sessions implemented | Configured node trust and failure isolation |
 | AZOA federation | Signed cross-node settlement intents and receipts | Signed envelope/replay boundary implemented | Durable inbox/outbox and sandbox cross-node demonstration |
 | Notifications | Workspace-scoped operational activity | Existing service under authorization hardening | Builder/Shura/Bazaar event integration |
-| Deployability | Central Railway service, persistent data, health/readiness, documented env | Canonical non-root/read-only Go 1.25 container and verified local builds/browser journey are ready | Verified Railway deployment and live QA documentation |
+| Deployability | Central Railway service, persistent data, health/readiness, documented env | Railway production service is live with persistent `/data`, exact-origin variables, sealed secrets, and a service-level `/api/health` gate; authenticated live QA is documented | Add backup/restore drill and customer-domain operations runbook |
 
 ## Honest boundary
 

@@ -1,6 +1,6 @@
 # Taawun sellable-MVP checkpoint passoff
 
-Checkpoint date: 2026-08-17
+Checkpoint date: 2026-08-17 (deployed 2026-08-18 UTC)
 
 This is the private-beta product checkpoint for deployment, not a claim that
 every future federation or key-management capability is finished. The hosted
@@ -73,6 +73,12 @@ orchestration remain server-owned. No generated app contains a ledger.
 - Standalone authenticated relay binary and signed AZOA federation envelopes.
 - Canonical Go 1.25 non-root/read-only container, persistent `/data`, corrected
   `/api/health` checks, and hardened SQLite WAL/foreign-key/busy-timeout settings.
+- Railway production service `taawun` is live at
+  `https://taawun-production.up.railway.app`; deployment
+  `80feecc7-e5fe-49cc-8cfa-858a64e86cee` passed the Railway `/api/health` gate.
+  Live registration, login, workspace creation, catalog inspection, signed
+  preview composition/serving, domain claim, and missing-proof behavior are
+  recorded in `docs/deployment-live-qa.md`.
 
 ## Verification evidence
 
@@ -86,8 +92,9 @@ go build -trimpath -o <temp>/taawun-relay.exe ./src/cmd/relay
 git diff --check
 ```
 
-Docker/Compose execution was not available because Docker is not installed in
-this desktop environment. The Compose health path was corrected by inspection.
+Docker/Compose execution was not available on the desktop because Docker is not
+installed. Railway built the repository Dockerfile successfully and promoted
+the same source checkpoint after its service-level health check passed.
 
 ## Screenshots
 
@@ -123,12 +130,9 @@ These remain intentionally deferred or operator-owned:
 
 ## Recommended continuation order
 
-1. Deploy this exact checkpoint to the existing Railway project and record the
-   service, deployment, public health route, and browser route in
-   `docs/deployment-live-qa.md`.
-2. Complete one controlled customer-DNS claim, fresh signed preview, activation,
+1. Complete one controlled customer-DNS claim, fresh signed preview, activation,
    and public-host smoke test before onboarding a customer.
-3. Add the deliberately deferred device-key envelopes, relay/ICE
+2. Add the deliberately deferred device-key envelopes, relay/ICE
    interoperability, and durable federation only when their operator model is
    chosen.
 

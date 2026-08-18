@@ -75,8 +75,10 @@ to the control-plane CORS allowlist. Public cards are served only by exact Host
 after a verified-domain publication; central `/api` access remains limited to
 the Taawun application origin.
 
-The Railway live-QA deployment details are recorded in
-`docs/deployment-live-qa.md` once the checkpoint is promoted.
+The promoted private-beta checkpoint is live at
+<https://taawun-production.up.railway.app>. Deployment identifiers, health
+configuration, authenticated journey results, and the controlled-DNS acceptance
+boundary are recorded in `docs/deployment-live-qa.md`.
 
 ## Explicitly deferred
 
