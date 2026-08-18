@@ -95,8 +95,42 @@ The first remediation batch now:
 
 Integrated source verification passed 11/11 Node tests (including headless
 Chrome), all Go package/command tests, both production binary builds, and
-`git diff --check`. Railway deployment and paired live retest are the next gate;
-their identifiers will be appended without replacing the original baseline.
+`git diff --check`.
+
+The functional fixes were committed as `a484bfe`. The first upload,
+`db2bf81c-c68d-4ecf-a949-f3fa240c69af`, failed before application startup
+because the Windows deployment archive materialized the container entrypoint
+with a CRLF shebang. Commit `9748666` pins `docker-entrypoint.sh` to LF and
+makes the Docker build reject a wrong shebang or any CR byte. Deployment
+`68914f4c-a916-43f7-b0bf-fbd578c25f43` then reached Railway `SUCCESS`; live
+health and cockpit promotion checks both returned `200`.
+
+Paired QA confirmed the signed-preview renderer, invalid-composition response,
+Railway-aware registration throttle, authenticated ethics audit, pending-claim
+publication response, and relay origin/identity binding live-green on that
+deployment. The broader lifecycle/role and synthetic Bazaar matrix remains in
+progress, so this is not a final private-beta sign-off.
+
+### Transient Railway edge incident
+
+Between `2026-08-18T05:10:13Z` and `05:10:43Z`, Railway's public edge returned
+two aggregate `502` responses for both the constant in-memory health endpoint
+and the embedded cockpit root. The same deployment recovered without a new
+release by approximately `05:11Z`.
+
+The bounded investigation found no application-level `5xx`, panic, exit, OOM,
+second container start, or health-handler dependency. The same instance remained
+`RUNNING`; CPU and memory were continuous and flat, no dropped network flow was
+recorded, and service ingress/egress was zero during the edge window before
+resuming. The evidence therefore supports a transient Railway edge/routing
+interruption, with **zero application-observed restarts**. Railway's internal
+restart counter was not exposed by the available interface.
+
+The release was deliberately not redeployed. Independent recovery checks passed
+8/8, followed by a five-minute low-rate soak of `/api/health` and `/`: 120/120
+responses were `200`, with `337.5 ms` p95 and `519.3 ms` maximum latency. A
+future recurrence must capture the Railway edge upstream reason and instance
+event before attributing it to application code.
 
 ## Acceptance boundary
 

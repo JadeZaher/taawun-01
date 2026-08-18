@@ -347,10 +347,12 @@ historical evidence.
 
 Current remediation status:
 
-- **Locally verified, awaiting Railway live retest:** iframe/runtime corruption,
-  invalid-composition classification, Railway registration attribution,
-  account deletion lifecycle, verified-claim publication state, and the private
-  authenticated ethics-audit boundary.
+- **Live-green on deployment `68914f4c-a916-43f7-b0bf-fbd578c25f43`:**
+  iframe/runtime rendering, invalid-composition classification, Railway
+  registration attribution, pending-claim publication state, private
+  authenticated ethics-audit boundaries, and relay identity/origin binding.
+- **Still under live QA:** account deletion lifecycle, remaining role contracts,
+  responsive/accessibility details, and the synthetic Bazaar sandbox journey.
 - **Still green and protected:** identity/workspace isolation, signed preview and
   event integrity, invitation membership, Shura decisions, financial actor
   injection defense, sandbox quest lifecycle, exact-origin claims, customer CORS,
@@ -359,6 +361,13 @@ Current remediation status:
   and Bazaar purchase need an operator-provided live domain and suitable published
   listing/decision fixtures. These boundaries must not be weakened to manufacture
   a green result.
+
+An all-route Railway edge `502` window occurred for roughly 30 seconds after
+promotion and self-recovered without a new deployment. Runtime/resource evidence
+showed zero application-observed restarts and no matching application `5xx`; an
+independent 8/8 recovery gate and a 120/120 five-minute health/root soak passed.
+It is tracked as a transient edge/routing incident unless new platform evidence
+identifies an application cause.
 
 Ranked next increments after baseline QA signs off:
 
