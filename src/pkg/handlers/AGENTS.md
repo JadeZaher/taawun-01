@@ -13,6 +13,11 @@ Artifact downloads are content-addressed and immutable. Every read goes through
 the artifact package's manifest and file-digest verification before bytes are
 served. Never join a URL path directly to the artifact output root.
 
+Preview responses expose a positive receipt-verification state only after the
+artifact store reopens and verifies the complete signed bundle. The browser
+must bind that state to the returned artifact, workspace, and signer fields;
+signature-shaped client data alone is never evidence of verification.
+
 ## Railway client attribution
 
 Public throttles may accept Railway's documented `X-Real-IP` only when the

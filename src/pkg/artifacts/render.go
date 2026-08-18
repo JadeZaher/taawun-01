@@ -376,6 +376,17 @@ func renderThemeCSS(accent string) []byte {
 }
 
 func contrastColor(hexColor string) string {
+	background := relativeLuminance(hexColor)
+	if contrastRatio(background, relativeLuminance("#FFFFFF")) >= 4.5 {
+		return "#FFFFFF"
+	}
+	if contrastRatio(background, relativeLuminance("#161A17")) >= 4.5 {
+		return "#161A17"
+	}
+	return "#000000"
+}
+
+func relativeLuminance(hexColor string) float64 {
 	components := make([]float64, 0, 3)
 	for offset := 1; offset < len(hexColor); offset += 2 {
 		value, _ := strconv.ParseUint(hexColor[offset:offset+2], 16, 8)
@@ -387,9 +398,12 @@ func contrastColor(hexColor string) string {
 		}
 		components = append(components, channel)
 	}
-	luminance := 0.2126*components[0] + 0.7152*components[1] + 0.0722*components[2]
-	if luminance > 0.42 {
-		return "#161A17"
+	return 0.2126*components[0] + 0.7152*components[1] + 0.0722*components[2]
+}
+
+func contrastRatio(left, right float64) float64 {
+	if right > left {
+		left, right = right, left
 	}
-	return "#FFFFFF"
+	return (left + 0.05) / (right + 0.05)
 }

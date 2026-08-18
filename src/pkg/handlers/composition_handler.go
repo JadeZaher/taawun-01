@@ -34,6 +34,7 @@ type CompositionService interface {
 }
 
 type compositionArtifactReader interface {
+	Open(context.Context, string) (artifacts.BuildResult, error)
 	ReadFile(context.Context, string, string) (artifacts.ArtifactFile, error)
 }
 
@@ -149,9 +150,19 @@ func (h *CompositionHTTPHandler) Preview(w http.ResponseWriter, r *http.Request)
 		writeCompositionError(w, http.StatusConflict, "preview_not_ready", "The composition did not reach a signed preview.")
 		return
 	}
+	opened, err := h.artifacts.Open(r.Context(), result.Track.Artifact.ContentHash)
+	if err != nil || opened.ArtifactID != result.Track.Artifact.ArtifactID || opened.ContentHash != result.Track.Artifact.ContentHash || opened.Manifest.WorkspaceID != result.Track.WorkspaceID || result.Track.Preview.ContentHash != opened.ContentHash {
+		writeCompositionError(w, http.StatusConflict, "preview_integrity_error", "The signed preview could not be verified.")
+		return
+	}
 	preview := compositionPreviewURLs(result.Track)
 	writeCompositionJSON(w, http.StatusCreated, map[string]any{
-		"track": result.Track, "created": result.Created, "manifest": result.Track.Artifact.Manifest,
+		"track": result.Track, "created": result.Created, "manifest": opened.Manifest,
+		"verification": map[string]any{
+			"status": "verified", "verified": true,
+			"artifactId": opened.Manifest.ArtifactID, "contentHash": opened.Manifest.ContentHash, "workspaceId": opened.Manifest.WorkspaceID,
+			"signatureAlgorithm": opened.Manifest.Signature.Algorithm, "signerKeyId": opened.Manifest.Signature.KeyID, "signatureValue": opened.Manifest.Signature.Value,
+		},
 		"preview": preview, "previewUrl": preview.DocumentURL,
 	})
 }

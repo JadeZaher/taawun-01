@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+const baselineContrastCSS = `.taawun-baseline{border-color:#FFFFFF;color:#FFFFFF;background:var(--taawun-color-ink)}`
+
 type previewView struct {
 	Language         string
 	Title            string
@@ -64,7 +66,7 @@ func renderPreviewDocuments(request BuildRequest, definition templateDefinition,
 	files := map[string][]byte{
 		"index.html":      indexHTML,
 		"embed.html":      embedHTML,
-		"app.css":         []byte(applicationCSS),
+		"app.css":         []byte(applicationCSS + baselineContrastCSS),
 		"embed-loader.js": renderEmbedLoader(request.Modules),
 	}
 	for _, module := range modules {

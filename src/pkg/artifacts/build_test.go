@@ -112,6 +112,33 @@ func TestBuildPublishesCompleteContentAddressedBundle(t *testing.T) {
 			t.Fatalf("theme token %q is missing or not namespaced", token)
 		}
 	}
+	appCSS := string(readBundleFile(t, result.Directory, "app.css"))
+	if !strings.Contains(appCSS, baselineContrastCSS) {
+		t.Fatal("hero baseline must keep an opaque high-contrast surface above every accent gradient")
+	}
+}
+
+func TestAccentForegroundAlwaysMeetsNormalTextContrast(t *testing.T) {
+	accents := []string{
+		"#57A68E", // cockpit default
+		"#F4ECDD", // light
+		"#777777", // mid-luminance fallback edge
+		"#0F766E", // dark
+		"#161A17", // very dark
+	}
+	for _, accent := range accents {
+		foreground := contrastColor(accent)
+		ratio := contrastRatio(relativeLuminance(accent), relativeLuminance(foreground))
+		if ratio < 4.5 {
+			t.Errorf("accent %s selected %s at %.2f:1, want at least 4.5:1", accent, foreground, ratio)
+		}
+	}
+	if got := contrastColor("#57A68E"); got != "#161A17" {
+		t.Fatalf("default accent foreground = %s, want Swiss ink", got)
+	}
+	if ratio := contrastRatio(relativeLuminance("#161A17"), relativeLuminance("#FFFFFF")); ratio < 4.5 {
+		t.Fatalf("baseline ink/white contrast = %.2f:1, want at least 4.5:1", ratio)
+	}
 }
 
 func TestBuildIsStableAndNeverOverwritesExistingArtifact(t *testing.T) {

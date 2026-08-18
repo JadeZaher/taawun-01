@@ -32,7 +32,7 @@
     }
 
     * { box-sizing: border-box; }
-    html { min-width: 320px; background: var(--ink); }
+    html { background: var(--ink); }
     body { margin: 0; min-height: 100vh; background: var(--ink); color: var(--parchment); font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
     body::before {
       content: "";
@@ -106,7 +106,8 @@
     .auth-story { min-height: 560px; padding: 52px; border-right: 1px solid var(--line-strong); display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(135deg, rgba(60, 114, 99, 0.2), transparent 58%); }
     .auth-story h1 { max-width: 9ch; margin-top: 56px; font: 500 clamp(38px, 5vw, 58px)/1.03 var(--serif); letter-spacing: -0.025em; }
     .auth-story h1 em { color: var(--emerald-bright); font-weight: 400; }
-    .auth-story p { max-width: 48ch; color: var(--parchment-dim); }
+    .auth-story p { max-width: 48ch; color: var(--parchment-dim); font-size: 14px; line-height: 1.55; }
+    .auth-story p strong { color: var(--parchment); font-weight: 500; }
     .auth-verse { margin-top: 28px; padding-left: 15px; border-left: 2px solid var(--gold); color: var(--gold); font: italic 15px/1.5 var(--serif); }
     .auth-panel { padding: 52px 42px; align-self: center; }
     .auth-panel h2 { margin: 12px 0 8px; font: 500 30px/1.15 var(--serif); }
@@ -269,22 +270,24 @@
     @media (max-width: 880px) {
       .cockpit { display: block; }
       .rail { position: static; width: 100%; height: auto; padding: 13px 20px; border-right: 0; border-bottom: 1px solid var(--line); }
-      .rail-title, .rail-boundary { display: none; }
+      .rail-title { display: none; }
       .step-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: 0; }
       .step { min-height: 0; padding: 30px 4px 0; text-align: center; }
       .step:not(:last-child)::after { left: calc(50% + 14px); right: calc(-50% + 14px); top: 11px; bottom: auto; width: auto; height: 1px; }
       .step::before { left: 50%; transform: translateX(-50%); }
       .step span { display: none; }
       .step strong { font-size: 10px; }
+      .rail-boundary { margin-top: 12px; padding-top: 12px; }
+      .rail-boundary p { max-width: 68ch; margin-top: 4px; }
       .builder-grid { grid-template-columns: 1fr; }
       .preview-frame, .preview-frame-wrap, .preview-empty { min-height: 480px; height: 480px; }
     }
     @media (max-width: 720px) {
       .auth-view { padding: 16px; }
       .auth-shell { grid-template-columns: 1fr; }
-      .auth-story { min-height: 280px; padding: 30px; border-right: 0; border-bottom: 1px solid var(--line-strong); }
-      .auth-story h1 { margin-top: 42px; font-size: 39px; }
-      .auth-story p { display: none; }
+      .auth-story { min-height: 0; padding: 28px; border-right: 0; border-bottom: 1px solid var(--line-strong); }
+      .auth-story h1 { margin-top: 30px; font-size: 37px; }
+      .auth-story p { margin-top: 26px; font-size: 13px; line-height: 1.45; }
       .auth-panel { padding: 34px 28px; }
       .topbar { padding: 0 16px; }
       .beta-tag, .session-copy { display: none; }
@@ -301,13 +304,49 @@
       .preview-frame, .preview-frame-wrap, .preview-empty { min-height: 410px; height: 410px; }
       .preview-empty { padding: 28px; }
     }
+    @media (max-width: 240px) {
+      .auth-view { padding: 8px; }
+      .auth-shell, .auth-story, .auth-panel, .auth-form, .field, .tabs { min-width: 0; }
+      .auth-shell { width: 100%; }
+      .auth-story { padding: 18px; }
+      .auth-story h1 { font-size: 30px; overflow-wrap: anywhere; }
+      .auth-story p, .auth-panel > p { overflow-wrap: anywhere; }
+      .auth-panel { padding: 24px 14px; }
+      .tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .tab { font-size: 10px; letter-spacing: 0; overflow-wrap: anywhere; }
+      .topbar { position: static; height: auto; min-height: 64px; flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
+      .topbar-left, .topbar-right { width: 100%; justify-content: space-between; gap: 8px; }
+      .logout { padding-left: 8px; }
+      .cockpit { min-height: 0; }
+      .rail { padding: 12px 8px; }
+      .step-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 4px; }
+      .step:not(:last-child)::after { display: none; }
+      .rail-boundary p { overflow-wrap: anywhere; }
+      .workspace { padding: 18px 8px; }
+      .workspace * { min-width: 0; overflow-wrap: anywhere; }
+      .workspace, .workspace-header, .builder-grid, .panel, .panel-head, .panel-body, .builder-form, .subhead, .workspace-picker, .workspace-state, .template-card, .template-card-top, .composition-contract, .module-list, .module-option, .color-control, .build-actions, .preview-column, .preview-toolbar, .contract-grid, .contract-section, .contract-body, .deploy-strip { min-width: 0; }
+      .workspace-header h1 { font-size: 26px; overflow-wrap: anywhere; }
+      .build-state { min-width: 0; }
+      .panel-head, .subhead, .template-card-top, .preview-toolbar, .boundary strong { flex-wrap: wrap; }
+      .panel-head, .panel-body, .contract-head, .contract-body { padding-inline: 10px; }
+      .template-card { padding: 10px; }
+      .template-badge { white-space: normal; }
+      .module-option { gap: 6px; padding: 8px; }
+      .preview-empty { padding: 15px; }
+      .empty-star { width: 52px; height: 52px; }
+      .empty-star::before, .empty-star::after { inset: 10px -10px; }
+      .preview-empty h3 { font-size: 20px; }
+      .contract-grid, .manifest-row, .adapter { grid-template-columns: 1fr; }
+      .deploy-strip { padding-inline: 10px; }
+      .button, input, select, textarea { max-width: 100%; overflow-wrap: anywhere; }
+    }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
     }
   </style>
 </head>
 <body>
-  <a class="skip-link" href="#mainContent">Skip to builder</a>
+  <a id="skipLink" class="skip-link" href="#authPanel">Skip to account access</a>
 
   <main id="authView" class="auth-view">
     <div class="auth-shell">
@@ -317,22 +356,22 @@
           <h1 id="authStoryTitle">Build for your <em>community.</em></h1>
           <div class="auth-verse">“And cooperate in righteousness and piety.” — Qur’an 5:2</div>
         </div>
-        <p>One honest app for private beta: fixed community modules, visible trust boundaries, and a working staging artifact before deployment.</p>
+        <p><strong>Workspace-signed artifacts, local-first records, and honest sandbox actions.</strong> Taawun centrally keeps identity, signed artifacts, and explicit transactional control records—not local community state or funds. Relay transit stays encrypted: an Amanah boundary with zero custody and no settlement.</p>
       </section>
 
-      <section class="auth-panel" aria-labelledby="authTitle">
+      <section id="authPanel" class="auth-panel" aria-labelledby="authTitle" tabindex="-1">
         <div class="eyebrow">Private beta · Architect access</div>
         <h2 id="authTitle">Enter the builder</h2>
         <p>Your session stays in this browser tab and clears when you sign out or reload.</p>
 
         <div class="tabs" role="tablist" aria-label="Account access">
-          <button id="loginTab" class="tab" type="button" role="tab" aria-selected="true" aria-controls="loginForm" data-auth-tab="login">Sign in</button>
-          <button id="registerTab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="registerForm" data-auth-tab="register">Create account</button>
+          <button id="loginTab" class="tab" type="button" role="tab" aria-selected="true" aria-controls="loginForm" tabindex="0" data-auth-tab="login">Sign in</button>
+          <button id="registerTab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="registerForm" tabindex="-1" data-auth-tab="register">Create account</button>
         </div>
 
         <div id="authAlert" class="notice auth-alert" role="alert" aria-live="polite"></div>
 
-        <form id="loginForm" class="auth-form" aria-labelledby="loginTab">
+        <form id="loginForm" class="auth-form" role="tabpanel" aria-labelledby="loginTab">
           <div class="field">
             <label class="required" for="loginEmail">Email</label>
             <input id="loginEmail" name="email" type="email" autocomplete="email" required>
@@ -344,7 +383,7 @@
           <button id="loginButton" class="button" type="submit">Sign in</button>
         </form>
 
-        <form id="registerForm" class="auth-form" aria-labelledby="registerTab" hidden>
+        <form id="registerForm" class="auth-form" role="tabpanel" aria-labelledby="registerTab" hidden>
           <div class="field">
             <label class="required" for="registerUsername">Username</label>
             <input id="registerUsername" name="username" type="text" autocomplete="username" minlength="3" maxlength="60" required>
@@ -355,8 +394,8 @@
           </div>
           <div class="field">
             <label class="required" for="registerPassword">Password</label>
-            <input id="registerPassword" name="password" type="password" autocomplete="new-password" minlength="12" required>
-            <div class="field-help">Use at least 12 characters.</div>
+            <input id="registerPassword" name="password" type="password" autocomplete="new-password" minlength="12" aria-describedby="registerPasswordHelp" required>
+            <div id="registerPasswordHelp" class="field-help">Use at least 12 characters.</div>
           </div>
           <button id="registerButton" class="button" type="submit">Create account</button>
         </form>
@@ -634,14 +673,22 @@
       button.setAttribute('aria-busy', String(busy));
     }
 
-    function switchAuthTab(tab) {
+    function setSkipDestination(targetId, label) {
+      const link = element('skipLink');
+      link.setAttribute('href', `#${targetId}`);
+      link.textContent = label;
+    }
+
+    function switchAuthTab(tab, { focusTab = false } = {}) {
       const login = tab === 'login';
       element('loginTab').setAttribute('aria-selected', String(login));
       element('registerTab').setAttribute('aria-selected', String(!login));
+      element('loginTab').tabIndex = login ? 0 : -1;
+      element('registerTab').tabIndex = login ? -1 : 0;
       element('loginForm').hidden = !login;
       element('registerForm').hidden = login;
       setNotice(element('authAlert'), '');
-      (login ? element('loginEmail') : element('registerUsername')).focus();
+      if (focusTab) (login ? element('loginTab') : element('registerTab')).focus();
     }
 
     function clearSession() {
@@ -690,14 +737,15 @@
       clearSession();
       element('appView').hidden = true;
       element('authView').hidden = false;
+      setSkipDestination('authPanel', 'Skip to account access');
       setNotice(element('authAlert'), message, message ? 'error' : '');
-      element('loginEmail').focus();
     }
 
     async function enterBuilder(loginUser) {
       state.user = loginUser || state.user;
       element('authView').hidden = true;
       element('appView').hidden = false;
+      setSkipDestination('mainContent', 'Skip to builder');
       renderProfile(state.user);
       await Promise.allSettled([loadProfile(), loadWorkspaces(), loadTemplate()]);
       updatePreviewAvailability();
@@ -981,17 +1029,74 @@
       list.append(row);
     }
 
-    function renderManifest(manifest) {
+    function verifiedManifestReceipt(source, verification) {
+      const authorization = source.authorization && typeof source.authorization === 'object' ? source.authorization : {};
+      const subject = authorization.subject && typeof authorization.subject === 'object' ? authorization.subject : {};
+      const signature = source.signature && typeof source.signature === 'object' ? source.signature : {};
+      return Boolean(verification && verification.verified === true && verification.status === 'verified'
+        && verification.artifactId === source.artifactId
+        && verification.contentHash === source.contentHash
+        && Number.isInteger(source.workspaceId) && verification.workspaceId === source.workspaceId
+        && subject.workspaceId === source.workspaceId
+        && authorization.signerKeyId === signature.keyId
+        && verification.signatureAlgorithm === signature.algorithm
+        && verification.signerKeyId === signature.keyId
+        && verification.signatureValue === signature.value
+        && signature.value);
+    }
+
+    function manifestOrigins(policy) {
+      const labels = [['surfaces', 'Surface'], ['embedders', 'Embedder'], ['connections', 'Connection'], ['resources', 'Resource']];
+      const origins = labels.flatMap(([field, label]) => Array.isArray(policy && policy[field])
+        ? policy[field].map((origin) => `${label}: ${origin}`)
+        : []);
+      return origins.join(' · ') || 'No exact origins listed';
+    }
+
+    function manifestLifecycle(authorization) {
+      const lifecycle = authorization && authorization.lifecycle ? String(authorization.lifecycle) : 'Lifecycle not provided';
+      const expiresAt = authorization && authorization.expiresAt;
+      const parsed = expiresAt ? Date.parse(expiresAt) : NaN;
+      if (!Number.isFinite(parsed)) return `${lifecycle} · expiry not provided`;
+      const expiry = new Date(parsed).toISOString();
+      return `${lifecycle} · expires ${expiry}${parsed <= Date.now() ? ' · expired' : ''}`;
+    }
+
+    function manifestReviewReferences(compliance) {
+      const references = compliance && Array.isArray(compliance.references) ? compliance.references : [];
+      const summary = references.map((reference) => {
+        if (!reference || typeof reference !== 'object') return String(reference);
+        const identity = reference.id || reference.title || 'Unnamed reference';
+        return `${identity}${reference.status ? ` (${reference.status})` : ''}`;
+      }).join(', ') || 'No review references supplied';
+      return `${summary} · Reference-only; not scholar approval`;
+    }
+
+    function renderManifest(manifest, verification) {
       const list = element('manifestList');
       list.replaceChildren();
       const source = manifest && typeof manifest === 'object' ? manifest : { manifest };
+      const authorization = source.authorization && typeof source.authorization === 'object' ? source.authorization : {};
+      const subject = authorization.subject && typeof authorization.subject === 'object' ? authorization.subject : {};
+      const signature = source.signature && typeof source.signature === 'object' ? source.signature : {};
+      const receiptVerified = verifiedManifestReceipt(source, verification);
       appendManifestRow(list, 'Contract', source.contractVersion);
       appendManifestRow(list, 'Artifact', source.artifactId);
       appendManifestRow(list, 'Content hash', source.contentHash);
+      appendManifestRow(list, 'Signature verification', receiptVerified ? 'Verified by Taawun build service' : 'Verification unavailable — do not rely on this receipt');
+      appendManifestRow(list, 'Signing key', signature.algorithm && signature.keyId
+        ? `${signature.algorithm} · ${signature.keyId}${receiptVerified ? '' : ' · not trusted by this receipt'}`
+        : 'Signing key not provided');
+      appendManifestRow(list, 'Workspace binding', Number.isInteger(source.workspaceId) && subject.workspaceId === source.workspaceId
+        ? `Workspace ${source.workspaceId}`
+        : (source.workspaceId || subject.workspaceId ? 'Workspace binding mismatch' : 'Workspace binding not provided'));
+      appendManifestRow(list, 'Lifecycle / expiry', manifestLifecycle(authorization));
+      appendManifestRow(list, 'Exact allowed origins', manifestOrigins(authorization.allowedOrigins));
       appendManifestRow(list, 'Template', source.template && (source.template.id ? `${source.template.id} · v${source.template.version || '?'}` : source.template));
       appendManifestRow(list, 'Modules', source.modules);
       appendManifestRow(list, 'Render modes', source.renderModes);
       appendManifestRow(list, 'Compliance', source.compliance && (source.compliance.status || source.compliance));
+      appendManifestRow(list, 'Review references', manifestReviewReferences(source.compliance));
       appendManifestRow(list, 'Financial', source.financial && (source.financial.status || source.financial));
       element('manifestEmpty').hidden = true;
       list.hidden = false;
@@ -1022,7 +1127,7 @@
         preview.documentUrl = safePreviewURL(preview.documentUrl || previewURL);
         preview.themeUrl = safePreviewURL(preview.themeUrl);
         preview.stylesUrl = safePreviewURL(preview.stylesUrl);
-        renderManifest(result.manifest);
+        renderManifest(result.manifest, result.verification);
         state.track = result.track || null;
         if (!state.track || !state.track.id) throw new Error('The build did not return a composition track.');
         artifactBuilt = true;
@@ -1169,7 +1274,28 @@
       }
     }
 
-    document.querySelectorAll('[data-auth-tab]').forEach((button) => button.addEventListener('click', () => switchAuthTab(button.dataset.authTab)));
+    const authTabs = [...document.querySelectorAll('[data-auth-tab]')];
+    authTabs.forEach((button, index) => {
+      button.addEventListener('click', () => switchAuthTab(button.dataset.authTab));
+      button.addEventListener('keydown', (event) => {
+        let nextIndex = index;
+        if (event.key === 'ArrowRight') nextIndex = (index + 1) % authTabs.length;
+        else if (event.key === 'ArrowLeft') nextIndex = (index - 1 + authTabs.length) % authTabs.length;
+        else if (event.key === 'Home') nextIndex = 0;
+        else if (event.key === 'End') nextIndex = authTabs.length - 1;
+        else return;
+        event.preventDefault();
+        switchAuthTab(authTabs[nextIndex].dataset.authTab, { focusTab: true });
+      });
+    });
+
+    element('skipLink').addEventListener('click', (event) => {
+      const target = document.querySelector(element('skipLink').hash);
+      if (!target || target.closest('[hidden]')) return;
+      event.preventDefault();
+      target.focus();
+      target.scrollIntoView({ block: 'start' });
+    });
 
     element('loginForm').addEventListener('submit', async (event) => {
       event.preventDefault();

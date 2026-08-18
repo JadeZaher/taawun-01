@@ -141,6 +141,12 @@ async function launchChromium(executable, profileDirectory) {
   return { processHandle, client: await DevToolsClient.connect(target.webSocketDebuggerUrl) };
 }
 
+async function pressKey(client, key, code, windowsVirtualKeyCode) {
+  const params = { key, code, windowsVirtualKeyCode, nativeVirtualKeyCode: windowsVirtualKeyCode };
+  await client.send('Input.dispatchKeyEvent', { type: 'keyDown', ...params });
+  await client.send('Input.dispatchKeyEvent', { type: 'keyUp', ...params });
+}
+
 test('cockpit inline modules parse before they are embedded in the server binary', async () => {
   const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const modules = [...html.matchAll(/<script type="module">([\s\S]*?)<\/script>/g)];
@@ -153,6 +159,7 @@ test('registration enforces the server password minimum', async () => {
   const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
 
   assert.match(html, /id="registerPassword"[^>]*minlength="12"/u);
+  assert.match(html, /id="registerPassword"[^>]*aria-describedby="registerPasswordHelp"/u);
   assert.match(html, /Use at least 12 characters\./u);
   assert.doesNotMatch(html, /Use at least 8 characters\.|id="registerPassword"[^>]*minlength="8"/u);
 });
@@ -172,6 +179,169 @@ test('successful registration signs in with ephemeral local credentials', async 
   assert.match(handler, /if \(accountCreated\) \{[\s\S]*?showAuth\(\);[\s\S]*?switchAuthTab\('login'\);[\s\S]*?element\('loginPassword'\)\.value = '';/u);
   assert.match(handler, /finally \{\s*password = '';/u);
   assert.doesNotMatch(handler, /localStorage|sessionStorage|document\.cookie/u);
+});
+
+test('mobile auth shell preserves its value and custody explanation with accessible keyboard tabs', async () => {
+  const browser = await installedChromium();
+  assert.ok(browser, 'Chromium is required; the mobile accessibility regression cannot be skipped');
+
+  const cockpitHTML = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const server = createServer((request, response) => {
+    if (request.method === 'GET' && new URL(request.url, 'http://localhost').pathname === '/') {
+      response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      response.end(cockpitHTML);
+      return;
+    }
+    response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    response.end('Not found.');
+  });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const tempDirectory = await mkdtemp(path.join(tmpdir(), 'taawun-auth-browser-'));
+  let chromium;
+  try {
+    chromium = await launchChromium(browser, path.join(tempDirectory, 'profile'));
+    const { client } = chromium;
+    await client.send('Page.enable');
+    await client.send('Runtime.enable');
+    await client.send('Emulation.setDeviceMetricsOverride', {
+      width: 400,
+      height: 1_000,
+      deviceScaleFactor: 1,
+      mobile: true,
+    });
+    await client.send('Page.navigate', { url: origin });
+    await waitFor(() => evaluate(client, `document.readyState === 'complete' && !document.querySelector('#authView').hidden`), 'mobile auth shell');
+
+    const semantics = await evaluate(client, `(() => {
+      const skip = document.querySelector('#skipLink');
+      const target = document.querySelector(skip.hash);
+      return {
+        skipHref: skip.getAttribute('href'),
+        skipLabel: skip.textContent.trim(),
+        targetVisible: Boolean(target && !target.closest('[hidden]') && getComputedStyle(target).display !== 'none'),
+        loginTabIndex: document.querySelector('#loginTab').tabIndex,
+        registerTabIndex: document.querySelector('#registerTab').tabIndex,
+        loginPanelRole: document.querySelector('#loginForm').getAttribute('role'),
+        registerPanelRole: document.querySelector('#registerForm').getAttribute('role'),
+        passwordDescription: document.querySelector('#registerPassword').getAttribute('aria-describedby'),
+      };
+    })()`);
+    assert.deepEqual(semantics, {
+      skipHref: '#authPanel',
+      skipLabel: 'Skip to account access',
+      targetVisible: true,
+      loginTabIndex: 0,
+      registerTabIndex: -1,
+      loginPanelRole: 'tabpanel',
+      registerPanelRole: 'tabpanel',
+      passwordDescription: 'registerPasswordHelp',
+    });
+
+    await evaluate(client, `document.querySelector('#skipLink').focus()`);
+    await pressKey(client, 'Enter', 'Enter', 13);
+    await waitFor(() => evaluate(client, `document.activeElement?.id === 'authPanel'`), 'logged-out skip destination');
+
+    await evaluate(client, `document.querySelector('#loginTab').focus()`);
+    await pressKey(client, 'ArrowRight', 'ArrowRight', 39);
+    const registerState = await evaluate(client, `(() => ({
+      active: document.activeElement?.id,
+      loginSelected: document.querySelector('#loginTab').getAttribute('aria-selected'),
+      registerSelected: document.querySelector('#registerTab').getAttribute('aria-selected'),
+      loginTabIndex: document.querySelector('#loginTab').tabIndex,
+      registerTabIndex: document.querySelector('#registerTab').tabIndex,
+      loginHidden: document.querySelector('#loginForm').hidden,
+      registerHidden: document.querySelector('#registerForm').hidden,
+    }))()`);
+    assert.deepEqual(registerState, {
+      active: 'registerTab',
+      loginSelected: 'false',
+      registerSelected: 'true',
+      loginTabIndex: -1,
+      registerTabIndex: 0,
+      loginHidden: true,
+      registerHidden: false,
+    });
+    await pressKey(client, 'ArrowLeft', 'ArrowLeft', 37);
+    assert.equal(await evaluate(client, `document.activeElement?.id`), 'loginTab');
+    assert.equal(await evaluate(client, `document.querySelector('#loginForm').hidden`), false);
+
+    for (const width of [320, 400]) {
+      for (const scale of [1, 2]) {
+        const layoutWidth = Math.round(width / scale);
+        await client.send('Emulation.setDeviceMetricsOverride', {
+          width: layoutWidth,
+          height: 1_000,
+          deviceScaleFactor: 1,
+          mobile: false,
+        });
+        await client.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
+        await waitFor(() => evaluate(client, `window.innerWidth === ${layoutWidth}`), `${width}px viewport at ${scale * 100}% reflow`);
+        const authLayout = await evaluate(client, `(() => {
+          document.querySelector('#authView').hidden = false;
+          document.querySelector('#appView').hidden = true;
+          const copy = document.querySelector('.auth-story p');
+          const style = getComputedStyle(copy);
+          const rect = copy.getBoundingClientRect();
+          return {
+            copy: copy.innerText.replace(/\\s+/g, ' ').trim(),
+            visible: style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0,
+            overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+            overflowElements: [...document.querySelectorAll('body *')].filter((candidate) => {
+              const candidateRect = candidate.getBoundingClientRect();
+              return candidateRect.right > document.documentElement.clientWidth + 0.5 || candidateRect.left < -0.5;
+            }).slice(0, 8).map((candidate) => candidate.tagName.toLowerCase() + '#' + candidate.id + '.' + candidate.className),
+            layoutWidth: window.innerWidth,
+          };
+        })()`);
+        assert.match(authLayout.copy, /Workspace-signed artifacts/u);
+        assert.match(authLayout.copy, /local-first records/u);
+        assert.match(authLayout.copy, /sandbox actions/u);
+        assert.match(authLayout.copy, /explicit transactional control records/u);
+        assert.match(authLayout.copy, /Relay transit stays encrypted: an Amanah boundary with zero custody and no settlement/u);
+        assert.equal(authLayout.visible, true, `${width}px at ${scale * 100}% must show the concrete product and custody explanation`);
+        assert.equal(authLayout.overflow, false, `${width}px at ${scale * 100}% must reflow without horizontal document overflow: ${authLayout.overflowElements.join(', ')}`);
+        assert.equal(authLayout.layoutWidth, layoutWidth, `${width}px at ${scale * 100}% must use the expected reflow width`);
+
+        const railLayout = await evaluate(client, `(() => {
+          document.querySelector('#authView').hidden = true;
+          document.querySelector('#appView').hidden = false;
+          const boundary = document.querySelector('.rail-boundary');
+          const style = getComputedStyle(boundary);
+          const rect = boundary.getBoundingClientRect();
+          return {
+            text: boundary.innerText.replace(/\\s+/g, ' ').trim(),
+            visible: style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0,
+            overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+            overflowElements: [...document.querySelectorAll('body *')].filter((candidate) => {
+              const candidateRect = candidate.getBoundingClientRect();
+              return candidateRect.right > document.documentElement.clientWidth + 0.5 || candidateRect.left < -0.5;
+            }).slice(0, 8).map((candidate) => candidate.tagName.toLowerCase() + '#' + candidate.id + '.' + candidate.className),
+          };
+        })()`);
+        assert.match(railLayout.text, /Amanah boundary/iu);
+        assert.match(railLayout.text, /browser-owned app/u);
+        assert.equal(railLayout.visible, true, `${width}px at ${scale * 100}% must keep the Amanah boundary visible`);
+        assert.equal(railLayout.overflow, false, `${width}px app shell at ${scale * 100}% must avoid horizontal document overflow: ${railLayout.overflowElements.join(', ')}`);
+      }
+    }
+  } finally {
+    if (chromium) {
+      try { await chromium.client.send('Browser.close'); } catch {}
+      chromium.client.close();
+      await Promise.race([
+        new Promise((resolve) => chromium.processHandle.once('exit', resolve)),
+        wait(1_000),
+      ]);
+      if (chromium.processHandle.exitCode === null) chromium.processHandle.kill();
+    }
+    server.closeAllConnections?.();
+    await new Promise((resolve) => server.close(resolve));
+    await rm(tempDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
 });
 
 test('customer cockpit renders an authenticated signed preview in the exact sandbox', async () => {
@@ -204,6 +374,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     [`${previewPrefix}app.css`, ['text/css; charset=utf-8', 'body{margin:0}main{padding:2rem}']],
   ]);
   const requests = [];
+  let previewBuilds = 0;
   const server = createServer(async (request, response) => {
     const chunks = [];
     for await (const chunk of request) chunks.push(chunk);
@@ -245,16 +416,50 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       return json(200, { templates: [{ id: 'community-iftar', version: '1.0.0', description: 'Signed private-beta card.' }] });
     }
     if (record.method === 'POST' && record.path === '/api/artifacts/preview') {
+      const manifest = {
+        contractVersion: 'taawun.artifact-manifest/v1',
+        artifactId: 'browser-signed-artifact',
+        contentHash: 'a'.repeat(64),
+        workspaceId: 41,
+        template: { id: 'community-iftar', version: '1.0.0' },
+        modules: ['iftar-registration', 'announcements', 'donation-campaign'],
+        renderModes: ['standalone'],
+        compliance: {
+          status: 'reference-only-pending-qualified-review',
+          references: [{ id: 'ref-iftar-1', title: 'Iftar reference', status: 'pending-qualified-review' }],
+        },
+        financial: { status: 'sandbox' },
+        authorization: {
+          subject: { id: 'user:7', userId: 7, workspaceId: 41 },
+          allowedOrigins: {
+            surfaces: [origin],
+            embedders: ['https://community.example'],
+            connections: ['https://relay.example'],
+            resources: ['https://assets.example'],
+          },
+          expiresAt: '2099-08-18T04:23:28Z',
+          signerKeyId: 'railway-artifact-v1',
+          lifecycle: 'preview',
+        },
+        signature: {
+          algorithm: 'Ed25519',
+          keyId: 'railway-artifact-v1',
+          value: previewBuilds === 1 ? 'tampered-signature' : 'browser-signature-value',
+        },
+      };
+      const responseManifest = previewBuilds === 2 ? { artifactId: 'missing-optional-fields' } : manifest;
+      previewBuilds += 1;
       return json(200, {
-        manifest: {
-          contractVersion: 'taawun.artifact-manifest/v1',
+        manifest: responseManifest,
+        verification: {
+          status: 'verified',
+          verified: true,
           artifactId: 'browser-signed-artifact',
           contentHash: 'a'.repeat(64),
-          template: { id: 'community-iftar', version: '1.0.0' },
-          modules: ['iftar-registration', 'announcements', 'donation-campaign'],
-          renderModes: ['standalone'],
-          compliance: { status: 'reviewed' },
-          financial: { status: 'sandbox' },
+          workspaceId: 41,
+          signatureAlgorithm: 'Ed25519',
+          signerKeyId: 'railway-artifact-v1',
+          signatureValue: 'browser-signature-value',
         },
         previewUrl: `${previewPrefix}index.html`,
         preview: {
@@ -328,6 +533,14 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.equal(cockpitState.sandbox, 'allow-scripts allow-forms', 'production preview sandbox must remain exact');
     assert.equal(cockpitState.hidden, false);
 
+    const receipt = await evaluate(client, `Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent]))`);
+    assert.equal(receipt['Signature verification'], 'Verified by Taawun build service');
+    assert.equal(receipt['Signing key'], 'Ed25519 · railway-artifact-v1');
+    assert.equal(receipt['Workspace binding'], 'Workspace 41');
+    assert.equal(receipt['Lifecycle / expiry'], 'preview · expires 2099-08-18T04:23:28.000Z');
+    assert.equal(receipt['Exact allowed origins'], `Surface: ${origin} · Embedder: https://community.example · Connection: https://relay.example · Resource: https://assets.example`);
+    assert.equal(receipt['Review references'], 'ref-iftar-1 (pending-qualified-review) · Reference-only; not scholar approval');
+
     const runtimeStartTag = '<script type="module">';
     const runtimeEndTag = '</script>';
     const runtimeStart = cockpitState.srcdoc.indexOf(runtimeStartTag);
@@ -386,6 +599,23 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     for (const runtimeRequest of requests.filter((item) => item.path === '/assets/datastar-v1.0.2.js')) {
       assert.equal(runtimeRequest.authorization, '', 'the bearer token must not leak to the public pinned runtime');
     }
+
+    await evaluate(client, `document.querySelector('#builderForm').requestSubmit()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Staging ready'
+      && [...document.querySelectorAll('#manifestList .manifest-row')].find((row) => row.querySelector('dt').textContent === 'Signature verification')?.querySelector('dd').textContent.startsWith('Verification unavailable')`), 'tampered receipt rejection');
+    const tamperedReceipt = await evaluate(client, `Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent]))`);
+    assert.equal(tamperedReceipt['Signature verification'], 'Verification unavailable — do not rely on this receipt');
+    assert.doesNotMatch(tamperedReceipt['Signature verification'], /^Verified\b/u);
+
+    await evaluate(client, `document.querySelector('#builderForm').requestSubmit()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Staging ready'
+      && [...document.querySelectorAll('#manifestList .manifest-row')].find((row) => row.querySelector('dt').textContent === 'Signing key')?.querySelector('dd').textContent === 'Signing key not provided'`), 'missing receipt fields');
+    const missingReceipt = await evaluate(client, `Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent]))`);
+    assert.equal(missingReceipt['Signing key'], 'Signing key not provided');
+    assert.equal(missingReceipt['Workspace binding'], 'Workspace binding not provided');
+    assert.equal(missingReceipt['Lifecycle / expiry'], 'Lifecycle not provided · expiry not provided');
+    assert.equal(missingReceipt['Exact allowed origins'], 'No exact origins listed');
+    assert.equal(missingReceipt['Review references'], 'No review references supplied · Reference-only; not scholar approval');
   } finally {
     if (chromium) {
       try { await chromium.client.send('Browser.close'); } catch {}

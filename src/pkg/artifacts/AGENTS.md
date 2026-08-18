@@ -22,3 +22,8 @@ Builds use a temporary directory under the configured output root and become
 visible through one atomic directory rename. Artifact identifiers are generated
 with `crypto/rand`; content hashes use SHA-256. Never derive a filesystem path
 from request content and never overwrite an existing artifact directory.
+
+Theme foregrounds are selected from the Swiss ink/light palette by measured
+WCAG contrast. A pure-black fallback covers the narrow mid-luminance range
+where neither palette foreground reaches 4.5:1 for normal text. Text placed over
+the hero gradient's fixed ink segment uses its own opaque ink/white treatment.

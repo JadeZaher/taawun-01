@@ -18,7 +18,7 @@ import (
 
 func TestCompositionPreviewUsesAuthenticatedPrincipalAndServerPreviewOrigin(t *testing.T) {
 	service := &compositionServiceStub{track: previewTrack()}
-	handler, err := NewCompositionHTTPHandler(service, artifactReaderStub{}, CurrentUser, []string{"http://localhost:8080"})
+	handler, err := NewCompositionHTTPHandler(service, artifactReaderStub{open: verifiedBuildResult(service.track)}, CurrentUser, []string{"http://localhost:8080"})
 	if err != nil {
 		t.Fatalf("NewCompositionHTTPHandler() error = %v", err)
 	}
@@ -40,14 +40,43 @@ func TestCompositionPreviewUsesAuthenticatedPrincipalAndServerPreviewOrigin(t *t
 		t.Fatalf("preview origins = %#v", service.request.RequestedOrigins)
 	}
 	var payload struct {
-		Manifest artifacts.Manifest `json:"manifest"`
-		Preview  previewURLs        `json:"preview"`
+		Manifest     artifacts.Manifest `json:"manifest"`
+		Preview      previewURLs        `json:"preview"`
+		Verification struct {
+			Verified           bool   `json:"verified"`
+			ContentHash        string `json:"contentHash"`
+			WorkspaceID        int    `json:"workspaceId"`
+			SignatureAlgorithm string `json:"signatureAlgorithm"`
+			SignerKeyID        string `json:"signerKeyId"`
+			SignatureValue     string `json:"signatureValue"`
+		} `json:"verification"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode preview response: %v", err)
 	}
 	if payload.Manifest.ContentHash != service.track.Artifact.ContentHash || payload.Preview.DocumentURL != "/api/conductor/tracks/track-1/preview/files/index.html" {
 		t.Fatalf("preview response = %+v", payload)
+	}
+	if !payload.Verification.Verified || payload.Verification.ContentHash != payload.Manifest.ContentHash || payload.Verification.WorkspaceID != 7 || payload.Verification.SignatureAlgorithm != "Ed25519" || payload.Verification.SignerKeyID != "test-key-1" || payload.Verification.SignatureValue != "signed-test-value" {
+		t.Fatalf("preview verification = %+v", payload.Verification)
+	}
+}
+
+func TestCompositionPreviewRejectsUnverifiedArtifact(t *testing.T) {
+	service := &compositionServiceStub{track: previewTrack()}
+	handler, err := NewCompositionHTTPHandler(service, artifactReaderStub{openErr: artifacts.ErrInvalidSignature}, CurrentUser, []string{"http://localhost:8080"})
+	if err != nil {
+		t.Fatalf("NewCompositionHTTPHandler() error = %v", err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/artifacts/preview", strings.NewReader(`{"workspaceId":7}`))
+	request.Header.Set("Content-Type", "application/json")
+	request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7}))
+	response := httptest.NewRecorder()
+
+	handler.Preview(response, request)
+
+	if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), `"code":"preview_integrity_error"`) || strings.Contains(response.Body.String(), artifacts.ErrInvalidSignature.Error()) {
+		t.Fatalf("unverified preview = status:%d body:%s", response.Code, response.Body.String())
 	}
 }
 
@@ -147,7 +176,13 @@ func (s *compositionServiceStub) Events(context.Context, *models.User, string) (
 }
 
 type artifactReaderStub struct {
-	file artifacts.ArtifactFile
+	file    artifacts.ArtifactFile
+	open    artifacts.BuildResult
+	openErr error
+}
+
+func (s artifactReaderStub) Open(context.Context, string) (artifacts.BuildResult, error) {
+	return s.open, s.openErr
 }
 
 func (s artifactReaderStub) ReadFile(context.Context, string, string) (artifacts.ArtifactFile, error) {
@@ -155,10 +190,20 @@ func (s artifactReaderStub) ReadFile(context.Context, string, string) (artifacts
 }
 
 func previewTrack() *conductor.Track {
-	manifest := artifacts.Manifest{ContentHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Authorization: artifacts.BundleAuthorization{ExpiresAt: time.Now().Add(time.Hour)}}
+	manifest := artifacts.Manifest{
+		ArtifactID: "art-test", ContentHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", WorkspaceID: 7,
+		Authorization: artifacts.BundleAuthorization{
+			Subject: artifacts.BundleSubject{WorkspaceID: 7}, ExpiresAt: time.Now().Add(time.Hour), SignerKeyID: "test-key-1", Lifecycle: artifacts.BundleLifecyclePreview,
+		},
+		Signature: artifacts.BundleSignature{Algorithm: "Ed25519", KeyID: "test-key-1", Value: "signed-test-value"},
+	}
 	return &conductor.Track{
 		ID: "track-1", WorkspaceID: 7,
-		Artifact: &conductor.ArtifactReference{ContentHash: manifest.ContentHash, Manifest: manifest},
+		Artifact: &conductor.ArtifactReference{ArtifactID: manifest.ArtifactID, ContentHash: manifest.ContentHash, Manifest: manifest},
 		Preview:  &conductor.PreviewMetadata{ContentHash: manifest.ContentHash},
 	}
+}
+
+func verifiedBuildResult(track *conductor.Track) artifacts.BuildResult {
+	return artifacts.BuildResult{ArtifactID: track.Artifact.ArtifactID, ContentHash: track.Artifact.ContentHash, Manifest: track.Artifact.Manifest}
 }
