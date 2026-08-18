@@ -8,10 +8,11 @@ cleanup. This lane does not implement or deploy source fixes.
 
 ## Acceptance state
 
-**BLOCKED — the technical baseline, first-session presentation, exact signed-
-receipt trust binding, and preview-origin denial boundary are live-green. The
-new component-document low-code checkpoint is awaiting a deployed live gate,
-and the rollback baseline retains one Shura-to-Finance continuity P1.**
+**BLOCKED — application `5c5018c` is deployed and its component-document HTTP
+contract is independently live-green, including exact signed documents and the
+pre-deploy Unicode/parser P1 fixes. Final acceptance is blocked by the Codex
+Browser plugin trusted-path failure, so no fresh live UI, responsive, keyboard,
+race or Shura-to-Finance cockpit credit is claimed.**
 Deployment `68914f4c-a916-43f7-b0bf-fbd578c25f43` fixed the raw-JavaScript
 preview, invalid composition, Railway-source throttle, publication state, account
 lifecycle, and ethics boundaries. Deployment
@@ -23,8 +24,7 @@ trust gate is accepted. Deployment `58d87a23-6037-4cc5-8151-09b37167cef5`
 correctly maps and safely correlates unauthorized requested preview origins.
 Application `09cd897` / Railway deployment `c2374acf-7102-4471-91fd-e568f7bdb5ce`
 is the last-known-good rollback baseline for component-document QA. Acceptance
-remains blocked until exact component documents round-trip through the signed
-contract in a fresh live browser pass.
+remains blocked until the component checkpoint passes a fresh live browser pass.
 A roughly 30-second all-route 502 interval at
 05:10Z was correlated as a transient Railway edge/routing interruption rather
 than a confirmed application crash; independent and implementation-lane recovery
@@ -50,6 +50,7 @@ enterprise abstractions, fake activity, or misleading authority claims.
 | `1bfa3008-319c-49ba-bd52-090da3dbfa5e` | `57d9fd1` (`f282aac` is docs-only PR head) | `SUCCESS` | Exact-manifest attestation trust gate accepted live. Complete digest/manifest binding, scalar and internal relationships, lifecycle/expiry, four origin categories, missing/corrupt evidence, sandbox/runtime, interaction, and signed-file boundaries are green. Separate P1: unauthorized requested preview origins return a generic application 500 instead of a deterministic client-error envelope. |
 | `58d87a23-6037-4cc5-8151-09b37167cef5` | `e269126` (`42a6a30` is docs-only PR head) | `SUCCESS` | Preview-origin boundary accepted live: four categories and identical replay return deterministic 422/no track, corrected same-key request creates a signed preview, safe Railway telemetry correlates all six denials, spoofed request ID is ignored, and immutable receipt/sandbox/signed-file boundaries remain green. |
 | `c2374acf-7102-4471-91fd-e568f7bdb5ce` | `09cd897` (`8b83d90` docs head; independent QA ledger `e8345ad`) | `SUCCESS` | Rollback baseline: real catalog, People/invitations, Viewer and Maintainer roles, Shura, finance and honest empty Bazaar surfaces are live. P1 continuity defect: an approved Shura decision is not exposed/carried into Finance, and the session proposal list remains stale. Component-document editing is not part of this release. |
+| `12cbe8e9-67fa-45dc-97e8-057ea4781de9` | `5c5018c` (`27d3e7f` docs head) | `SUCCESS` | Component-document HTTP gate independently live-green: 3 templates/11 modules, v2 exact multi-component/custom/emoji manifest and files, verified reload, safe parser bounds, same-key correction, signed-file auth, and supported cleanup. Implementation's 13/13 Node/real-Chromium and live role smoke are green. Independent live UI acceptance is externally blocked by the Browser plugin trusted-path defect. |
 
 The prior accepted checkpoint `80feecc7-e5fe-49cc-8cfa-858a64e86cee`
 (`6a4d3a0`) is now `REMOVED` and is retained only as historical evidence in
@@ -193,6 +194,10 @@ Fresh browser principal `15`, workspace `11`, track
 | User `23`, workspace `18`, track `track_KL3HSuls6Y7ezZtt63YXwvZd`, artifact `art_9d38ec588ae3f2a586016c76f9947ee9` | Four-category preview-origin denial and corrected same-key signed-preview retest | Workspace and user both deleted through supported routes with `204`; the old token returned `401`. |
 | User `24`, workspace `19`, track `track_j9ACIFlbwFHbL7INEe_kxwu1`, artifact `art_9ae54568d60a1da71df8db748b16dd42` | Identical denial replay and corrected same-key signed-preview retest | Workspace and user both deleted through supported routes with `204`; the old token returned `401`. |
 | Users `26` (Architect), `27` (Viewer), and `29` (Maintainer); workspace `22`; artifact `art_4a115ebd40f8c784139e3e5032746c6f`; proposal `proposal_a17beB3U_DYPbQvz0HpdZGb-` | Live rollback-baseline organizer → Viewer → Maintainer catalog, signed-preview, People, Shura, finance and Bazaar journey | Workspace `22` deleted with `204`; all three users deleted through supported self-lifecycle routes with `204`; every old token returned `401`. No quest or Bazaar listing was created. |
+| Inference-only user `30` | Implementation's registration-only component smoke stopped before login/workspace | Pending supported application-admin read-back/cleanup. Allocation is inferred only; no credential, workspace, track or artifact exists in the evidence. No raw deletion. |
+| User `34`, workspace `26`, tracks `track_WwRfj3BvKx7vBvrMWC2xGln5` / `track_58qfrQdVG9rjBCJGDDCMrOMx` | Independent component exactness/adversarial HTTP matrix | Workspace/user deleted `204/204`; old token `401`. Signed artifacts remain immutable evidence. |
+| Users `35/36/37`, workspace `27` | Role harness with rejected username-shaped invitee | All three users and workspace deleted through supported routes with `204`; all old tokens `401`. Downstream role statuses were discarded as harness-invalid. |
+| Users `38` (Architect) / `39` (Viewer→Maintainer), workspace `28`, tracks `track_yr1lbtRKjfwGn_5Mg-eLwGz8` / `track_KA71mFCbqIvAJLAQwjB7H43i` | Corrected second-template, role, Shura and finance continuity matrix | Member/workspace/Architect deleted `204/204/204`; both old tokens `401`. Quest `quest_OoW7kRyOH8Uu7a_cSm8sTdIo` cancel endpoint returned `200`; Shura/financial audit identifiers retained as evidence. |
 | One bounded People API principal/workspace | Authorized/cross-workspace People contract, fields and response-hardening check | Workspace and user both deleted with `204`; old token returned `401`. The synthetic credentials/token were never recorded. |
 | Two intermediate in-memory API principals/workspaces | Unauthorized-origin 500 and relative-preview-URL harness correction | Supported workspace/user deletes ran from `finally`; operator read-back is requested because the deliberate harness exceptions suppressed their cleanup IDs/status output. No credential or token was persisted. |
 | User `8` | Earlier domain/OAuth self-delete repro | Pre-existing cleanup blocker; pending supported operator cleanup only. QA will not attempt credential recovery or raw database deletion. |
@@ -211,11 +216,13 @@ confirm the two exception-path API fixtures are absent.
   isolation, Shura authority, finance actor boundaries, OAuth/MCP, relay,
   session/password invalidation, exact CORS, and workspace isolation are
   live-green on the rollback baseline.
-- The component-document editor/contract is awaiting deployment. Shura-to-Finance
-  decision continuity is P1. Request-ID coverage beyond the accepted
-  origin-denial path, consistent errors, OpenAPI, and favicon remain P2. Signed-
-  receipt binding, activity truthfulness, default theme contrast and auth-tab
-  semantics are live-green; responsive layout must be rerun on the new editor.
+- The component-document server contract, role boundaries and Shura-to-Finance
+  decision continuity are live-green on deployment `12cbe8e9`; the promoted
+  Chromium suite covers the new editor. This lane still requires a fresh live
+  browser pass for editor recovery, visible decision carry, stale-response races,
+  keyboard/AT semantics, 320/400 px and effective 200% reflow. Request-ID
+  coverage beyond the accepted origin-denial path, consistent errors, OpenAPI,
+  and favicon remain P2.
 - Controlled DNS verification/publication/public serving remains fixture-gated;
   it must not be weakened or claimed complete without an external DNS fixture.
 
@@ -413,7 +420,7 @@ Fresh live browser evidence:
   with the same hardening. Its synthetic workspace/user cleaned with `204/204`;
   the old token returned `401`.
 
-### Open P1 — Shura-to-Finance continuity
+### Closed implementation P1 — Shura-to-Finance continuity (live UI retest pending)
 
 The Architect created proposal `proposal_a17beB3U_DYPbQvz0HpdZGb-`, recorded one
 approval vote and finalized it approved. The authoritative card correctly showed
@@ -429,6 +436,17 @@ refresh the session proposal record after every load/vote/decision; clear it on
 workspace/principal generation change. Viewer remains read-only and Maintainer
 remains unable to decide or advance Architect-only quest states.
 
+Application `5c5018c` implements the durable decision display/carry and stale
+response guards, with promoted Chromium coverage. Independent live API on
+deployment `12cbe8e9` confirmed the server seam: Viewer read `200` and vote
+`403`; Maintainer vote `201` and decision `403`; Architect decision `201`;
+authoritative reload returned `DECIDED`, version `3`, one vote, `APPROVED`, the
+same decision ID and proposal version `3`. Finance rejected a wrong decision
+with `409 shura_decision_not_approved`, rejected a missing decision with `422
+shura_decision_required`, accepted the exact approved decision with `201`, and
+the synthetic quest's cancel route returned `200`. The cockpit's visible copy
+and prefill remain part of the externally blocked fresh browser gate.
+
 Responsive limitation: the in-app browser's advertised viewport override did not
 change the document layout viewport in this run (`innerWidth` remained 1280), so
 independent live 400/320/200%-reflow evidence is not claimed for this release.
@@ -437,7 +455,8 @@ override was reset or invalidated when the browser-control session restarted.
 
 ## Component-document checkpoint acceptance gate
 
-No component-document deployment has been handed to QA yet. Approval will require
+Deployment `12cbe8e9-67fa-45dc-97e8-057ea4781de9` / application `5c5018c` is
+under independent acceptance. Final approval still requires
 a fresh organizer/Maintainer/Viewer browser journey over multiple live templates
 and components; exact request → durable track/reload → render → manifest/digest/
 signature equality for declared and user-added JSON fields; adversarial JSON,
@@ -447,6 +466,106 @@ last-valid-draft and last-verified-preview recovery; and preservation of every
 accepted auth, receipt, origin, signed-file, role, Shura, finance, cleanup and
 service-health boundary. Custom DNS and Bazaar publication remain out of scope
 and must not be weakened.
+
+Browser-tooling limitation at `2026-08-18T13:31Z` and again after a full Codex
+app restart: the installed Browser plugin had upgraded from bundle
+`26.810.52044` to `26.814.41407`, but the secure browser bridge rejected the new
+`browser-service.mjs` cache path as outside its configured trusted code paths.
+The live Taawun tab itself was open in the in-app browser; initialization failed
+before any Taawun navigation or interaction. This is classified as an external
+QA-tooling blocker, not an application regression. API/source/deployment checks
+may continue, but no component-document release may receive the required
+real-browser acceptance credit until the bridge is repaired and a fresh journey
+is completed.
+
+Closed pre-deploy P1 source finding: Advanced JSON could accept an unpaired Unicode
+surrogate such as `{"title":"Unicode","summary":"\ud800"}`. The browser's
+control-character check does not reject surrogate code units and its encoder
+substitutes U+FFFD, while Go's JSON token decoder also replaces the unpaired
+escape before `utf8.ValidString` runs. The server can therefore canonicalize and
+sign data different from the organizer's draft, and the receipt path verifies
+the returned manifest internally without binding its component documents back
+to the exact draft fingerprint. Commit `5c5018c` added fail-fast browser and
+HTTP/MCP rejection before durable state, safe bounded `422`, one canonical raw
+JSON parser, receipt-to-submitted-document binding, retention of the last valid
+draft/preview, and positive exact round-trip coverage for valid surrogate
+pairs/emoji. The independent HTTP evidence below confirms the server seam.
+
+The same exactness batch includes the custom object/array value editor: unlike
+the Advanced JSON editor, it decoded raw JSON before duplicate-key and
+canonical-number checks. Inputs such as `{"a":1,"a":2}` or
+`{"amount":1e2}` could be silently collapsed/rewritten and then accepted as
+the mutated JavaScript value. Every raw JSON entry surface must apply one policy
+before decoding, including nested object/array duplicates, exponent, negative
+zero, trailing fractional zero, invalid scalar and trailing-token cases.
+
+### Independent live HTTP evidence — deployment `12cbe8e9`
+
+At `2026-08-18T14:05:41Z–14:05:53Z`, a fresh synthetic organizer (`user 34`)
+and workspace (`26`) exercised the promoted component contract. The authenticated
+catalog returned three templates, eleven modules and policy
+`taawun.artifact/v2`. A two-component `community-iftar` request containing
+declared fields plus scalar, array, nested-object and emoji data created `201`
+track `track_WwRfj3BvKx7vBvrMWC2xGln5` and artifact
+`art_b9ce40591575adb4f1c2a83f48333507`. The exact manifest JSON SHA-256 matched
+its receipt, both documents matched the submitted data, verified track reload
+returned the same manifest digest, and the manifest-listed component and
+aggregate file digests matched their authenticated bytes. Anonymous component
+file access returned `401`; bearer access returned `200`, `no-store, private`
+and `nosniff`. Preview request ID: `dpdxs39aQFOjdL3wljLL4A`.
+
+Adversarial results were deterministic nested `422 invalid_composition`:
+unpaired surrogate `invalid_unicode_scalar`, explicit empty components
+`components_required`, duplicate object key `duplicate_key`, reserved authority
+key `reserved_key`, exponent number `non_canonical_number`, disallowed control
+text `control_character`, and a restrained 9,003-byte request
+`document_too_large`. No duplicate or reserved raw value appeared in its error.
+The same surrogate denial replayed `422` under request IDs
+`mRa2gmO7Q_600q_F9fVATg` and `_UfZ3eDwS9eZ2as5npoFkQ`; correcting that same
+idempotency key created `201` track `track_58qfrQdVG9rjBCJGDDCMrOMx` and artifact
+`art_df234ad60ddd7d1642f78dd7496a1644`, proving denial did not consume durable
+idempotency.
+
+Supported cleanup completed: workspace `26` `204`, user `34` `204`, and the old
+token then returned `401`. A later Shura-role harness correctly received the
+existing production registration throttle `429` before any account or workspace
+was created; QA did not evade the boundary. Implementation separately reports
+its live organizer/Viewer smoke cleaned workspace `25` and users `32/33` with
+`204/204/204`. Its earlier registration-only allocation is inference-only user
+`30`, with no workspace/artifact or recoverable credentials; retain it for
+supported application-admin cleanup only. Existing users `8/19` and other
+inferred exception fixtures remain under the same authority blocker.
+
+At `14:19:46Z–14:20:08Z`, a corrected two-principal role journey used the
+declared invitee email contract. Architect `38` created workspace `28` and a
+verified two-component `bazaar-cooperative` preview
+(`track_yr1lbtRKjfwGn_5Mg-eLwGz8`,
+`art_ae4bbd3b101e154f28772a4adfcf4cd8`) with exact custom emoji data. Member
+`39` received `403` for People and verified-track access before invitation,
+accepted Viewer membership (`201/200`), then received People/track/component
+file `200` with `no-store`/`nosniff` while preview mutation returned `403`.
+After supported membership removal `204`, the same principal accepted a
+Maintainer invitation (`201/200`) and created a separately verified exact edit
+(`track_KA71mFCbqIvAJLAQwjB7H43i`,
+`art_9454e9e705c60ed27faf209bf6709d9e`). The Shura/Finance results are recorded
+in the closed continuity section above. Synthetic proposal
+`proposal_K_OeeNUrSPHAYe9JZT2pdq69`, decision
+`decision_39C2qJUa50e6LqMuhBJsHzfG`, and quest
+`quest_OoW7kRyOH8Uu7a_cSm8sTdIo` remain as audit evidence; the quest cancel
+endpoint returned `200`. Supported cleanup completed for member `39`, workspace
+`28`, and Architect `38` with `204/204/204`; both old tokens then returned
+`401`.
+
+An earlier harness used username rather than the documented invitee email/user
+ID and therefore received invitation `400`; no downstream role conclusion is
+drawn from that run. Its users `35/36/37` and workspace `27` all cleaned via
+supported routes (`204` each), and all three old tokens returned `401`.
+
+The component release integrated gate passed all Go packages/commands, 13/13
+Node tests including two promoted real-Chromium journeys, both production binary
+builds, independent backend/UI review and an 8/8 health plus 8/8 root soak. This
+is valuable interim evidence, but it is not a substitute for this lane's live
+browser gate.
 
 ## Acceptance rule
 

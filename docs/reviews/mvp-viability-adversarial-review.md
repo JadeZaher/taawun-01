@@ -478,3 +478,14 @@ claimed. It joins the supported-admin cleanup backlog. Independent live-browser
 acceptance remains pending because the Codex Browser plugin currently fails
 before browser selection on an external trusted-path mismatch; API-only evidence
 does not replace that required gate.
+
+Independent QA later accepted the application/API technical gate on deployment
+`12cbe8e9-67fa-45dc-97e8-057ea4781de9`. The live matrix independently covered
+exact v2 document/digest/file/reload binding, adversarial Unicode and JSON
+denials with idempotency recovery, role/workspace isolation, Maintainer build,
+Shura `DECIDED` version 3, approved-decision finance creation plus missing/wrong
+rejection, signed-file boundaries, and supported cleanup. No Taawun P0/P1 fix
+prompt was issued. The only remaining checkpoint blocker is the external Codex
+Browser bundle trusted-path failure before browser selection, so no independent
+live UI/mobile/keyboard/race credit is claimed yet and the candidate release is
+held unchanged.

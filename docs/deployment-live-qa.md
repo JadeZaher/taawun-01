@@ -314,3 +314,19 @@ This is an implementation/deployment handoff, not independent live-browser
 acceptance. QA's Codex Browser bridge is temporarily blocked by an external
 trusted-plugin-path mismatch and will run the required fresh browser matrix
 after that tooling trust state is refreshed.
+
+Paired QA subsequently **accepted the application/API technical gate** on this
+same deployment. Its independent live matrix verified the real 3-template/
+11-module v2 catalog; exact component, aggregate-file, manifest and reload
+digests; safe Unicode/duplicate/reserved/number/control/size denials with
+same-key correction; signed-file authorization and response hardening; Viewer
+and Maintainer isolation; Shura `DECIDED` version 3 with the exact approved
+decision ID; finance missing/wrong/approved-decision behavior; and supported
+fixture cleanup. No Taawun P0/P1 fix prompt resulted.
+
+Overall checkpoint acceptance remains withheld solely because the independent
+lane cannot start a live browser: Codex Browser bundle `26.814.41407` rejects
+its own `browser-service.mjs` before browser selection because the upgraded
+cache path is outside the host's configured trusted RPC paths. That is external
+tooling evidence, not an application failure, and API-only evidence is not used
+as a substitute for the required live UI/mobile/keyboard/race pass.
