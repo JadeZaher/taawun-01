@@ -132,6 +132,24 @@ responses were `200`, with `337.5 ms` p95 and `519.3 ms` maximum latency. A
 future recurrence must capture the Railway edge upstream reason and instance
 event before attributing it to application code.
 
+## 2026-08-18 first-session trust handoff
+
+Commit `da5e136` removes fabricated dashboard evidence, keeps the signed/local-
+first and custody boundaries visible through 320/400-pixel and 200% reflow
+layouts, selects signed-card foregrounds through measured WCAG contrast, and
+shows a server-verified manifest receipt with signing key, workspace, lifecycle,
+expiry, exact origins, and reference-only review sources. Missing or mismatched
+verification evidence never renders a positive verification claim.
+
+The integrated gate passed every Go package/command test and 12/12 Node tests,
+including the required real-Chromium cockpit, opaque preview sandbox, signed-file
+boundary, interaction, receipt-tamper, and responsive-reflow regressions.
+Railway deployment `fe372625-e35f-4490-a8de-d8647826e7d3` reached terminal
+`SUCCESS`; its Docker healthcheck passed, and independent public probes returned
+`200` for `/api/health` (`status=ok`) and `/` with the Taawun cockpit. This is an
+implementation handoff awaiting the paired QA task's fresh browser acceptance,
+not a self-issued private-beta sign-off.
+
 ## Acceptance boundary
 
 No customer-controlled DNS zone was provided for this QA session. The live run

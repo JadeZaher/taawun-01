@@ -369,6 +369,15 @@ independent 8/8 recovery gate and a 120/120 five-minute health/root soak passed.
 It is tracked as a transient edge/routing incident unless new platform evidence
 identifies an application cause.
 
+Commit `da5e136` is the next implementation checkpoint. It replaces fabricated
+dashboard evidence with deterministic accessible-workspace data and honest empty
+states, preserves accurate value/custody copy through effective 200% reflow,
+measures signed-card text contrast, and exposes only server-verified manifest
+trust facts. Deployment `fe372625-e35f-4490-a8de-d8647826e7d3` reached Railway
+`SUCCESS`; container and public health/cockpit gates passed. These remediations
+are awaiting the paired QA task's independent live retest and are not recorded as
+accepted solely from source tests.
+
 Ranked next increments after baseline QA signs off:
 
 1. **First-session differentiated journey:** surface the existing broader catalog,

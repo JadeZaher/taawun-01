@@ -33,6 +33,7 @@ enterprise abstractions, fake activity, or misleading authority claims.
 | `04f32db0-72e9-4364-82c6-bee0796ab161` | Railway did not expose a commit hash; deployment time aligns with remote PR head `68372da` | `SUCCESS` | P0 preview renderer failure reproduced; login, workspace, artifact build, signed file serving, and card content otherwise reached |
 | `db2bf81c-c68d-4ecf-a949-f3fa240c69af` | `a484bfe` | Failed before health promotion | Container could not execute `/usr/local/bin/docker-entrypoint.sh`; deploy logs repeatedly reported `No such file or directory`, consistent with CRLF shebang packaging. Prior `SUCCESS` deployment remained active; no live regression was run. |
 | `68914f4c-a916-43f7-b0bf-fbd578c25f43` | `9748666` | `SUCCESS` | P0 preview and prioritized contract fixes live-green. Full-site Railway 502 window at 05:10Z recovered without QA intervention and was classified as a transient edge/routing interruption after a 120/120 five-minute soak. Acceptance remains blocked on role/product viability. |
+| `fe372625-e35f-4490-a8de-d8647826e7d3` | `da5e136` | `SUCCESS` | Implementation handoff for truthful scoped dashboard evidence, mobile value/custody reflow, measured card contrast, and verified receipt facts. Railway healthcheck and implementation-lane public health/root probes passed; independent QA retest is pending. |
 
 The prior accepted checkpoint `80feecc7-e5fe-49cc-8cfa-858a64e86cee`
 (`6a4d3a0`) is now `REMOVED` and is retained only as historical evidence in
@@ -256,6 +257,18 @@ Public product polish probes after the recovery gate returned a real 404 for bot
 (`xalCfet1R6KVDrj6WUN5dQ`). The repository's only Swagger file describes obsolete
 `/api/v1` cookie/CSRF routes and omits the live conductor, domain, Shura, finance,
 Bazaar, OAuth/MCP, relay, and ethics contracts.
+
+## Implementation handoff awaiting independent retest
+
+Commit `da5e136` was deployed as
+`fe372625-e35f-4490-a8de-d8647826e7d3` with terminal Railway `SUCCESS`.
+The integrated source gate passed all Go packages and 12/12 Node tests, including
+real-Chromium signed-preview, trust-receipt tamper/missing-state, keyboard, and
+effective 200% reflow coverage. The implementation lane also observed public
+`200` responses from `/api/health` (`status=ok`) and `/`. The four P1 trust rows
+remain open until this QA lane completes the requested fresh browser and API
+comparison; this entry records handoff evidence only and does not change the QA
+acceptance state.
 
 ## Acceptance rule
 
