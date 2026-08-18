@@ -2,9 +2,12 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -49,6 +52,8 @@ func TestCompositionPreviewUsesAuthenticatedPrincipalAndServerPreviewOrigin(t *t
 			SignatureAlgorithm string `json:"signatureAlgorithm"`
 			SignerKeyID        string `json:"signerKeyId"`
 			SignatureValue     string `json:"signatureValue"`
+			ManifestDigest     string `json:"manifestDigest"`
+			ManifestJSON       string `json:"manifestJson"`
 		} `json:"verification"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
@@ -59,6 +64,18 @@ func TestCompositionPreviewUsesAuthenticatedPrincipalAndServerPreviewOrigin(t *t
 	}
 	if !payload.Verification.Verified || payload.Verification.ContentHash != payload.Manifest.ContentHash || payload.Verification.WorkspaceID != 7 || payload.Verification.SignatureAlgorithm != "Ed25519" || payload.Verification.SignerKeyID != "test-key-1" || payload.Verification.SignatureValue != "signed-test-value" {
 		t.Fatalf("preview verification = %+v", payload.Verification)
+	}
+	digest := sha256.Sum256([]byte(payload.Verification.ManifestJSON))
+	if payload.Verification.ManifestDigest != hex.EncodeToString(digest[:]) {
+		t.Fatalf("manifest digest = %q, want digest of exact payload", payload.Verification.ManifestDigest)
+	}
+	var attested artifacts.Manifest
+	if err := json.Unmarshal([]byte(payload.Verification.ManifestJSON), &attested); err != nil || !reflect.DeepEqual(attested, payload.Manifest) {
+		t.Fatalf("attested manifest does not match rendered manifest: error=%v attested=%+v rendered=%+v", err, attested, payload.Manifest)
+	}
+	exactManifestJSON, err := json.Marshal(payload.Manifest)
+	if err != nil || payload.Verification.ManifestJSON != string(exactManifestJSON) {
+		t.Fatalf("manifest JSON is not the exact canonical serialization: error=%v", err)
 	}
 }
 

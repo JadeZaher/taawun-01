@@ -8,11 +8,16 @@ cleanup. This lane does not implement or deploy source fixes.
 
 ## Acceptance state
 
-**BLOCKED — technical fixes are live-green, but P1 private-beta market viability
-is not yet acceptable.** Deployment
-`68914f4c-a916-43f7-b0bf-fbd578c25f43` fixed the raw-JavaScript preview, invalid
-composition, Railway-source throttle, publication state, account lifecycle, and
-ethics boundaries under test. A roughly 30-second all-route 502 interval at
+**BLOCKED — the technical baseline and first-session presentation are live-green,
+but signed-receipt trust binding and persona discoverability still have open P1s.**
+Deployment `68914f4c-a916-43f7-b0bf-fbd578c25f43` fixed the raw-JavaScript
+preview, invalid composition, Railway-source throttle, publication state, account
+lifecycle, and ethics boundaries. Deployment
+`fe372625-e35f-4490-a8de-d8647826e7d3` made dashboard evidence truthful,
+preserved mobile value/custody copy, corrected theme contrast, and exposed signed
+receipt details. Its client verification attestation still does not bind every
+rendered signed authorization field or reject expiry, so acceptance remains
+blocked. A roughly 30-second all-route 502 interval at
 05:10Z was correlated as a transient Railway edge/routing interruption rather
 than a confirmed application crash; independent and implementation-lane recovery
 soaks passed without redeployment. Any recurrence remains an immediate P0, but
@@ -33,7 +38,7 @@ enterprise abstractions, fake activity, or misleading authority claims.
 | `04f32db0-72e9-4364-82c6-bee0796ab161` | Railway did not expose a commit hash; deployment time aligns with remote PR head `68372da` | `SUCCESS` | P0 preview renderer failure reproduced; login, workspace, artifact build, signed file serving, and card content otherwise reached |
 | `db2bf81c-c68d-4ecf-a949-f3fa240c69af` | `a484bfe` | Failed before health promotion | Container could not execute `/usr/local/bin/docker-entrypoint.sh`; deploy logs repeatedly reported `No such file or directory`, consistent with CRLF shebang packaging. Prior `SUCCESS` deployment remained active; no live regression was run. |
 | `68914f4c-a916-43f7-b0bf-fbd578c25f43` | `9748666` | `SUCCESS` | P0 preview and prioritized contract fixes live-green. Full-site Railway 502 window at 05:10Z recovered without QA intervention and was classified as a transient edge/routing interruption after a 120/120 five-minute soak. Acceptance remains blocked on role/product viability. |
-| `fe372625-e35f-4490-a8de-d8647826e7d3` | `da5e136` | `SUCCESS` | Implementation handoff for truthful scoped dashboard evidence, mobile value/custody reflow, measured card contrast, and verified receipt facts. Railway healthcheck and implementation-lane public health/root probes passed; independent QA retest is pending. |
+| `fe372625-e35f-4490-a8de-d8647826e7d3` | `da5e136` (`a39e246` is docs-only PR head) | `SUCCESS` | Dashboard, mobile/auth semantics, contrast, and visible receipt detail retests are live-green. P1 receipt-attestation scope gap remains; discoverability batch has not started. |
 
 The prior accepted checkpoint `80feecc7-e5fe-49cc-8cfa-858a64e86cee`
 (`6a4d3a0`) is now `REMOVED` and is retained only as historical evidence in
@@ -158,6 +163,9 @@ Fresh browser principal `15`, workspace `11`, track
   31.12 MB, p95 8 ms), with two aggregate 5xx among 140 requests and zero dropped
   network-flow records. Classification: transient Railway edge/routing event,
   not a confirmed application crash.
+- A final low-rate health probe after synthetic cleanup returned 200 at
+  05:34:01Z (Railway request `lXHQyFd8RUSfgFnN9fVATg`); no edge recurrence was
+  observed during the resumed matrix.
 
 ## Synthetic data and cleanup
 
@@ -167,7 +175,9 @@ Fresh browser principal `15`, workspace `11`, track
 | User `15`, workspace `11`, track `track_pMM8J-Yj0Th6tApeCR83Ipzo`, artifact `art_056d91d6aa5c93af3190f5c5d635ee73`, pending claim `31c1OWd8CnazactpjaREF0QA` | Post-fix browser, relay, publication, OAuth/account-lifecycle, Shura, and financial QA | Cleanup completed through `DELETE /api/users/15` (`204`; request `bxxaUcbNRwa8GNnWnPRhug`). Old JWT, OAuth access/refresh authority, and authorization cookie were invalidated. Required audit attribution remains retained. |
 | User `16`, workspace `12`, Viewer membership in workspace `11`, invitation `invite_mCghWgajW5yXG42aH1lNh-OI` | Independent principal, invitation acceptance, actor/workspace isolation, and Viewer denial | Workspace `12` deleted with `204` (`l-dQl7ODSOG2QPTA9I3ezw`), then user `16` deleted with `204` (`HiuWSuhXQ3O-dKlc-_9nXA`); old token returned 401. |
 | OAuth public client `taawun_client_2dEPrJWKeYFmghlk-CV9xS3EOkoxJw4D3Ew5oCyCFm8` | PKCE authorization and MCP challenge/invalidation | Retained synthetic identifier because the public-client API has no supported deletion route. No secret, credential, access token, refresh token, or authorization code is recorded. |
-| User `8` | Earlier domain/OAuth self-delete repro | Pre-existing cleanup blocker; still pending implementation fix |
+| User `17`, workspace `13`, track `track_kSAC9qY_o8hFnb1iFhT5Jv1x`, pending claim `Rg7llNYN3kCziQqYVLYIyzPIM` | Trust-batch browser/API, responsive, signed receipt, contrast, publication, invitation, Shura, and financial regression | Workspace `13` deleted with `204` (`bB-5QnKRQHKK41_anpoFkQ`), then user `17` deleted with `204` (`d0uDN88V6TEK-w087WUN5dQ`); old token returned 401. Workspace deletion made the retained track inaccessible. |
+| User `18`, Viewer membership in workspace `13`, invitation `invite_O3Z8DzHIEVM_lC3uXUs1_mk5` | Honest empty dashboard, pre/post-invite isolation, and Viewer denial | User deleted with `204` (`B-rcSchXTMGpEN_q2h0iww`); old token returned 401. |
+| User `8` | Earlier domain/OAuth self-delete repro | Pre-existing cleanup blocker; pending supported operator cleanup only. QA will not attempt credential recovery or raw database deletion. |
 
 No credentials or bearer tokens are recorded. Synthetic records will be removed
 only through supported lifecycle routes. User `8` cannot be removed by this lane
@@ -181,8 +191,10 @@ control-room lane must perform that final supported cleanup.
   fixture-limited; Viewer isolation, Shura, financial sandbox, OAuth/MCP, relay,
   session/password invalidation, exact CORS, and actor/workspace isolation are
   live-green.
-- No-store/nosniff, request-ID logging, consistent errors, activity data,
-  discoverability, OpenAPI, favicon, keyboard/accessibility, and responsive layout.
+- Signed-receipt attestation binding, discoverability/time-to-value, Maintainer
+  persona coverage, no-store/nosniff, request-ID logging, consistent errors,
+  OpenAPI, and favicon. Activity truthfulness, responsive layout, default theme
+  contrast, and auth-tab semantics are live-green.
 - Controlled DNS verification/publication/public serving remains fixture-gated;
   it must not be weakened or claimed complete without an external DNS fixture.
 
@@ -217,19 +229,19 @@ request for new platform primitives.
 
 | Priority | Persona / job | Current evidence | Minimal acceptance criterion |
 |:---|:---|:---|:---|
-| P1 | Community organizer: understand value and reach a trustworthy preview | Fresh registration, workspace creation, a 3-template/11-module catalog, and an intact interactive signed preview are live-green; mobile pre-login value explanation is hidden | A fresh organizer understands the signed/local-first/sandbox promise and reaches the preview without support at desktop and mobile widths |
+| P1 | Community organizer: understand value and reach a trustworthy preview | Fresh registration, workspace creation, concrete signed/local-first/sandbox copy, and an intact interactive signed preview are live-green at desktop, 400px, and 320px | Measure unsupported first-session time-to-preview and recovery friction in the next persona pass |
 | P1 | Organizer/operator: find the next action after preview | Domain controls exist, but broader publication state and recovery need a complete live pass | Clear exact next step, failure recovery, and honest external-DNS requirement; no dead-end or authority overclaim |
 | P1 | Invited Viewer/Maintainer and governance approver: find their work | Existing invitation/Shura APIs are not discoverable in the current cockpit snapshot | Small, role-aware entry points to accept/join, review, vote/decide, with Viewer denial explained safely |
 | P1 | Marketplace buyer/test-driver: evaluate before purchase | Bazaar capability is wired but absent from the observed authenticated cockpit | A published fixture can be found, test-driven before payment, and purchased only through disclosed sandbox escrow |
 | P1 | Private-beta operator: understand platform health and cleanup | Health exists, but request IDs/activity/support surfaces are incomplete | Correlatable safe errors, real activity or explicit empty state, and supported cleanup/recovery without database access |
-| P1 | Private-beta operator: trust displayed activity | Dashboard user counts are hard-coded and the sole activity row is a fabricated 2024 login | Display real scoped data or an explicit empty state; never ship fake activity or counts |
-| P1 | Generated-card user: read buttons and trust the default theme | Source and live default use accent `#57A68E` with white text, approximately 2.9:1 contrast | Default and user-selected accents choose a foreground that meets 4.5:1 for normal text; preserve the Swiss palette and regression-test representative mid-luminance accents |
-| P1 | Organizer: verify the artifact is genuinely signed and scoped | Visible receipt hides workspace binding, signature/key, expiry, exact origins, and review references in raw JSON | Show a concise verified-signature/workspace/expiry/origin/reference-only summary without implying scholarly or settlement authority |
-| P1 | Mobile first-session visitor: understand value and custody | At &lt;=720px the product explanation is hidden; at &lt;=880px the Amanah boundary is hidden | Preserve compact value and zero-custody copy at 320/400px and 200% zoom without redesigning the responsive grid |
+| Closed | Private-beta operator: trust displayed activity | Empty account returns zero scoped counts plus explicit empty messages; populated account returns one accessible workspace/user and one real `workspace_created` activity, with no fixed 2024 row | Preserve deterministic accessible-workspace scope and honest empty states |
+| Closed | Generated-card user: read buttons and trust the default theme | Live default/light/mid/dark accents all select readable foregrounds; measured minima are 6.07:1 default, 13.17:1 light, 6.45:1 mid, 11.95:1 dark, and 17.58:1 baseline badge | Preserve &gt;=4.5:1 across arbitrary accepted accents |
+| P1 | Organizer: rely on the signed receipt's exact scope | Visible signature/key, workspace, lifecycle/expiry, exact origins, and reference-only review facts match the positive manifest, but the client verifier compares only artifact/hash/workspace/signature fields; it does not recompute/bind the full manifest or reject expiration | A server attestation or client verification step must bind every displayed signed field, including lifecycle/expiry and all origin categories; missing, altered, mismatched, or expired evidence must never render `Verified` |
+| Closed | Mobile first-session visitor: understand value and custody | Concrete signed/local-first/sandbox and accurate central-retention/Amanah/zero-custody/no-settlement copy remain visible at 400/320px with no overflow; authenticated boundary also remains visible | Preserve compact copy and true 200% reflow regression coverage |
 | P2 | All personas: keyboard, zoom, mobile, and trust comprehension | Semantic landmarks and labels are present in the baseline snapshot; full focus/contrast/reflow testing remains | WCAG 2.1 AA keyboard path, visible focus, 200% zoom/reflow, &gt;=44px targets, and no misleading compliance/custody copy |
 | P2 | API integrator/operator: diagnose and integrate safely | Application responses do not emit their own request ID; sensitive profile/password/dashboard responses inconsistently omit `no-store`/`nosniff`; `/openapi.json` and `/favicon.ico` are real 404s | Consistent safe envelopes and request correlation, sensitive-response hardening, accurate live OpenAPI, and a real favicon |
 
-### Live first-session and accessibility evidence
+### Pre-fix first-session and accessibility evidence — deployment `68914f4c`
 
 - At 320 and 400 CSS pixels the logged-out page has no horizontal overflow and
   input/button controls remain at least 44.5 px high. The two auth-tab buttons are
@@ -258,17 +270,26 @@ Public product polish probes after the recovery gate returned a real 404 for bot
 `/api/v1` cookie/CSRF routes and omits the live conductor, domain, Shura, finance,
 Bazaar, OAuth/MCP, relay, and ethics contracts.
 
-## Implementation handoff awaiting independent retest
+## Trust-batch retest — deployment `fe372625`
 
-Commit `da5e136` was deployed as
-`fe372625-e35f-4490-a8de-d8647826e7d3` with terminal Railway `SUCCESS`.
-The integrated source gate passed all Go packages and 12/12 Node tests, including
-real-Chromium signed-preview, trust-receipt tamper/missing-state, keyboard, and
-effective 200% reflow coverage. The implementation lane also observed public
-`200` responses from `/api/health` (`status=ok`) and `/`. The four P1 trust rows
-remain open until this QA lane completes the requested fresh browser and API
-comparison; this entry records handoff evidence only and does not change the QA
-acceptance state.
+Application commit `da5e136`; Railway deployment
+`fe372625-e35f-4490-a8de-d8647826e7d3` terminal `SUCCESS`. Implementation gate:
+all Go packages, 12/12 Node tests including real Chromium, clean diff check, and
+independent approval. Live cleanup health request `XpyNwFAFT-CjP0ImWUN5dQ`
+returned 200; no edge 502 recurrence was observed.
+
+| Area | Result | Evidence |
+|:---|:---|:---|
+| Honest dashboard | **Green** | User `18` with no workspace received scoped zero counts, `evidence_state: empty`, “No workspace evidence yet…” and “No recorded workspace activity yet.” Requests `7KVEB5t7TX-bUnZUpHNmDw` and `1XFX-eQNS5yfOOV4MwUFZXw`. User `17` received only one accessible workspace/user and one real `workspace_created` activity; no fixed 2024 timestamp or `Logged in` row. |
+| Logged-out value/custody | **Green at live desktop/400/320** | Concrete workspace-signed/local-first/sandbox text and accurate central-retention, Amanah, zero-custody, and no-settlement boundaries remain visible with no horizontal overflow. |
+| Auth semantics | **Green with one tooling limitation** | Tabs have roving `tabindex`, paired tabpanels, and ArrowRight/Home/End change both focus and selection. Registration password uses `aria-describedby=registerPasswordHelp`. Skip link changes to `#authPanel` while logged out and activates the visible account panel. The in-app browser key API would not synthesize Tab traversal, so actual skip-link keyboard activation is not overclaimed. |
+| 200% reflow | **Green in verified release suite; partial live evidence** | The app's integrated real-Chromium test passes effective 160/200px layout widths. The in-app browser viewport capability floors requests below 240px, where the live app also has no overflow; exact 160/200px could not be independently forced live. |
+| Default accent | **Green** | `#57A68E`: hero/buttons 6.07:1, category badge 6.45:1, opaque baseline badge 17.58:1. |
+| Representative accents | **Green** | `#E8DEC9` 13.17:1, `#C7942C` 6.45:1, `#173D36` 11.95:1 for hero/buttons; badges remain 6.45:1 and baseline 17.58:1. Synthetic artifacts were removed with workspace `13`. |
+| Positive signed receipt | **Green** | Browser artifact `art_009b6cbd16d2c30b28806fef909c10f0` visibly matched its raw manifest for artifact/hash/workspace, Ed25519 key `railway-artifact-v1`, preview expiry, exact surface origin, and both seed references marked “Reference-only; not scholar approval.” API track `track_kSAC9qY_o8hFnb1iFhT5Jv1x` returned a server `verified:true` attestation for artifact `art_66d33aff3aacaef9fb761dc2d026935b` (request `hwgbkEATT3aM-rsjWUN5dQ`). |
+| Receipt fail-closed scope | **P1 fail** | In deployed `index.html`, `verifiedManifestReceipt` compares artifact ID, content hash, workspace, signature algorithm/key/value, but neither recomputes a canonical manifest digest nor checks lifecycle, expiry, or allowed origins. `manifestLifecycle` merely appends `expired`. Therefore altered signed authorization fields or an expired receipt can still retain “Verified” if the shallow attestation fields match. Existing regression covers signature mismatch and missing fields only. |
+| Preview runtime | **Green** | Exact sandbox `allow-scripts allow-forms`, no `src`, one inline/zero external runtimes, no visible raw-JavaScript pattern; clicking Compose changed the live notice. |
+| Surrounding boundaries | **Green** | Signed file anonymous 401/bearer 200 no-store; Viewer pre-invite 403/post-invite read 200/build 403; Architect and Viewer-read Shura capability 201/Viewer-propose 403; seven financial flows; pending claim publication 409 `publication_claim_unavailable` with track version 6 unchanged; supported workspace/user cleanup 204 and revoked tokens 401. |
 
 ## Acceptance rule
 

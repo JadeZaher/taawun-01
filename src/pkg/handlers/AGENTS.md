@@ -14,9 +14,10 @@ the artifact package's manifest and file-digest verification before bytes are
 served. Never join a URL path directly to the artifact output root.
 
 Preview responses expose a positive receipt-verification state only after the
-artifact store reopens and verifies the complete signed bundle. The browser
-must bind that state to the returned artifact, workspace, and signer fields;
-signature-shaped client data alone is never evidence of verification.
+artifact store reopens and verifies the complete signed bundle. The receipt
+attests to the exact serialized manifest with a SHA-256 digest; the browser
+recomputes the digest and compares the complete payload before checking expiry.
+Signature-shaped client data alone is never evidence of active verification.
 
 ## Railway client attribution
 

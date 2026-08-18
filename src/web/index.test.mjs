@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -374,6 +375,28 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     [`${previewPrefix}app.css`, ['text/css; charset=utf-8', 'body{margin:0}main{padding:2rem}']],
   ]);
   const requests = [];
+  const receiptVariants = [
+    'active',
+    'missing-attestation',
+    'missing-digest',
+    'digest-mismatch',
+    'artifact',
+    'content-hash',
+    'workspace',
+    'signature',
+    'key',
+    'algorithm',
+    'subject-workspace',
+    'authorization-key',
+    'lifecycle',
+    'expiry',
+    'elapsed-expiry',
+    'surfaces',
+    'embedders',
+    'connections',
+    'resources',
+    'missing-fields',
+  ];
   let previewBuilds = 0;
   const server = createServer(async (request, response) => {
     const chunks = [];
@@ -416,7 +439,8 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       return json(200, { templates: [{ id: 'community-iftar', version: '1.0.0', description: 'Signed private-beta card.' }] });
     }
     if (record.method === 'POST' && record.path === '/api/artifacts/preview') {
-      const manifest = {
+      const variant = receiptVariants[previewBuilds] || 'active';
+      const attestedManifest = {
         contractVersion: 'taawun.artifact-manifest/v1',
         artifactId: 'browser-signed-artifact',
         contentHash: 'a'.repeat(64),
@@ -444,23 +468,45 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
         signature: {
           algorithm: 'Ed25519',
           keyId: 'railway-artifact-v1',
-          value: previewBuilds === 1 ? 'tampered-signature' : 'browser-signature-value',
+          value: 'browser-signature-value',
         },
       };
-      const responseManifest = previewBuilds === 2 ? { artifactId: 'missing-optional-fields' } : manifest;
+      if (variant === 'elapsed-expiry') attestedManifest.authorization.expiresAt = '2000-08-18T04:23:28Z';
+      if (variant === 'subject-workspace') attestedManifest.authorization.subject.workspaceId = 42;
+      if (variant === 'authorization-key') attestedManifest.authorization.signerKeyId = 'tampered-key';
+      let responseManifest = structuredClone(attestedManifest);
+      if (variant === 'lifecycle') responseManifest.authorization.lifecycle = 'published';
+      if (variant === 'expiry') responseManifest.authorization.expiresAt = '2098-08-18T04:23:28Z';
+      if (variant === 'surfaces') responseManifest.authorization.allowedOrigins.surfaces = ['https://tampered-surface.example'];
+      if (variant === 'embedders') responseManifest.authorization.allowedOrigins.embedders = ['https://tampered-embedder.example'];
+      if (variant === 'connections') responseManifest.authorization.allowedOrigins.connections = ['https://tampered-connection.example'];
+      if (variant === 'resources') responseManifest.authorization.allowedOrigins.resources = ['https://tampered-resource.example'];
+      if (variant === 'missing-fields') responseManifest = { artifactId: 'missing-optional-fields' };
+      const manifestJson = JSON.stringify(attestedManifest);
+      const verification = {
+        status: 'verified',
+        verified: true,
+        artifactId: 'browser-signed-artifact',
+        contentHash: 'a'.repeat(64),
+        workspaceId: 41,
+        signatureAlgorithm: 'Ed25519',
+        signerKeyId: 'railway-artifact-v1',
+        signatureValue: 'browser-signature-value',
+        manifestDigest: createHash('sha256').update(manifestJson).digest('hex'),
+        manifestJson,
+      };
+      if (variant === 'missing-digest') delete verification.manifestDigest;
+      if (variant === 'digest-mismatch') verification.manifestDigest = '0'.repeat(64);
+      if (variant === 'artifact') verification.artifactId = 'tampered-artifact';
+      if (variant === 'content-hash') verification.contentHash = 'b'.repeat(64);
+      if (variant === 'workspace') verification.workspaceId = 42;
+      if (variant === 'signature') verification.signatureValue = 'tampered-signature';
+      if (variant === 'key') verification.signerKeyId = 'tampered-key';
+      if (variant === 'algorithm') verification.signatureAlgorithm = 'tampered-algorithm';
       previewBuilds += 1;
       return json(200, {
         manifest: responseManifest,
-        verification: {
-          status: 'verified',
-          verified: true,
-          artifactId: 'browser-signed-artifact',
-          contentHash: 'a'.repeat(64),
-          workspaceId: 41,
-          signatureAlgorithm: 'Ed25519',
-          signerKeyId: 'railway-artifact-v1',
-          signatureValue: 'browser-signature-value',
-        },
+        verification: variant === 'missing-attestation' ? undefined : verification,
         previewUrl: `${previewPrefix}index.html`,
         preview: {
           documentUrl: `${previewPrefix}index.html`,
@@ -534,7 +580,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.equal(cockpitState.hidden, false);
 
     const receipt = await evaluate(client, `Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent]))`);
-    assert.equal(receipt['Signature verification'], 'Verified by Taawun build service');
+    assert.equal(receipt['Signature verification'], 'Verified by Taawun build service · authorization active');
     assert.equal(receipt['Signing key'], 'Ed25519 · railway-artifact-v1');
     assert.equal(receipt['Workspace binding'], 'Workspace 41');
     assert.equal(receipt['Lifecycle / expiry'], 'preview · expires 2099-08-18T04:23:28.000Z');
@@ -600,22 +646,27 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       assert.equal(runtimeRequest.authorization, '', 'the bearer token must not leak to the public pinned runtime');
     }
 
-    await evaluate(client, `document.querySelector('#builderForm').requestSubmit()`);
-    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Staging ready'
-      && [...document.querySelectorAll('#manifestList .manifest-row')].find((row) => row.querySelector('dt').textContent === 'Signature verification')?.querySelector('dd').textContent.startsWith('Verification unavailable')`), 'tampered receipt rejection');
-    const tamperedReceipt = await evaluate(client, `Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent]))`);
-    assert.equal(tamperedReceipt['Signature verification'], 'Verification unavailable — do not rely on this receipt');
-    assert.doesNotMatch(tamperedReceipt['Signature verification'], /^Verified\b/u);
-
-    await evaluate(client, `document.querySelector('#builderForm').requestSubmit()`);
-    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Staging ready'
-      && [...document.querySelectorAll('#manifestList .manifest-row')].find((row) => row.querySelector('dt').textContent === 'Signing key')?.querySelector('dd').textContent === 'Signing key not provided'`), 'missing receipt fields');
-    const missingReceipt = await evaluate(client, `Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent]))`);
-    assert.equal(missingReceipt['Signing key'], 'Signing key not provided');
-    assert.equal(missingReceipt['Workspace binding'], 'Workspace binding not provided');
-    assert.equal(missingReceipt['Lifecycle / expiry'], 'Lifecycle not provided · expiry not provided');
-    assert.equal(missingReceipt['Exact allowed origins'], 'No exact origins listed');
-    assert.equal(missingReceipt['Review references'], 'No review references supplied · Reference-only; not scholar approval');
+    for (let index = 1; index < receiptVariants.length; index += 1) {
+      const variant = receiptVariants[index];
+      await evaluate(client, `document.querySelector('#builderForm').requestSubmit()`);
+      await waitFor(async () => previewBuilds === index + 1
+        && await evaluate(client, `document.querySelector('#previewStatus').textContent === 'Staging ready'`), `${variant} receipt response`);
+      const changedReceipt = await evaluate(client, `Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent]))`);
+      if (variant === 'elapsed-expiry') {
+        assert.equal(changedReceipt['Signature verification'], 'Signature attested by Taawun build service · authorization expired');
+        assert.match(changedReceipt['Lifecycle / expiry'], /expired$/u);
+      } else {
+        assert.equal(changedReceipt['Signature verification'], 'Verification unavailable — do not rely on this receipt', `${variant} must fail active verification`);
+        assert.doesNotMatch(changedReceipt['Signature verification'], /^Verified\b/u, `${variant} must not retain the positive state`);
+      }
+      if (variant === 'missing-fields') {
+        assert.equal(changedReceipt['Signing key'], 'Signing key not provided');
+        assert.equal(changedReceipt['Workspace binding'], 'Workspace binding not provided');
+        assert.equal(changedReceipt['Lifecycle / expiry'], 'Lifecycle not provided · expiry not provided');
+        assert.equal(changedReceipt['Exact allowed origins'], 'No exact origins listed');
+        assert.equal(changedReceipt['Review references'], 'No review references supplied · Reference-only; not scholar approval');
+      }
+    }
   } finally {
     if (chromium) {
       try { await chromium.client.send('Browser.close'); } catch {}

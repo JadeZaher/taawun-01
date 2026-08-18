@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -155,6 +156,12 @@ func (h *CompositionHTTPHandler) Preview(w http.ResponseWriter, r *http.Request)
 		writeCompositionError(w, http.StatusConflict, "preview_integrity_error", "The signed preview could not be verified.")
 		return
 	}
+	manifestJSON, err := json.Marshal(opened.Manifest)
+	if err != nil {
+		writeCompositionError(w, http.StatusInternalServerError, "composition_unavailable", "The signed preview receipt could not be prepared.")
+		return
+	}
+	manifestDigest := sha256.Sum256(manifestJSON)
 	preview := compositionPreviewURLs(result.Track)
 	writeCompositionJSON(w, http.StatusCreated, map[string]any{
 		"track": result.Track, "created": result.Created, "manifest": opened.Manifest,
@@ -162,6 +169,7 @@ func (h *CompositionHTTPHandler) Preview(w http.ResponseWriter, r *http.Request)
 			"status": "verified", "verified": true,
 			"artifactId": opened.Manifest.ArtifactID, "contentHash": opened.Manifest.ContentHash, "workspaceId": opened.Manifest.WorkspaceID,
 			"signatureAlgorithm": opened.Manifest.Signature.Algorithm, "signerKeyId": opened.Manifest.Signature.KeyID, "signatureValue": opened.Manifest.Signature.Value,
+			"manifestDigest": hex.EncodeToString(manifestDigest[:]), "manifestJson": string(manifestJSON),
 		},
 		"preview": preview, "previewUrl": preview.DocumentURL,
 	})

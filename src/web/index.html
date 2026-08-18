@@ -1029,12 +1029,30 @@
       list.append(row);
     }
 
-    function verifiedManifestReceipt(source, verification) {
+    async function sha256Hex(value) {
+      if (!globalThis.crypto || !globalThis.crypto.subtle) return '';
+      const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+      return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function verifiedManifestReceipt(source, verification) {
+      if (!verification || verification.verified !== true || verification.status !== 'verified'
+        || typeof verification.manifestJson !== 'string' || !/^[0-9a-f]{64}$/.test(verification.manifestDigest || '')) {
+        return { active: false, attested: false, expired: false };
+      }
+      let attestedManifest;
+      try {
+        const digest = await sha256Hex(verification.manifestJson);
+        if (!digest || digest !== verification.manifestDigest) return { active: false, attested: false, expired: false };
+        attestedManifest = JSON.parse(verification.manifestJson);
+      } catch {
+        return { active: false, attested: false, expired: false };
+      }
+      if (JSON.stringify(attestedManifest) !== JSON.stringify(source)) return { active: false, attested: false, expired: false };
       const authorization = source.authorization && typeof source.authorization === 'object' ? source.authorization : {};
       const subject = authorization.subject && typeof authorization.subject === 'object' ? authorization.subject : {};
       const signature = source.signature && typeof source.signature === 'object' ? source.signature : {};
-      return Boolean(verification && verification.verified === true && verification.status === 'verified'
-        && verification.artifactId === source.artifactId
+      const fieldsMatch = verification.artifactId === source.artifactId
         && verification.contentHash === source.contentHash
         && Number.isInteger(source.workspaceId) && verification.workspaceId === source.workspaceId
         && subject.workspaceId === source.workspaceId
@@ -1042,7 +1060,11 @@
         && verification.signatureAlgorithm === signature.algorithm
         && verification.signerKeyId === signature.keyId
         && verification.signatureValue === signature.value
-        && signature.value);
+        && Boolean(signature.value);
+      const expiry = Date.parse(authorization.expiresAt || '');
+      if (!fieldsMatch || !Number.isFinite(expiry)) return { active: false, attested: false, expired: false };
+      const expired = expiry <= Date.now();
+      return { active: !expired, attested: true, expired };
     }
 
     function manifestOrigins(policy) {
@@ -1072,20 +1094,22 @@
       return `${summary} · Reference-only; not scholar approval`;
     }
 
-    function renderManifest(manifest, verification) {
+    async function renderManifest(manifest, verification) {
       const list = element('manifestList');
       list.replaceChildren();
       const source = manifest && typeof manifest === 'object' ? manifest : { manifest };
       const authorization = source.authorization && typeof source.authorization === 'object' ? source.authorization : {};
       const subject = authorization.subject && typeof authorization.subject === 'object' ? authorization.subject : {};
       const signature = source.signature && typeof source.signature === 'object' ? source.signature : {};
-      const receiptVerified = verifiedManifestReceipt(source, verification);
+      const receipt = await verifiedManifestReceipt(source, verification);
       appendManifestRow(list, 'Contract', source.contractVersion);
       appendManifestRow(list, 'Artifact', source.artifactId);
       appendManifestRow(list, 'Content hash', source.contentHash);
-      appendManifestRow(list, 'Signature verification', receiptVerified ? 'Verified by Taawun build service' : 'Verification unavailable — do not rely on this receipt');
+      appendManifestRow(list, 'Signature verification', receipt.active
+        ? 'Verified by Taawun build service · authorization active'
+        : (receipt.expired ? 'Signature attested by Taawun build service · authorization expired' : 'Verification unavailable — do not rely on this receipt'));
       appendManifestRow(list, 'Signing key', signature.algorithm && signature.keyId
-        ? `${signature.algorithm} · ${signature.keyId}${receiptVerified ? '' : ' · not trusted by this receipt'}`
+        ? `${signature.algorithm} · ${signature.keyId}${receipt.attested ? '' : ' · not trusted by this receipt'}`
         : 'Signing key not provided');
       appendManifestRow(list, 'Workspace binding', Number.isInteger(source.workspaceId) && subject.workspaceId === source.workspaceId
         ? `Workspace ${source.workspaceId}`
@@ -1127,7 +1151,7 @@
         preview.documentUrl = safePreviewURL(preview.documentUrl || previewURL);
         preview.themeUrl = safePreviewURL(preview.themeUrl);
         preview.stylesUrl = safePreviewURL(preview.stylesUrl);
-        renderManifest(result.manifest, result.verification);
+        await renderManifest(result.manifest, result.verification);
         state.track = result.track || null;
         if (!state.track || !state.track.id) throw new Error('The build did not return a composition track.');
         artifactBuilt = true;
