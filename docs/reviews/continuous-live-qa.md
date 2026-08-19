@@ -721,6 +721,94 @@ DNS/Bazaar/federation/TURN/E2EE dependencies remain documented; users `8`, `19`
 and inference-only `30` must still be handled only through supported authorized
 operator lifecycle paths.
 
+## Signed Starter Path — deployment `b2fa4543`
+
+Application source `f3cc84d` (feature `4064cf9`) was deployed as Railway
+`b2fa4543-1627-4d08-b68a-5416f1e0006f`, image
+`sha256:92d647c6932534d774ae3baf9bba7e80799844b469b237a0a82b335e24f9d9c2`.
+The docs-only PR head was `1e050d2`; rollback remained
+`cedacb0` / `d446f826-bb48-4005-afc4-98e7fac8e046`. The release handoff reported
+all Go packages/commands and both production builds green, 13/13 Node tests
+including two promoted real-Chromium journeys, diff check and independent review.
+This lane independently reran all Go package/command tests successfully. Its local
+Chromium and Edge launches both aborted before `Page.enable` because the Windows
+GPU cache process could not acquire its host files; this is a Codex/host tooling
+failure, not an application assertion. No fresh browser, keyboard, reflow or
+screen-reader credit is claimed; the promoted real-Chromium evidence remains the
+only UI evidence in this checkpoint.
+
+Source and promoted-test review confirmed the intended ephemeral starter model:
+no-workspace, history-loading, history-error, authorized zero-history and
+non-empty states are distinct; the starter appears only after a successful
+authorized zero-row history response; all three templates and eleven modules stay
+explicit; a meaningful non-default document edit is required; preview verification
+and history confirmation are separate; history failure retains the trusted preview
+with bounded retry; fresh login skips an inapplicable newer draft-only row and
+reopens one applicable verified track without events or per-row requests; People,
+history and domain failures are independent; and principal/workspace resets clear
+ephemeral invitation and completion state. The promoted organizer path used seven
+counted activations. The five-person comprehension study remains pending genuine
+private-beta participants and is not represented as a technical gate.
+
+At `2026-08-19T08:46:05Z–08:46:10Z`, independent Architect `63` created workspace
+`39`, received the exact three-template/eleven-module catalog and submitted a
+meaningfully customized two-component `community-iftar` document containing
+Unicode scalar, array and object data. Railway request
+`xp-pekGjSjavgR_F9fVATg` returned preview `201` in 57 ms, creating track
+`track_zIgDbxDKc-sAjZ0826Ec1gQC` and artifact
+`art_33e45b6be623fba9bfabe79c673fda44`. The exact `manifestJson` digest, full
+manifest/track/workspace/actor/component/signature/key/origin/lifecycle/expiry
+relationships and every bearer-protected manifest file byte/digest matched.
+Anonymous signed-file access remained `401`, and the signed document was the
+styled card rather than raw Datastar source.
+
+That positive path exposed one release-blocking P1 trust defect. The signed
+manifest and authenticated artifact runtime require SHA-256
+`2837d87acf6ee0ba8e4e63765926c25a98d63883b02f88be194a86b81d3fd24a`
+over 34,083 LF-normalized bytes. The cockpit instead fetched and executed public
+`/assets/datastar-v1.0.2.js`, whose deployed raw response was 34,092 bytes with
+SHA-256
+`ad76a361fa0ba5dcda7478dc20925ee4cf397dca0619fae0ac848613f31ce662`
+and nine CRLF pairs. LF normalization yields the declared signed digest, but the
+cockpit does not perform that normalization or any WebCrypto comparison: its
+`loadPreviewFrame` fetches the public URL, reads text and inlines it before
+committing the iframe and verified receipt. The signed-bundle loader normalizes
+only the authenticated artifact copy, while the public `web.FS` file server emits
+the raw checkout bytes. Active **Verified** can therefore accompany executed
+runtime bytes outside the exact signed file.
+
+The coherent P1 batch sent to implementation requires the cockpit to load the
+actor-authorized signed runtime for that track and verify its raw bytes against
+the exact manifest/file digest before committing iframe or receipt. Missing,
+mismatched, delayed or stale runtime must preserve the prior trusted preview,
+show verification unavailable/stale and keep publication disabled. Required
+regression coverage includes a corrupt/public-mismatch response, old
+workspace/principal response suppression, exact one-inline-runtime assembly,
+the `allow-scripts allow-forms` sandbox, control interaction and signed-file
+anonymous `401` / bearer `200`. Live retest must prove the bytes actually executed
+equal the declared `2837…d24a` digest.
+
+Railway remained healthy during this bounded pass: both preview requests sampled
+were `201` (`wh9CgkzITdq4HTy79fVATg` 58 ms and
+`BT3XaiFkR3Gz1qkq2h0iww` 46 ms), the defect request above was `201` / 57 ms,
+the 78-request sample contained 67 `2xx`, eleven intentional `4xx` and zero
+`5xx`, and bounded runtime output showed one clean start with no panic or exit.
+Exploratory fixtures were cleaned only through supported routes: users
+`52–54`, `55–57`, `58–60`, `61–62` and workspaces `36–38` were deleted with
+successful `204` lifecycle responses where allocated, and retained tokens read
+back `401`. The final defect fixture workspace `39` and users `63/64` returned
+`204/204/204`; both tokens returned `401`. No fixture from this pass remains.
+
+**Verdict:** BLOCKED for Signed Starter Path release acceptance on `f3cc84d` /
+`b2fa4543` by the single P1 signed-runtime execution mismatch. Testing stopped at
+the trust boundary instead of generating further role fixtures. No other P0/P1
+application finding is asserted from this incomplete matrix, and no fresh Browser
+credit is claimed. Retest must start from a new verified deployment, close this
+runtime binding, then complete organizer history confirmation/fresh-login
+derivation, Viewer inspection/build denial, Maintainer actor-bound clone,
+independent loader recovery, stale response suppression and non-empty-workspace
+regression before acceptance.
+
 ## Acceptance rule
 
 Under the current control-room charter, sign-off requires zero open P0/P1 findings,
