@@ -33,7 +33,7 @@ but it is not silently removed from the product workflow.
 | Qard Hasan | Interest-free loan workflow and sandbox quest | Durable vetted state machine implemented | Terms/compliance UI and Shura approval integration |
 | Volunteer stipends | Approved stipend workflow and sandbox quest | Durable vetted state machine implemented | Terms UI and Shura approval integration |
 | Compliance corpus | Hanafi, Shafi'i, Maliki, Hanbali, and neutral retrieval with citations/status | Tagged seed corpus implemented | UI/MCP selection, publish gate, and review-status visibility |
-| Conductor | Observable build/audit/preview/publish stages | Real declarative Conductor service replaces the legacy fail-closed path in the composition root | Hosted verified-domain activation smoke test |
+| Conductor | Observable build/audit/preview/publish stages | Real declarative Conductor service plus bounded workspace Build History expose authorized durable status, exact verified reopen, safe draft recovery, and publication retry without leaking event detail | Hosted verified-domain activation smoke test |
 | MCP control plane | Hosted typed discovery/audit/build/inspect/publish tools for our LLM or a customer's LLM over Streamable HTTP | Official SDK tools, OAuth scopes, workspace binding, preview origins, and signed artifact inspection implemented | External-client smoke test and richer declarative composition schema |
 | Relay federation | Independent nodes exchange authenticated opaque relay coordination | Local signed relay sessions implemented | Configured node trust and failure isolation |
 | AZOA federation | Signed cross-node settlement intents and receipts | Signed envelope/replay boundary implemented | Durable inbox/outbox and sandbox cross-node demonstration |

@@ -567,9 +567,96 @@ builds, independent backend/UI review and an 8/8 health plus 8/8 root soak. This
 is valuable interim evidence, but it is not a substitute for this lane's live
 browser gate.
 
+## Market-viability activation and continuity — frozen deployment `12cbe8e9`
+
+The control-room charter changed after the component checkpoint: the external
+Codex Browser trust-path failure is no longer an application acceptance blocker.
+This pass therefore uses low-rate live HTTP, Railway correlation, current source
+contracts and the already-promoted real-Chromium journeys. It claims no new
+independent browser, mobile, keyboard or screen-reader evidence.
+
+At `2026-08-19T05:27:06Z–05:27:19Z`, synthetic Architect `43` created workspace
+`31`. The live catalog returned all three templates (`bazaar-cooperative`,
+`community-iftar`, `community-workspace`) and eleven modules. A customized
+two-component `community-iftar` request created verified track
+`track_vlF2554GG4nEPjwOKKkNmkiK`; Railway request
+`HmEXE6JJRo2RbOZn-_9nXA` was `201` in 133 ms. After discarding that bearer and
+signing in afresh, workspace recovery remained `200`, but the dashboard contained
+only real `workspace_created` activity and both the natural workspace history
+queries `GET /api/conductor/tracks?workspaceId=31&limit=20` and
+`GET /api/artifacts?workspaceId=31&limit=20` returned `404`. Supplying the already
+known opaque track ID returned the exact verified preview `200`, and its append-only
+history returned six events `200` with `no-store` and `nosniff`.
+
+The exact signed documents were then edited and rebuilt into distinct verified
+track `track_UloPHy_EDSHZx5OHxQzIuSgE`; Railway request
+`Q5WgoNN7RCamvUI6jq4OvQ` was `201` in 57 ms. This proves durable exact reload and
+immutable edit work, while also proving there is no discoverable relationship or
+collection through which a customer can find either build. Source confirms the
+cockpit stores the successful track only in `state.track`, never renders or copies
+its random ID, and exposes recovery only through a manual `track_…` input. Local
+drafts use principal/workspace/template-scoped `sessionStorage`, so device or
+session loss also removes the only automatic draft path.
+
+The role boundary is green. Viewer `44` received known-track `403` before invite,
+then invitation `201`, acceptance `200`, known-track inspection `200`, collection
+`404`, and build `403`. A role handoff is therefore safe when the opaque ID is
+delivered out of band, but it is not a usable product journey. The highest-value
+P1 batch sent to implementation is a bounded, deterministic, workspace-authorized
+track-summary collection plus honest Build History: visible/copyable ID,
+loading/empty/error/retry, verified inspection, build-capable exact draft recovery
+into a new actor-bound track, Viewer inspect-only, safe event/failure status and
+optimistic resume only where already supported. Summaries must exclude documents,
+actor identity, signatures, raw failures and cross-workspace evidence.
+
+Domain evidence has the same recovery gap. Synthetic claim
+`TXPXXvmLuGJ2CUmk6zokVB4M` was created `201`, rediscovered through the existing
+workspace claim list `200`, and correctly failed verification `422` because QA did
+not alter external DNS. Source shows the cockpit never calls the existing list or
+publication-history APIs and clears its in-memory claim on reload. The second P1
+slice is to rediscover real claims and render pending/verified/revoked/expired,
+signed-origin inclusion and exact next action without weakening DNS, review or
+Bazaar publication gates.
+
+Railway remained healthy throughout: the post-pass 88-request sample contained
+59 `2xx`, 29 intentional/adversarial `4xx`, zero `5xx`, p95 62 ms and p99 133 ms;
+no runtime error line appeared. All fixtures from the exploratory and corrected
+runs cleaned through supported HTTP: workspace/user `29/40` `204/204`; claim
+`8BzlD0ExdTFg95ojzGBdhUVo` `200`, workspace `30` `204`, users `42/41` `204/204`;
+and claim `TXPXXvmLuGJ2CUmk6zokVB4M` `200`, member `44` `204`, workspace `31` `204`,
+users `44/43` `204/204`. Every retained bearer read back `401`. The workspace-30
+membership delete returned `400` because its intentionally invalid invitation had
+created no membership; workspace and both users still cleaned successfully.
+
+### Ranked remaining market-viability backlog
+
+1. **P1 — Build discovery and continuity:** durable signed work is commercially
+   unreachable once its opaque ID is lost. Implement and independently retest the
+   bounded authorized history and safe exact-draft recovery described above.
+2. **P1 — Domain readiness after reload:** real claim/publication evidence exists
+   in supported APIs but is not surfaced; show its authoritative state and next
+   action without bypassing external DNS or review.
+3. **P2 — Honest activity navigation:** `dashboard/recent` reports only workspace
+   creation. After history exists, link to real build/domain activity or retain an
+   explicit empty state; never synthesize activity.
+4. **P2 / operator-authority dependency — cleanup visibility:** normal Architects
+   correctly receive `403` for `/api/admin/users` and `/api/admin/statistics`.
+   Existing admin routes provide supported enumeration/status operations, but no
+   production application-admin authority is configured for this lane and user
+   deletion is not exposed in the admin subrouter. Keep users `8`, `19`, and
+   inference-only `30` on the supported-operator ledger. A provisioning/runbook
+   decision and an audited supported lifecycle path are required; raw database or
+   fabricated JWT access remains prohibited.
+5. **External only:** controlled DNS, authorized Bazaar review/purchase fixture,
+   federation, TURN and E2EE remain explicit dependencies, not product defects to
+   bypass.
+
 ## Acceptance rule
 
-Sign-off requires zero open P0/P1 findings, a real-browser sellable journey, green
-deployment/tests, a final comprehensive regression pass with no new failures, and
-explicit limitation of remaining gaps to external DNS or the documented
-federation/TURN/E2EE deferrals.
+Under the current control-room charter, sign-off requires zero open P0/P1 findings,
+green deployment and promoted real-Chromium tests, independent low-rate live API /
+Railway verification, a final comprehensive pass with no new failures, supported
+cleanup evidence, and explicit limitation of remaining gaps to authorized operator
+provisioning, external DNS/Bazaar fixtures or the documented federation/TURN/E2EE
+deferrals. Fresh independent browser evidence remains valuable but is not claimed
+and is not a release blocker while the Codex trust-path defect persists.

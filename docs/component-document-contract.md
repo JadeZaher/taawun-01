@@ -223,6 +223,59 @@ The browser UI must preserve both editing work and the last trustworthy result:
   and live announcements and must reflow without horizontal overflow at 320 px,
   400 px, and 200% zoom.
 
+## Workspace build history and activation continuity
+
+The history endpoint is deliberately a small recovery index over existing
+Conductor tracks:
+
+```text
+GET /api/conductor/tracks?workspaceId=<positive>&limit=<positive>&cursor=<opaque>
+```
+
+- `workspaceId` is required and freshly authorized with the workspace View
+  capability. Viewer, Maintainer, and Architect may list only a workspace they
+  can already view; an outsider receives the same bounded workspace denial.
+- `limit` defaults to 20. HTTP values above 50 are capped at 50. The optional
+  cursor is an opaque base64url keyset over `(updatedAt, trackId)` and is valid
+  only as an input to a freshly authorized workspace query.
+- Results are ordered by `updatedAt DESC, id DESC`. The response contains
+  `tracks` and an optional `nextCursor`.
+- Each summary contains only ID, template ID, status, version, updated time,
+  artifact/preview/publication presence, and optional preview-authorization
+  expiry. Presence is not called verified. Summaries omit workspace IDs,
+  component documents, app/customer content, actors, subjects, artifact IDs,
+  hashes, signatures, origins, claims/publication identities, failure reasons,
+  tokens, and event details.
+- The composite SQLite index is additive; existing tracks require no data
+  migration. Legacy v1 and v2 tracks are listed from their durable request and
+  status metadata, while their existing version-specific verification rules
+  remain unchanged.
+
+Selecting a summary first loads the authorized durable track and a timeline made
+only from event type, resulting status, version, and time. Raw event detail is
+never rendered. Reopening then calls the existing verified-preview endpoint,
+which reopens the immutable bundle and applies the complete v1/v2 verification
+contract before changing the iframe or receipt.
+
+Build-capable roles may copy the exact curated request into a new local draft.
+This recovery never transfers creator, signer, track, idempotency, lifecycle,
+origin, claim, or publication authority. Viewer remains inspect-only. The
+existing Resume operation is shown only for a resumable status and remains
+server-gated to the original creator, a fresh Build capability, and exact
+expected version. Authorization and creator checks occur before the version
+comparison, preventing a track-version oracle. A conflict reloads authoritative
+status/version without replacing the current draft or trusted preview.
+
+Architect delivery state is recovered through the existing domain-claim and
+publication-history APIs. Pending, verified, revoked, and expired states show
+their real next action. A pending claim never reconstructs a TXT proof; issuing
+or rotating a proof uses the supported claim endpoint. Publication still
+requires a currently verified claim whose exact origin appears in a fresh signed
+preview. If request succeeds but activation fails, the cockpit retains the
+durable `PUBLICATION_REQUESTED` version, reloads safe status/events, and retries
+activation without repeating the publication request. DNS control, reviewer,
+and Bazaar gates remain unchanged.
+
 ## Rollback and operational boundary
 
 Use the last-known-good application `09cd897` / Railway deployment
