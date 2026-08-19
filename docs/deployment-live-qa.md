@@ -330,3 +330,80 @@ its own `browser-service.mjs` before browser selection because the upgraded
 cache path is outside the host's configured trusted RPC paths. That is external
 tooling evidence, not an application failure, and API-only evidence is not used
 as a substitute for the required live UI/mobile/keyboard/race pass.
+
+## 2026-08-19 build activation and continuity handoff
+
+Application source checkpoint `cedacb0` adds the bounded, workspace-authorized
+Conductor history needed to rediscover durable signed work. The collection is
+`GET /api/conductor/tracks?workspaceId=&limit=&cursor=` with a default limit of
+20, a cap of 50, and deterministic keyset order by `updatedAt DESC, id DESC`.
+It authorizes Workspace View before querying and returns only track ID,
+template, status, version, update time, artifact/preview/publication presence,
+and optional authorization expiry. It never returns component documents,
+actor identity, hashes, signatures, origins, claim/publication details, raw
+failure data, or event details. A list row is explicitly not verification;
+the existing exact verified-reopen contract remains the trust gate.
+
+The compact Build History surface provides honest loading, empty, error,
+retry, pagination, status and copyable-ID states. Architect and Maintainer can
+recover exact curated documents into a new local draft and therefore create a
+new actor-bound immutable track; Viewer remains inspect-only. Resume retains
+the existing creator and Build-capability requirements, now checked before
+expected-version comparison so a known ID cannot act as a version oracle.
+Workspace/principal/track/claim epochs prevent delayed responses from replacing
+the selected draft or trusted preview. Track events are reduced to safe status,
+version, type and time in the UI; raw detail is never rendered.
+
+Existing domain claims and publication history are rediscovered after reload
+for Architects. Pending, verified, revoked and expired states name the exact
+next action without reconstructing DNS proof or weakening verification,
+reviewer, publication, Bazaar, custody or settlement boundaries. A durable
+publication request is retained before activation; an ambiguous activation
+failure reconciles the latest track and safe events, and retry invokes only
+activation with the latest version.
+
+The one integrated release sweep passed every Go package/command test, both
+production binary builds, `git diff --check`, and all 13 Node tests. The two
+promoted real-Chromium journeys covered bounded history/error/retry/pagination,
+exact verified reopen and new-draft recovery, resume conflict recovery,
+Viewer/Maintainer boundaries, stale workspace/principal/claim/publication
+responses, domain readiness, activation retry, signed-receipt retention, and
+the existing responsive and role regressions. Independent source review
+approved the final trust, authorization, redaction and DNS boundaries. The
+independent QA ledger remained byte-for-byte at SHA-256
+`E5DA2DDA9E8430B17504DA3B922044562E98C79AEBBD81B3F0516962E443133B`.
+
+Railway deployment `d446f826-bb48-4005-afc4-98e7fac8e046` reached terminal
+`SUCCESS` with image digest
+`sha256:a33cce1d52df957432841f4c071083c943a45f9cc06307be85d49c74b79f7343`.
+Deploy logs show one container start, successful database initialization from
+the `/data` volume and the server binding `:8080`, with no application error.
+Eight health/root pairs over roughly forty seconds returned 16/16 `200` with
+correct bodies; observed latency was 181–477 ms. Railway recorded no HTTP
+`>=500` response for this deployment during the release gate.
+
+The bounded live organizer-to-Viewer smoke created synthetic owner `45`, Viewer
+`46`, workspace `32`, signed track
+`track_JB7nsGvh5kP42wc6m15ScARh`, and artifact
+`art_acedb69779338b89d46d9f95684f45ed`. Preview request
+`9B2Rgp7hTy2iGdJKYqVb7A` returned `201` in 60 ms with exact manifest digest and
+complete manifest equality. Owner history returned the new track using only the
+documented redacted schema. Before invitation, Viewer history and exact-track
+reads returned `403`; after accepting a real Viewer invitation, history,
+verified reopen and the signed file returned `200`, while preview mutation
+remained `403`. Anonymous signed-file access returned `401`; the Viewer response
+was `text/html`, private/no-store and `nosniff`.
+
+Cleanup ran through supported lifecycle routes in the smoke's `finally` block:
+Viewer `46`, workspace `32` and owner `45` returned `204/204/204`, and both old
+tokens subsequently returned `401`. No database, fabricated token or admin
+bypass was used. Inference-only user `30` remains on the supported-admin backlog.
+
+Rollback readiness remains application `09cd897` / deployment
+`c2374acf-7102-4471-91fd-e568f7bdb5ce`. Use Railway's supported redeploy path
+only for a confirmed application-caused health or persona-smoke regression;
+classify transient edge intervals using the established correlation process.
+The external Codex Browser trusted-path limitation is recorded in the QA ledger
+but, under the current control-room charter, does not block this deployment or
+replace the promoted real-Chromium evidence with a claimed independent browser
+pass.
