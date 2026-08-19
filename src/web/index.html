@@ -195,6 +195,19 @@
     .workspace-state { display: grid; gap: 10px; }
     .compact-state { padding: 12px; border: 1px dashed var(--line-strong); color: var(--parchment-dim); font-size: 12px; }
     .compact-state strong { display: block; margin-bottom: 3px; color: var(--parchment); }
+    .starter-path { display: grid; gap: 12px; padding: 14px; border: 1px solid rgba(199, 162, 74, 0.42); background: linear-gradient(120deg, rgba(199, 162, 74, 0.1), rgba(87, 166, 142, 0.06)); }
+    .starter-path h3 { margin-top: 4px; font: 500 19px/1.2 var(--serif); }
+    .starter-path > p, .starter-action-copy { color: var(--parchment-dim); font-size: 11px; line-height: 1.45; }
+    .starter-steps { list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin: 0; padding: 0; }
+    .starter-step { min-width: 0; padding: 9px 10px; border-left: 2px solid var(--line-strong); background: rgba(17, 22, 26, 0.64); }
+    .starter-step[data-complete="true"] { border-left-color: var(--emerald-bright); }
+    .starter-step strong, .starter-step span { display: block; overflow-wrap: anywhere; }
+    .starter-step strong { font-size: 11px; }
+    .starter-step span { margin-top: 3px; color: var(--parchment-dim); font-size: 9px; }
+    .starter-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .starter-actions .button { min-height: 44px; }
+    #recoveryInviteButton, #openNewestBuildButton { min-height: 44px; }
+    .starter-action-copy { grid-column: 1 / -1; }
     details.create-workspace { border: 1px solid var(--line); }
     details.create-workspace summary { padding: 10px 12px; color: var(--emerald-bright); cursor: pointer; font: 500 11px/1.2 var(--mono); }
     .create-fields { display: grid; gap: 10px; padding: 3px 12px 12px; }
@@ -249,6 +262,8 @@
     .compliance-note strong { display: block; color: var(--gold); font-size: 12px; }
     .compliance-note p { margin-top: 4px; color: var(--parchment-dim); font-size: 11px; }
     .build-actions { display: grid; gap: 9px; margin-top: 3px; }
+    .history-head { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    .history-head .button { min-height: 44px; }
     .privacy-copy { color: var(--parchment-dim); font-size: 10px; text-align: center; }
 
     .preview-column { display: grid; gap: 18px; min-width: 0; }
@@ -354,6 +369,8 @@
       .component-head code { grid-column: 2; }
       .component-fields { padding-left: 0; }
       .custom-field, .track-recovery { grid-template-columns: 1fr; }
+      .starter-steps, .starter-actions { grid-template-columns: 1fr; }
+      .starter-action-copy { grid-column: auto; }
       .preview-frame, .preview-frame-wrap, .preview-empty { min-height: 410px; height: 410px; }
       .preview-empty { padding: 28px; }
     }
@@ -377,7 +394,7 @@
       .rail-boundary p { overflow-wrap: anywhere; }
       .workspace { padding: 18px 8px; }
       .workspace * { min-width: 0; overflow-wrap: anywhere; }
-      .workspace, .workspace-header, .builder-grid, .panel, .panel-head, .panel-body, .builder-form, .subhead, .workspace-picker, .workspace-state, .template-card, .template-card-top, .composition-contract, .module-list, .module-option, .component-editor, .component-head, .component-fields, .custom-field, .track-recovery, .color-control, .build-actions, .preview-column, .preview-toolbar, .contract-grid, .contract-section, .contract-body, .deploy-strip { min-width: 0; }
+      .workspace, .workspace-header, .builder-grid, .panel, .panel-head, .panel-body, .builder-form, .subhead, .workspace-picker, .workspace-state, .starter-path, .starter-steps, .starter-actions, .template-card, .template-card-top, .composition-contract, .module-list, .module-option, .component-editor, .component-head, .component-fields, .custom-field, .track-recovery, .history-head, .color-control, .build-actions, .preview-column, .preview-toolbar, .contract-grid, .contract-section, .contract-body, .deploy-strip { min-width: 0; }
       .workspace-header h1 { font-size: 26px; overflow-wrap: anywhere; }
       .build-state { min-width: 0; }
       .panel-head, .subhead, .template-card-top, .preview-toolbar, .boundary strong { flex-wrap: wrap; }
@@ -548,6 +565,24 @@
                   </details>
                 </div>
 
+                <article id="signedStarterPath" class="starter-path" aria-labelledby="signedStarterTitle" hidden>
+                  <div><div class="eyebrow">First signed build</div><h3 id="signedStarterTitle">A bounded path to trustworthy evidence</h3></div>
+                  <p>This guide is derived from the selected workspace’s real empty build history. Choose an approved template and components explicitly; no starter data is invented or persisted.</p>
+                  <ol class="starter-steps" aria-label="Signed starter progress">
+                    <li id="starterTemplateStep" class="starter-step" data-complete="false"><strong>Template chosen</strong><span id="starterTemplateStatus">Choose one real catalog template.</span></li>
+                    <li id="starterComponentsStep" class="starter-step" data-complete="false"><strong>Components chosen</strong><span id="starterComponentsStatus">Choose at least one allowed component.</span></li>
+                    <li id="starterCustomizationStep" class="starter-step" data-complete="false"><strong>Content customized</strong><span id="starterCustomizationStatus">Change at least one declared component field from its catalog default.</span></li>
+                    <li id="starterPreviewStep" class="starter-step" data-complete="false"><strong>Preview verified</strong><span id="starterPreviewStatus">Create and verify the exact signed preview.</span></li>
+                    <li id="starterHistoryStep" class="starter-step" data-complete="false"><strong>History confirmed</strong><span id="starterHistoryStatus">Confirm the exact track independently in Build history.</span></li>
+                  </ol>
+                  <div class="starter-actions">
+                    <button id="starterPrimaryButton" class="button" type="button" disabled>Waiting for workspace role</button>
+                    <button id="starterInviteButton" class="button secondary" type="button" disabled>Invite a Viewer</button>
+                    <p id="starterActionCopy" class="starter-action-copy">Workspace membership is loading. Build and invitation actions remain disabled until authority resolves.</p>
+                  </div>
+                  <div id="starterPathStatus" class="visually-hidden" role="status" aria-live="polite"></div>
+                </article>
+
                 <div class="section-rule" aria-hidden="true"></div>
                 <div class="subhead"><h3>Prompt &amp; template</h3><span>Curated P0</span></div>
                 <div class="field">
@@ -609,11 +644,13 @@
                   </div>
                   <div id="trackRecoveryHelp" class="field-help">Track IDs are selectors, not credentials. Workspace authorization is rechecked before any build record or signed preview is shown.</div>
                   <section aria-labelledby="buildHistoryTitle">
-                    <div class="component-head">
+                    <div class="history-head">
                       <div><strong id="buildHistoryTitle">Build history</strong><small>Real workspace tracks · newest activity first</small></div>
-                      <button id="retryBuildHistory" class="button tertiary" type="button">Reload history</button>
+                      <div class="component-tools"><button id="openNewestBuildButton" class="button secondary" type="button" hidden>Open selected or newest</button><button id="retryBuildHistory" class="button tertiary" type="button">Reload history</button></div>
                     </div>
                     <div id="buildHistoryState" class="compact-state" role="status">Select a workspace to load its signed build records.</div>
+                    <div id="starterRecoveryState" class="compact-state" role="status" hidden></div>
+                    <button id="recoveryInviteButton" class="button secondary" type="button" hidden>Invite a Viewer</button>
                     <ul id="buildHistoryList" class="surface-list" aria-label="Workspace build history"></ul>
                     <button id="loadMoreBuildHistory" class="button tertiary" type="button" hidden>Load older builds</button>
                     <article id="buildRecord" class="surface-record" aria-labelledby="buildRecordTitle" hidden>
@@ -849,6 +886,7 @@
       shuraToken: '',
       shuraClaims: null,
       invitations: [],
+      peopleLoadState: 'idle',
       proposals: [],
       proposalRecord: null,
       proposalMutation: null,
@@ -862,6 +900,7 @@
       workspaceEpoch: 0,
       proposalEpoch: 0,
       buildHistoryEpoch: 0,
+      starterRecoveryEpoch: 0,
       trackRecordEpoch: 0,
       domainEpoch: 0,
       domainPublicationEpoch: 0,
@@ -872,12 +911,17 @@
       track: null,
       buildHistory: [],
       buildHistoryCursor: '',
+      buildHistoryLoadState: 'idle',
+      starterRecoveryState: 'idle',
+      starterRecoveryTrackId: '',
+      starterRecoveryCustomized: false,
       selectedTrack: null,
       trackEvents: [],
       domainClaims: [],
       domainPublications: [],
       domainClaim: null,
       domainOrigin: '',
+      domainLoadState: 'idle',
     };
 
     const element = (id) => document.getElementById(id);
@@ -962,6 +1006,7 @@
       state.workspacesEpoch += 1;
       state.workspaceEpoch += 1;
       state.buildHistoryEpoch += 1;
+      state.starterRecoveryEpoch += 1;
       state.trackRecordEpoch += 1;
       state.domainEpoch += 1;
       state.domainPublicationEpoch += 1;
@@ -988,6 +1033,7 @@
       state.members = [];
       state.workspaceRole = '';
       state.productRole = '';
+      state.peopleLoadState = 'idle';
       state.shuraToken = '';
       state.shuraClaims = null;
       state.invitations = [];
@@ -1002,12 +1048,17 @@
       state.track = null;
       state.buildHistory = [];
       state.buildHistoryCursor = '';
+      state.buildHistoryLoadState = 'idle';
+      state.starterRecoveryState = 'idle';
+      state.starterRecoveryTrackId = '';
+      state.starterRecoveryCustomized = false;
       state.selectedTrack = null;
       state.trackEvents = [];
       state.domainClaims = [];
       state.domainPublications = [];
       state.domainClaim = null;
       state.domainOrigin = '';
+      state.domainLoadState = 'idle';
       const frame = element('previewFrame');
       frame.removeAttribute('src');
       frame.removeAttribute('srcdoc');
@@ -1015,6 +1066,7 @@
       element('previewEmpty').hidden = false;
       element('previewLoading').hidden = true;
       setBusy(element('loadTrackButton'), false, 'Inspecting…', 'Inspect build');
+      setBusy(element('openNewestBuildButton'), false, 'Opening…', 'Open selected or newest');
       element('manifestList').replaceChildren();
       element('manifestList').hidden = true;
       element('manifestEmpty').hidden = false;
@@ -1037,6 +1089,10 @@
       element('buildRecordTrackID').value = '';
       element('buildHistoryState').textContent = 'Select a workspace to load its signed build records.';
       element('buildHistoryState').hidden = false;
+      element('openNewestBuildButton').hidden = true;
+      element('starterRecoveryState').hidden = true;
+      element('starterRecoveryState').textContent = '';
+      element('recoveryInviteButton').hidden = true;
       setNotice(element('buildRecordAlert'), '');
       element('peopleList').replaceChildren();
       element('invitationList').replaceChildren();
@@ -1184,14 +1240,277 @@
       announce(`${selected?.textContent.trim() || 'Workspace'} workspace tool opened.`);
     }
 
+    function starterVerifiedPreview() {
+      const frame = element('previewFrame');
+      return Boolean(state.previewReady && state.track && state.track.id && frame.srcdoc && frame.dataset.stale !== 'true');
+    }
+
+    function starterHistoryConfirmed() {
+      return Boolean(starterVerifiedPreview() && state.buildHistoryLoadState === 'success'
+        && state.buildHistory.some((summary) => summary && summary.id === state.track.id));
+    }
+
+    function renderSignedStarterPath() {
+      const workspaceID = currentWorkspaceID();
+      const historySucceededEmpty = workspaceID > 0 && state.buildHistoryLoadState === 'success' && state.buildHistory.length === 0;
+      const path = element('signedStarterPath');
+      path.hidden = !historySucceededEmpty;
+      const openNewest = element('openNewestBuildButton');
+      openNewest.hidden = !workspaceID || state.buildHistory.length === 0;
+      if (openNewest.getAttribute('aria-busy') !== 'true') openNewest.disabled = state.peopleLoadState !== 'success';
+      openNewest.title = openNewest.disabled ? 'Workspace membership must resolve before a build can be opened.' : 'Opens only the selected track when it is in this page, otherwise the newest track.';
+      const recoveryInvite = element('recoveryInviteButton');
+      const recoveryInviteAllowed = state.peopleLoadState === 'success' && state.productRole === 'Architect'
+        && starterHistoryConfirmed() && !element('starterRecoveryState').hidden;
+      recoveryInvite.hidden = !recoveryInviteAllowed;
+      recoveryInvite.disabled = !recoveryInviteAllowed;
+      recoveryInvite.title = recoveryInviteAllowed ? 'Creates a Viewer invitation whose acceptance token is shown only in this browser session.' : '';
+      if (!historySucceededEmpty) return;
+
+      const templateChosen = state.catalogHealthy && Boolean(selectedTemplate());
+      const componentCount = state.catalogHealthy ? selectedModules().length : 0;
+      const customized = currentDraftDiffersFromCatalogDefaults();
+      const previewVerified = starterVerifiedPreview() && customized;
+      const historyConfirmed = previewVerified && starterHistoryConfirmed();
+      const steps = [
+        ['starterTemplateStep', templateChosen, 'starterTemplateStatus', templateChosen ? `${selectedTemplate().title} selected explicitly.` : 'Choose one real catalog template.'],
+        ['starterComponentsStep', componentCount > 0, 'starterComponentsStatus', componentCount ? `${componentCount} allowed component${componentCount === 1 ? '' : 's'} selected.` : 'Choose at least one allowed component.'],
+        ['starterCustomizationStep', customized, 'starterCustomizationStatus', customized ? 'At least one selected component differs from its validated catalog default.' : 'Change at least one declared component field from its catalog default.'],
+        ['starterPreviewStep', previewVerified, 'starterPreviewStatus', previewVerified ? `Verified preview ${state.track.id} is retained.` : 'Create and verify the exact signed preview.'],
+        ['starterHistoryStep', historyConfirmed, 'starterHistoryStatus', historyConfirmed ? `Exact track ${state.track.id} is confirmed in history.` : (previewVerified ? 'Verified evidence is separate; refresh history to confirm the exact track.' : 'Confirm the exact track independently in Build history.')],
+      ];
+      for (const [stepID, complete, statusID, copy] of steps) {
+        element(stepID).dataset.complete = String(complete);
+        element(statusID).textContent = copy;
+      }
+
+      const primary = element('starterPrimaryButton');
+      const invite = element('starterInviteButton');
+      const copy = element('starterActionCopy');
+      primary.dataset.action = '';
+      invite.dataset.action = '';
+      invite.title = '';
+      primary.disabled = true;
+      invite.disabled = true;
+      if (state.peopleLoadState !== 'success') {
+        primary.textContent = state.peopleLoadState === 'error' ? 'Reload people to resolve access' : 'Waiting for workspace role';
+        copy.textContent = state.peopleLoadState === 'error'
+          ? 'Workspace membership could not be confirmed. Reload People before any role-sensitive action.'
+          : 'Workspace membership is loading. Build and invitation actions remain disabled until authority resolves.';
+      } else if (state.productRole === 'Viewer') {
+        primary.textContent = 'Viewer inspect-only';
+        copy.textContent = 'Viewer access may inspect signed evidence and history, but cannot mutate this starter draft.';
+      } else if (!canBuildWorkspace()) {
+        primary.textContent = 'Build access unavailable';
+        copy.textContent = 'This membership does not authorize a signed build.';
+      } else if (!state.catalogHealthy) {
+        primary.textContent = 'Waiting for approved catalog';
+        copy.textContent = 'Retry the real catalog. The starter never substitutes a template or component.';
+      } else if (!templateChosen) {
+        primary.textContent = 'Choose a template';
+        primary.dataset.action = 'template';
+        primary.disabled = false;
+        copy.textContent = 'Template and component choices remain explicit; the starter never selects either for you.';
+      } else if (!componentCount) {
+        primary.textContent = 'Choose components';
+        primary.dataset.action = 'components';
+        primary.disabled = false;
+        copy.textContent = 'Choose at least one component allowed by the selected real template.';
+      } else if (!customized) {
+        primary.textContent = 'Customize component content';
+        primary.dataset.action = 'customize';
+        primary.disabled = false;
+        copy.textContent = 'Change at least one declared plain-content field. Catalog defaults alone do not complete the customized starter step.';
+      } else if (![element('appName'), element('organizationName'), element('city')].every((control) => control.value.trim())) {
+        primary.textContent = 'Complete app details';
+        primary.dataset.action = 'details';
+        primary.disabled = false;
+        copy.textContent = 'Complete the required plain-text identity fields before creating signed evidence.';
+      } else if (!previewVerified) {
+        primary.textContent = state.building ? 'Building signed preview…' : 'Create signed preview';
+        primary.dataset.action = 'preview';
+        primary.disabled = state.building;
+        copy.textContent = 'The server validates and signs the exact curated component documents; this step does not publish.';
+      } else if (!historyConfirmed) {
+        primary.textContent = 'Confirm signed track in history';
+        primary.dataset.action = 'history';
+        primary.disabled = state.buildHistoryLoadState === 'loading';
+        copy.textContent = 'Preview verification and durable history confirmation are independent trust signals.';
+      } else {
+        primary.textContent = 'Signed track confirmed';
+        copy.textContent = 'The exact verified preview track is present in the selected workspace history.';
+      }
+
+      if (state.peopleLoadState === 'success' && state.productRole === 'Architect') {
+        invite.disabled = false;
+        invite.dataset.action = 'invite';
+        invite.textContent = 'Invite a Viewer';
+      } else if (state.productRole === 'Maintainer') {
+        invite.textContent = 'Ask an Architect to invite';
+        invite.title = 'Ask an Architect to invite a Viewer, or work with an existing member.';
+      } else if (state.productRole === 'Viewer') {
+        invite.textContent = 'Viewer inspect-only';
+        invite.title = 'Viewer access cannot create invitations.';
+      } else {
+        invite.textContent = 'Invite a Viewer';
+        invite.title = 'Workspace membership must resolve before invitations are available.';
+      }
+      const summary = `${steps.filter((step) => step[1]).length} of ${steps.length} signed starter checks complete. ${primary.textContent}.`;
+      if (element('starterPathStatus').dataset.summary !== summary) {
+        element('starterPathStatus').dataset.summary = summary;
+        element('starterPathStatus').textContent = summary;
+      }
+    }
+
+    function runStarterAction(button) {
+      if (button.disabled || element('signedStarterPath').hidden) return;
+      const action = button.dataset.action;
+      if (action === 'template') {
+        element('templateSelect').focus();
+        announce('Choose one approved template. No template is selected automatically.');
+      } else if (action === 'components') {
+        const checkbox = element('moduleList').querySelector('input[type="checkbox"]:not(:checked)');
+        checkbox?.focus();
+        announce('Choose at least one component allowed by this template.');
+      } else if (action === 'customize') {
+        const control = [...element('moduleList').querySelectorAll('.component-editor')]
+          .filter((card) => card.querySelector('input[type="checkbox"]:checked'))
+          .map((card) => card.querySelector('.component-fields .field input, .component-fields .field textarea'))
+          .find(Boolean);
+        control?.focus();
+        announce('Change this declared plain-content field from its catalog default. Text entry is never interpreted as code.');
+      } else if (action === 'details') {
+        const missing = [element('appName'), element('organizationName'), element('city')].find((control) => !control.value.trim());
+        missing?.focus();
+        announce('Complete the required app identity fields.');
+      } else if (action === 'preview') {
+        element('builderForm').requestSubmit();
+      } else if (action === 'history') {
+        loadBuildHistory();
+      } else if (action === 'invite') {
+        openViewerInvitation();
+      }
+    }
+
+    function runStarterActionFromKeyboard(event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      if (!event.repeat) runStarterAction(event.currentTarget);
+    }
+
+    function signedHandoffCopy(track, customized) {
+      const trackID = String(track && track.id || 'unknown track');
+      const status = String(track && track.status || 'UNKNOWN').toUpperCase();
+      const publication = status === 'PUBLISHED'
+        ? 'preview verification is separate from publication; the durable track status is PUBLISHED.'
+        : 'this preview is not published.';
+      const customization = customized
+        ? 'Its exact component documents differ from the current validated catalog defaults.'
+        : 'Its exact component documents match the current catalog defaults, so the customized starter milestone is incomplete.';
+      const role = state.productRole === 'Architect'
+        ? 'Invite a Viewer with a session-only acceptance token when ready.'
+        : state.productRole === 'Maintainer'
+          ? 'Share the track selector with an existing member, and ask an Architect to invite anyone new.'
+          : 'Viewer access is inspect-only.';
+      return `Exact workspace-bound signed preview verified; durable history confirmed; ${publication} Track ${trackID} is a selector, not authority. ${customization} ${role}`;
+    }
+
+    function showSignedHandoff(track, customized) {
+      const recovery = element('starterRecoveryState');
+      recovery.textContent = signedHandoffCopy(track, customized);
+      recovery.hidden = false;
+      if (state.buildHistoryLoadState === 'success' && state.buildHistory.length && starterHistoryConfirmed()) {
+        element('buildHistoryState').textContent = `${state.buildHistory.length} real workspace build record${state.buildHistory.length === 1 ? '' : 's'} loaded. Exact verified preview track ${track.id} is confirmed.`;
+      }
+      const invite = element('recoveryInviteButton');
+      invite.hidden = !(state.peopleLoadState === 'success' && state.productRole === 'Architect');
+      invite.disabled = invite.hidden;
+      invite.title = invite.hidden ? '' : 'Creates a Viewer invitation whose acceptance token is shown only in this browser session.';
+    }
+
+    function showPendingHistoryConfirmation() {
+      const recovery = element('starterRecoveryState');
+      recovery.textContent = `Exact history confirmation is pending; the verified preview and receipt are retained. This preview is not published. Track ${state.track && state.track.id || 'ID unavailable'} is a selector, not authority.`;
+      recovery.hidden = false;
+      element('recoveryInviteButton').hidden = true;
+    }
+
+    function openViewerInvitation() {
+      if (state.peopleLoadState !== 'success' || state.productRole !== 'Architect') return;
+      element('inviteRole').value = 'Viewer';
+      switchWorkspaceTab('people', { focusPanel: true });
+      element('invitee').focus();
+      announce('Viewer invitation is ready. The returned acceptance token remains session-only.');
+    }
+
+    async function maybeRecoverSignedStarterProgress() {
+      const workspaceID = currentWorkspaceID();
+      if (!workspaceID || state.peopleLoadState !== 'success' || !state.catalogHealthy || state.buildHistoryLoadState !== 'success' || !state.buildHistory.length) return;
+      if (starterVerifiedPreview()) {
+        if (starterHistoryConfirmed()) showSignedHandoff(state.track, componentDocumentsDifferFromCatalogDefaults(state.track && state.track.request && state.track.request.components));
+        return;
+      }
+      if (element('previewFrame').srcdoc || state.building) return;
+      const applicable = (candidate) => Boolean(candidate && candidate.previewPresent === true && candidate.artifactPresent === true);
+      const selectedID = String(state.selectedTrack && state.selectedTrack.id || '');
+      const summary = state.buildHistory.find((candidate) => applicable(candidate) && candidate.id === selectedID)
+        || state.buildHistory.find(applicable);
+      const trackID = String(summary && summary.id || '');
+      if (!/^track_[A-Za-z0-9_-]+$/.test(trackID)) {
+        const recovery = element('starterRecoveryState');
+        recovery.textContent = 'Build history is present, but no loaded summary reports both preview and artifact evidence. No signed progress is inferred.';
+        recovery.hidden = false;
+        element('recoveryInviteButton').hidden = true;
+        return;
+      }
+      if (state.starterRecoveryState === 'loading' && state.starterRecoveryTrackId === trackID) return;
+      if (state.starterRecoveryState === 'verified' && state.starterRecoveryTrackId === trackID) return;
+
+      const marker = workspaceMarker();
+      const historyEpoch = state.buildHistoryEpoch;
+      const trackRecordEpoch = state.trackRecordEpoch;
+      const selectedTrackID = String(state.selectedTrack && state.selectedTrack.id || '');
+      const draft = draftMarker();
+      const recoveryEpoch = ++state.starterRecoveryEpoch;
+      const guard = () => currentWorkspace(marker) && recoveryEpoch === state.starterRecoveryEpoch
+        && historyEpoch === state.buildHistoryEpoch && trackRecordEpoch === state.trackRecordEpoch
+        && String(state.selectedTrack && state.selectedTrack.id || '') === selectedTrackID
+        && state.buildHistoryLoadState === 'success'
+        && state.buildHistory.some((candidate) => candidate && candidate.id === trackID) && currentDraft(draft);
+      state.starterRecoveryState = 'loading';
+      state.starterRecoveryTrackId = trackID;
+      const recovery = element('starterRecoveryState');
+      recovery.textContent = `Verifying selected or newest signed track ${trackID} without inferring trust from its history summary…`;
+      recovery.hidden = false;
+      element('recoveryInviteButton').hidden = true;
+      try {
+        const result = await api(`/conductor/tracks/${encodeURIComponent(trackID)}?includeVerifiedPreview=true`);
+        if (!guard()) return;
+        const components = result && result.track && result.track.request && result.track.request.components;
+        const customized = componentDocumentsDifferFromCatalogDefaults(components);
+        const active = await applyVerifiedPreview(result, guard, { restoreDraft: false, expectedComponents: components, expectedTrackID: trackID });
+        if (!guard() || !active) throw new Error('The selected signed preview is not actively verified.');
+        state.starterRecoveryState = 'verified';
+        state.starterRecoveryCustomized = customized;
+        showSignedHandoff(state.track, customized);
+      } catch (error) {
+        if (!guard()) return;
+        state.starterRecoveryState = 'error';
+        state.starterRecoveryCustomized = false;
+        recovery.textContent = `${error.message || 'Signed progress could not be verified.'} History presence is not treated as trust; use Open selected or newest to retry.`;
+        recovery.hidden = false;
+      }
+    }
+
     function renderWorkspaceAccess() {
       const workspaceID = currentWorkspaceID();
-      const roleLabel = workspaceID && state.productRole ? state.productRole : 'Select a workspace';
+      const roleLabel = workspaceID && state.productRole ? state.productRole : (workspaceID && state.peopleLoadState === 'loading' ? 'Checking access' : (workspaceID && state.peopleLoadState === 'error' ? 'Access unavailable' : 'Select a workspace'));
       element('workspaceRole').textContent = roleLabel;
-      const buildAllowed = workspaceID > 0 && canBuildWorkspace();
-      const publishAllowed = workspaceID > 0 && canPublishWorkspace();
-      element('templateSelect').disabled = !workspaceID || !state.templates.length || !state.catalogHealthy;
-      if (element('loadTrackButton').getAttribute('aria-busy') !== 'true') element('loadTrackButton').disabled = !workspaceID;
+      const accessResolved = state.peopleLoadState === 'success';
+      const buildAllowed = workspaceID > 0 && accessResolved && canBuildWorkspace();
+      const publishAllowed = workspaceID > 0 && accessResolved && canPublishWorkspace();
+      element('templateSelect').disabled = !buildAllowed || !state.templates.length || !state.catalogHealthy;
+      if (element('loadTrackButton').getAttribute('aria-busy') !== 'true') element('loadTrackButton').disabled = !workspaceID || !accessResolved;
       element('retryBuildHistory').disabled = !workspaceID;
       element('loadMoreBuildHistory').disabled = !workspaceID;
       element('createInviteButton').disabled = !publishAllowed;
@@ -1239,6 +1558,7 @@
       if (state.listings.length) renderBazaar();
       if (state.templates.length) renderComponentEditors();
       updatePreviewAvailability();
+      renderSignedStarterPath();
     }
 
     function renderRecordList(target, records, render) {
@@ -1291,7 +1611,8 @@
         inspect.type = 'button';
         inspect.className = 'button tertiary';
         inspect.textContent = 'Inspect build';
-        inspect.disabled = !summary.id;
+        inspect.disabled = !summary.id || state.peopleLoadState !== 'success';
+        inspect.title = state.peopleLoadState === 'success' ? '' : 'Workspace membership must resolve before a build can be inspected.';
         inspect.addEventListener('click', () => inspectBuildTrack(String(summary.id || '')));
         item.append(title, meta, expiry, inspect);
         target.append(item);
@@ -1350,19 +1671,23 @@
       if (!workspaceID) {
         state.buildHistory = [];
         state.buildHistoryCursor = '';
+        state.buildHistoryLoadState = 'idle';
         renderBuildHistory();
         element('buildHistoryState').textContent = 'Select a workspace to load its signed build records.';
         element('buildHistoryState').hidden = false;
         element('loadMoreBuildHistory').hidden = true;
+        renderSignedStarterPath();
         return;
       }
       const marker = workspaceMarker();
       const requestEpoch = ++state.buildHistoryEpoch;
       const cursor = append ? state.buildHistoryCursor : '';
+      state.buildHistoryLoadState = 'loading';
       element('buildHistoryState').textContent = append ? 'Loading older real build records…' : 'Loading real workspace build records…';
       element('buildHistoryState').hidden = false;
       element('retryBuildHistory').disabled = true;
       element('loadMoreBuildHistory').disabled = true;
+      renderSignedStarterPath();
       try {
         const query = new URLSearchParams({ workspaceId: String(workspaceID), limit: '20' });
         if (cursor) query.set('cursor', cursor);
@@ -1371,20 +1696,42 @@
         const tracks = normalizeCollection(payload, 'tracks');
         state.buildHistory = append ? [...state.buildHistory, ...tracks] : tracks;
         state.buildHistoryCursor = String(payload && payload.nextCursor || '');
+        state.buildHistoryLoadState = 'success';
         renderBuildHistory();
+        const exactTrackConfirmed = starterHistoryConfirmed();
         element('buildHistoryState').textContent = state.buildHistory.length
-          ? `${state.buildHistory.length} real workspace build record${state.buildHistory.length === 1 ? '' : 's'} loaded. Presence does not mean a preview is verified.`
+          ? `${state.buildHistory.length} real workspace build record${state.buildHistory.length === 1 ? '' : 's'} loaded. ${exactTrackConfirmed ? `Exact verified preview track ${state.track.id} is confirmed.` : (starterVerifiedPreview() ? 'The current verified preview is not confirmed in this loaded history page.' : 'Presence does not mean a preview is verified.')}`
           : 'No workspace build records yet. Create a staging preview to add the first real record.';
         element('loadMoreBuildHistory').hidden = !state.buildHistoryCursor;
+        void maybeRecoverSignedStarterProgress();
       } catch (error) {
         if (!currentWorkspace(marker) || requestEpoch !== state.buildHistoryEpoch) return;
-        element('buildHistoryState').textContent = `${error.message || 'Build history could not be loaded.'} ${state.buildHistory.length ? 'The last loaded records are retained.' : 'Use Reload history to retry.'}`;
+        state.buildHistoryLoadState = 'error';
+        element('buildHistoryState').textContent = `${error.message || 'Build history could not be loaded.'} ${starterVerifiedPreview() ? 'Exact history confirmation is pending; the verified preview and receipt are retained.' : (state.buildHistory.length ? 'The last loaded records are retained.' : 'Use Reload history to retry.')}`;
+        if (starterVerifiedPreview()) showPendingHistoryConfirmation();
         element('loadMoreBuildHistory').hidden = !state.buildHistoryCursor;
       } finally {
         if (currentWorkspace(marker) && requestEpoch === state.buildHistoryEpoch) {
           element('retryBuildHistory').disabled = false;
           element('loadMoreBuildHistory').disabled = false;
+          renderSignedStarterPath();
         }
+      }
+    }
+
+    async function openSelectedOrNewestBuild() {
+      if (state.peopleLoadState !== 'success' || !state.buildHistory.length) return;
+      const marker = workspaceMarker();
+      const selectedID = String(state.selectedTrack && state.selectedTrack.id || '');
+      const summary = state.buildHistory.find((candidate) => candidate && candidate.id === selectedID) || state.buildHistory[0];
+      if (!summary || !summary.id) return;
+      const button = element('openNewestBuildButton');
+      setBusy(button, true, 'Opening…', 'Open selected or newest');
+      try {
+        const track = await inspectBuildTrack(String(summary.id), { quiet: true });
+        if (currentWorkspace(marker) && track && state.selectedTrack && state.selectedTrack.id === summary.id) await reopenSelectedBuildPreview();
+      } finally {
+        if (currentWorkspace(marker)) setBusy(button, false, 'Opening…', 'Open selected or newest');
       }
     }
 
@@ -1429,6 +1776,8 @@
       state.members = [];
       state.workspaceRole = '';
       state.productRole = '';
+      state.peopleLoadState = workspaceID ? 'loading' : 'idle';
+      state.domainLoadState = 'idle';
       state.shuraToken = '';
       state.shuraClaims = null;
       state.proposalRecord = null;
@@ -1452,13 +1801,17 @@
       element('peopleList').replaceChildren();
       renderInvitations();
       renderProposals();
+      renderBuildHistory();
       if (!workspaceID) {
         element('peopleState').textContent = 'Select a workspace to load members.';
+        await loadBuildHistory();
         renderWorkspaceAccess();
         return;
       }
       element('peopleState').hidden = false;
       element('peopleState').textContent = 'Loading authoritative workspace membership…';
+      const historyPromise = loadBuildHistory();
+      const domainPromise = loadDomainClaims();
       try {
         const payload = await api(`/workspaces/${workspaceID}/people`);
         if (!currentWorkspace(marker)) return;
@@ -1472,12 +1825,18 @@
           meta: `${productRoleForWorkspaceRole(String(member.role || '')) || 'Unknown role'} · workspace role ${member.role || 'unknown'}`,
         }));
         element('peopleState').textContent = state.members.length ? `${state.members.length} real workspace member${state.members.length === 1 ? '' : 's'}.` : 'No active workspace members were returned.';
+        state.peopleLoadState = 'success';
+        renderBuildHistory();
         renderWorkspaceAccess();
-        await Promise.allSettled([loadBuildHistory(), loadDomainClaims()]);
+        void maybeRecoverSignedStarterProgress();
+        await Promise.allSettled([historyPromise, domainPromise]);
         if (!currentWorkspace(marker)) return;
       } catch (error) {
         if (!currentWorkspace(marker)) return;
+        state.peopleLoadState = 'error';
+        renderBuildHistory();
         element('peopleState').textContent = `Could not load workspace people: ${error.message || 'request failed'}. Use Reload people to retry.`;
+        await Promise.allSettled([historyPromise, domainPromise]);
       } finally {
         if (currentWorkspace(marker)) renderWorkspaceAccess();
       }
@@ -2197,7 +2556,7 @@
         }
         if (state.selectedTemplateId && ![...select.options].some((option) => option.value === state.selectedTemplateId)) state.selectedTemplateId = '';
         select.value = state.selectedTemplateId;
-        select.disabled = !currentWorkspaceID();
+        select.disabled = !currentWorkspaceID() || state.peopleLoadState !== 'success' || !canBuildWorkspace();
         element('templateCatalogCount').textContent = `${state.templates.length} real templates · ${state.modules.length} real modules from the approved catalog.`;
         if (state.selectedTemplateId) {
           const saved = readComponentDraft(state.selectedTemplateId);
@@ -2207,6 +2566,7 @@
           }
         }
         renderComponentEditors();
+        void maybeRecoverSignedStarterProgress();
       } catch (error) {
         if (!currentSession(sessionEpoch) || catalogEpoch !== state.catalogEpoch) return;
         element('templateBadge').textContent = state.templates.length ? 'Refresh failed · draft preserved' : 'Unavailable';
@@ -2223,6 +2583,7 @@
       const allowed = hasWorkspace && canBuildWorkspace();
       element('previewButton').disabled = state.building || !state.templateReady || !selectedModules().length || !allowed;
       element('previewButton').title = hasWorkspace && !canBuildWorkspace() ? 'Viewer access is read-only. Ask an Architect for Maintainer access.' : '';
+      renderSignedStarterPath();
     }
 
     function currentWorkspaceID() {
@@ -2307,7 +2668,7 @@
 
     async function loadDomainPublications(claim) {
       const workspaceID = currentWorkspaceID();
-      if (!claim || !claim.id || !workspaceID || !canPublishWorkspace()) {
+      if (!claim || !claim.id || !workspaceID) {
         state.domainPublications = [];
         renderDomainPublications();
         return;
@@ -2362,14 +2723,15 @@
 
     async function loadDomainClaims() {
       const workspaceID = currentWorkspaceID();
-      if (!workspaceID || !canPublishWorkspace()) {
+      if (!workspaceID) {
+        state.domainLoadState = 'idle';
         state.domainClaims = [];
         state.domainPublications = [];
         state.domainClaim = null;
         state.domainOrigin = '';
         renderDomainClaims();
         renderDomainPublications();
-        element('domainClaimsState').textContent = workspaceID ? 'Viewer and Maintainer access is inspect-only; an Architect manages delivery claims.' : 'Select an Architect workspace to load real domain claims.';
+        element('domainClaimsState').textContent = 'Select a workspace to load server-authorized domain evidence.';
         element('domainClaimsState').hidden = false;
         renderWorkspaceAccess();
         return;
@@ -2377,6 +2739,7 @@
       const marker = workspaceMarker();
       const requestEpoch = ++state.domainEpoch;
       const previousID = String(state.domainClaim && state.domainClaim.id || '');
+      state.domainLoadState = 'loading';
       element('domainClaimsState').textContent = 'Loading real domain claims for this workspace…';
       element('domainClaimsState').hidden = false;
       element('retryDomainClaims').disabled = true;
@@ -2384,6 +2747,7 @@
         const payload = await api(`/workspaces/${workspaceID}/domains`);
         if (!currentWorkspace(marker) || requestEpoch !== state.domainEpoch) return;
         state.domainClaims = normalizeCollection(payload, 'claims');
+        state.domainLoadState = 'success';
         const selected = state.domainClaims.find((claim) => String(claim.id) === previousID)
           || state.domainClaims.find((claim) => domainClaimLabel(claim) === 'verified')
           || state.domainClaims.find((claim) => domainClaimLabel(claim) === 'pending')
@@ -2400,7 +2764,14 @@
         }
       } catch (error) {
         if (!currentWorkspace(marker) || requestEpoch !== state.domainEpoch) return;
-        element('domainClaimsState').textContent = `${error.message || 'Domain claims could not be loaded.'} Use Reload domain claims to retry.`;
+        state.domainLoadState = 'error';
+        state.domainClaims = [];
+        state.domainPublications = [];
+        state.domainClaim = null;
+        state.domainOrigin = '';
+        renderDomainClaims();
+        renderDomainPublications();
+        element('domainClaimsState').textContent = `${error.message || 'Domain claims could not be loaded.'} Domain evidence is unavailable for this membership; no mutation controls are enabled. Use Reload domain claims to retry.`;
       } finally {
         if (currentWorkspace(marker) && requestEpoch === state.domainEpoch) {
           element('retryDomainClaims').disabled = false;
@@ -2441,6 +2812,28 @@
       if (Array.isArray(value)) return value.map(canonicalClientValue);
       if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalClientValue(value[key])]));
       return value;
+    }
+
+    function componentDocumentsDifferFromCatalogDefaults(components) {
+      if (!state.catalogHealthy || !Array.isArray(components) || !components.length) return false;
+      let changed = false;
+      try {
+        for (const component of components) {
+          if (!component || component.id !== component.type) return false;
+          const module = moduleByID(component.id);
+          if (!module) return false;
+          const document = validateComponentDocument(component.id, component.data);
+          const catalogDefault = validateComponentDocument(component.id, module.defaultDocument);
+          if (JSON.stringify(canonicalClientValue(document)) !== JSON.stringify(canonicalClientValue(catalogDefault))) changed = true;
+        }
+      } catch {
+        return false;
+      }
+      return changed;
+    }
+
+    function currentDraftDiffersFromCatalogDefaults() {
+      try { return componentDocumentsDifferFromCatalogDefaults(selectedComponents()); } catch { return false; }
     }
 
     function currentDraftFingerprint(payload = null) {
@@ -2991,9 +3384,13 @@
           await Promise.allSettled([inspectBuildTrack(state.track.id, { quiet: true }), loadBuildHistory()]);
           if (!guard()) return;
         }
+        const customized = componentDocumentsDifferFromCatalogDefaults(state.track && state.track.request && state.track.request.components);
+        const confirmed = active && starterHistoryConfirmed();
+        if (confirmed) showSignedHandoff(state.track, customized);
+        else if (active) showPendingHistoryConfirmation();
         setNotice(element('builderAlert'), active
-          ? 'Staging artifact created. Review the preview and manifest before deployment.'
-          : 'The returned evidence is not actively verified. Your last verified preview was retained and publication is disabled.', active ? 'success' : 'error');
+          ? (confirmed ? signedHandoffCopy(state.track, customized) : 'Exact workspace-bound signed preview verified; exact history confirmation is pending. The verified preview and receipt are retained, and this preview is not published.')
+          : 'The returned evidence is not actively verified. Your last verified preview was retained and publication is disabled.', active ? (confirmed ? 'success' : 'gold') : 'error');
       } catch (error) {
         if (!operationCurrent()) return;
         const frame = element('previewFrame');
@@ -3032,23 +3429,33 @@
       element('previewButton').textContent = 'Refresh staging preview';
       setLifecycle(0);
       updateDeploymentAvailability();
+      renderSignedStarterPath();
     }
 
     function clearVerifiedPreviewForScope() {
       state.previewEpoch += 1;
       state.trackRecordEpoch += 1;
       state.buildHistoryEpoch += 1;
+      state.starterRecoveryEpoch += 1;
       state.draftRevision += 1;
       state.building = false;
       state.previewReady = false;
       state.track = null;
       state.buildHistory = [];
       state.buildHistoryCursor = '';
+      state.buildHistoryLoadState = currentWorkspaceID() ? 'loading' : 'idle';
+      state.starterRecoveryState = 'idle';
+      state.starterRecoveryTrackId = '';
+      state.starterRecoveryCustomized = false;
       clearSelectedBuildRecord();
       renderBuildHistory();
       element('buildHistoryState').textContent = currentWorkspaceID() ? 'Loading real workspace build records…' : 'Select a workspace to load its signed build records.';
       element('buildHistoryState').hidden = false;
       element('loadMoreBuildHistory').hidden = true;
+      element('openNewestBuildButton').hidden = true;
+      element('starterRecoveryState').hidden = true;
+      element('starterRecoveryState').textContent = '';
+      element('recoveryInviteButton').hidden = true;
       const frame = element('previewFrame');
       frame.removeAttribute('src');
       frame.removeAttribute('srcdoc');
@@ -3057,6 +3464,7 @@
       element('previewEmpty').hidden = false;
       element('previewLoading').hidden = true;
       setBusy(element('loadTrackButton'), false, 'Inspecting…', 'Inspect build');
+      setBusy(element('openNewestBuildButton'), false, 'Opening…', 'Open selected or newest');
       element('manifestList').replaceChildren();
       element('manifestList').hidden = true;
       element('manifestEmpty').hidden = false;
@@ -3068,6 +3476,7 @@
       element('deployStateHelp').textContent = 'Create and review a workspace-bound staging preview first.';
       setLifecycle(0);
       updateDeploymentAvailability();
+      renderSignedStarterPath();
     }
 
     function restoreDraftForCurrentScope() {
@@ -3936,6 +4345,12 @@
     element('loadTrackButton').addEventListener('click', loadVerifiedTrack);
     element('retryBuildHistory').addEventListener('click', () => loadBuildHistory());
     element('loadMoreBuildHistory').addEventListener('click', () => loadBuildHistory({ append: true }));
+    element('openNewestBuildButton').addEventListener('click', openSelectedOrNewestBuild);
+    element('starterPrimaryButton').addEventListener('click', (event) => runStarterAction(event.currentTarget));
+    element('starterInviteButton').addEventListener('click', (event) => runStarterAction(event.currentTarget));
+    element('starterPrimaryButton').addEventListener('keydown', runStarterActionFromKeyboard);
+    element('starterInviteButton').addEventListener('keydown', runStarterActionFromKeyboard);
+    element('recoveryInviteButton').addEventListener('click', openViewerInvitation);
     element('copyBuildTrackButton').addEventListener('click', async () => {
       const trackID = element('buildRecordTrackID').value;
       try {

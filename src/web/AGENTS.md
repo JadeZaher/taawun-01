@@ -17,3 +17,25 @@ claim, origin, track, version, draft, and verified-preview generation. A stale
 response may not replace a newer draft, receipt, claim selection, or publication
 state. Failures retain the last valid draft and verified preview while showing a
 specific retry/recovery state.
+
+## Signed starter derivation
+
+The Signed Starter Path is ephemeral cockpit guidance, not persisted workflow
+state. It appears only after an authorized Build History request independently
+proves that the selected workspace has zero tracks; loading, errors, nonempty
+history, and no workspace remain distinct states.
+
+On a later login, a nonempty summary never counts as signed progress. The
+cockpit verifies only the selected track when it is in the loaded page, otherwise
+the newest applicable summary that reports both preview and artifact presence,
+using one `includeVerifiedPreview=true` read. Presence only selects the candidate;
+it never supplies trust. Exact verified
+component documents are then compared with validated catalog defaults. No event
+scan, per-row verification, or summary-presence shortcut is allowed.
+
+People, Build History, and domain evidence load independently. Role-sensitive
+buttons remain disabled until People resolves, while history and domain failures
+keep their own honest retry states. Viewer invitations remain session-only;
+Architect may invite a Viewer, Maintainer coordinates with an Architect or an
+existing member, and Viewer remains inspect-only. None of this guidance adds a
+backend record, durable milestone, or analytics event.

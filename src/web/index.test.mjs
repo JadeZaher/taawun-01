@@ -481,8 +481,13 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
   ];
   let previewBuilds = 0;
   let activeTrackResponse = null;
+  let delayPeopleResponse = false;
+  let failPeopleNext = false;
   let historyFailNext = false;
+  let domainFailNext = false;
+  let includeInapplicableNewest = false;
   let delayHistoryResponse = false;
+  let delaySecondPrincipalHistory = false;
   let resumeConflictOnce = true;
   let activationFailNext = true;
   let delayClaimResponse = false;
@@ -555,6 +560,14 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       return json(200, { workspaces: [{ id: 41, name: 'QA Community' }, { id: 42, name: 'QA Other Workspace' }] });
     }
     if (record.method === 'GET' && record.path === '/api/workspaces/41/people') {
+      if (delayPeopleResponse) {
+        delayPeopleResponse = false;
+        await wait(300);
+      }
+      if (failPeopleNext) {
+        failPeopleNext = false;
+        return json(503, { error: { code: 'people_unavailable', message: 'Synthetic People interruption.' } });
+      }
       return json(200, { members: [
         { user_id: 7, username: 'QA Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
         { user_id: 8, username: 'Second Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
@@ -592,12 +605,26 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
         delayHistoryResponse = false;
         await wait(180);
       }
+      if (delaySecondPrincipalHistory && record.authorization === `Bearer ${secondToken}`) {
+        delaySecondPrincipalHistory = false;
+        await wait(420);
+      }
       const workspaceID = Number(requestURL.searchParams.get('workspaceId'));
-      const all = [activeTrackResponse?.track, ...extraTracks.values()].filter((track) => track && Number(track.workspaceId) === workspaceID);
+      const inapplicableNewest = includeInapplicableNewest ? {
+        id: 'track_newest_draft', workspaceId: 41, status: 'DRAFT', version: 1, updatedAt: '2099-08-18T05:00:00Z',
+        request: { templateId: 'community-iftar' },
+      } : null;
+      const all = [inapplicableNewest, activeTrackResponse?.track, ...extraTracks.values()].filter((track) => track && Number(track.workspaceId) === workspaceID);
       const tracks = all.map((track) => ({ id: track.id, templateId: track.request?.templateId || '', status: track.status, version: track.version, updatedAt: track.updatedAt, previewPresent: Boolean(track.preview), artifactPresent: Boolean(track.artifact), publicationPresent: Boolean(track.publication), authorizationExpiresAt: track.preview?.authorizationExpiresAt }));
       return json(200, { tracks });
     }
-    if (record.method === 'GET' && record.path === '/api/workspaces/41/domains') return json(200, { claims: domainClaims });
+    if (record.method === 'GET' && record.path === '/api/workspaces/41/domains') {
+      if (domainFailNext) {
+        domainFailNext = false;
+        return json(503, { error: { code: 'domain_dependency_unavailable', message: 'Synthetic domain interruption.' } });
+      }
+      return json(200, { claims: domainClaims });
+    }
     if (record.method === 'GET' && record.path === '/api/workspaces/42/domains') return json(200, { claims: [] });
     if (record.method === 'GET' && /^\/api\/workspaces\/41\/domains\/[^/]+\/publications$/u.test(record.path)) return json(200, { publications: domainPublications });
     if (record.method === 'POST' && record.path === '/api/workspaces/41/domains') {
@@ -814,6 +841,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
   const unauthenticatedPreview = await fetch(`${origin}${previewPrefix}index.html`);
   await unauthenticatedPreview.text();
   assert.equal(unauthenticatedPreview.status, 401, 'signed preview files must reject unauthenticated reads');
+  requests.length = 0;
 
   const tempDirectory = await mkdtemp(path.join(tmpdir(), 'taawun-cockpit-browser-'));
   let chromium;
@@ -825,6 +853,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     await client.send('Page.navigate', { url: origin });
     await waitFor(() => evaluate(client, `document.readyState === 'complete' && !document.querySelector('#loginForm').hidden`), 'cockpit login');
 
+    delayPeopleResponse = true;
     await evaluate(client, `(() => {
       const set = (id, value) => {
         const input = document.getElementById(id);
@@ -836,12 +865,179 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       document.getElementById('loginForm').requestSubmit();
       return true;
     })()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#signedStarterPath').hidden
+      && document.querySelector('#buildHistoryState').textContent.includes('No workspace build records yet')
+      && document.querySelector('#domainClaimSelect').value === 'claim_browser'
+      && document.querySelector('#starterPrimaryButton').disabled
+      && document.querySelector('#starterInviteButton').disabled
+      && document.querySelector('#templateSelect').disabled
+      && document.querySelector('#workspaceRole').textContent === 'Checking access'`), 'history and domain evidence independently load a role-gated starter while People is still loading');
     await waitFor(() => evaluate(client, `!document.querySelector('#appView').hidden
       && document.querySelector('#workspaceSelect').value === '41'
       && document.querySelector('#templateSelect').options.length === 3
       && document.querySelector('#templateSelect').value === ''
       && document.querySelector('#previewButton').disabled`), 'workspace and explicit catalog choice');
     await waitFor(() => evaluate(client, `document.querySelector('#buildHistoryState').textContent.includes('No workspace build records yet') && document.querySelector('#domainClaimSelect').value === 'claim_browser'`), 'honest empty build history and recovered verified domain readiness');
+    assert.equal(await evaluate(client, `document.querySelector('#signedStarterPath').hidden`), false, 'starter is visible only after an authorized exact-empty history response');
+    assert.match(await evaluate(client, `document.querySelector('#signedStarterPath').innerText`), /no starter data is invented or persisted/iu);
+    for (const layoutWidth of [160, 200, 320, 400]) {
+      await client.send('Emulation.setDeviceMetricsOverride', { width: layoutWidth, height: 1_000, deviceScaleFactor: 1, mobile: false });
+      await waitFor(() => evaluate(client, `window.innerWidth === ${layoutWidth}`), `${layoutWidth}px signed starter`);
+      const layout = await evaluate(client, `({ overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, path: document.querySelector('#signedStarterPath').getBoundingClientRect().width, viewport: document.documentElement.clientWidth, targets: [...document.querySelectorAll('#starterPrimaryButton, #starterInviteButton')].map((button) => button.getBoundingClientRect().height) })`);
+      assert.equal(layout.overflow, false, `${layoutWidth}px signed starter must not overflow horizontally`);
+      assert.ok(layout.path <= layout.viewport, `${layoutWidth}px signed starter remains inside the viewport`);
+      assert.ok(layout.targets.every((height) => height >= 44), `${layoutWidth}px signed starter actions must be at least 44px`);
+    }
+    await client.send('Emulation.setDeviceMetricsOverride', { width: 1_280, height: 1_000, deviceScaleFactor: 1, mobile: false });
+    await waitFor(() => evaluate(client, `window.innerWidth === 1280`), 'signed starter desktop reset');
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Architect'
+      && !document.querySelector('#starterPrimaryButton').disabled
+      && document.querySelector('#starterPrimaryButton').textContent === 'Choose a template'
+      && !document.querySelector('#templateSelect').disabled`), 'resolved Architect authority before the measured keyboard path');
+
+    const starterActivations = [];
+    await evaluate(client, `document.querySelector('#starterPrimaryButton').focus()`);
+    await pressKey(client, 'Enter', 'Enter', 13);
+    starterActivations.push('focus explicit template choice');
+    assert.equal(await evaluate(client, `document.activeElement?.id`), 'templateSelect', 'starter keyboard action focuses the explicit real-template selector');
+    await pressKey(client, 'ArrowDown', 'ArrowDown', 40);
+    await pressKey(client, 'Enter', 'Enter', 13);
+    starterActivations.push('choose Community Iftar template');
+    await waitFor(() => evaluate(client, `document.querySelector('#starterPrimaryButton').textContent === 'Choose components' && document.querySelector('#starterPathStatus').textContent.includes('1 of 5')`), 'starter live progress after explicit template');
+    for (const [componentID, label] of [['iftar-registration', 'choose Iftar registration'], ['announcements', 'choose announcements'], ['donation-campaign', 'choose donation campaign']]) {
+      await evaluate(client, `document.querySelector('#moduleList input[name="selectedModule"][value="${componentID}"]').focus()`);
+      await pressKey(client, ' ', 'Space', 32);
+      starterActivations.push(label);
+      await waitFor(() => evaluate(client, `document.querySelector('#moduleList input[name="selectedModule"][value="${componentID}"]').checked`), `${componentID} keyboard selection`);
+    }
+    await waitFor(() => evaluate(client, `document.querySelectorAll('#moduleList input[name="selectedModule"]:checked').length === 3 && document.querySelector('#starterPathStatus').textContent.includes('2 of 5') && document.querySelector('#starterPrimaryButton').textContent === 'Customize component content'`), 'starter live progress after explicit components');
+    const previewRequestsBeforeCustomization = requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview').length;
+    await evaluate(client, `document.querySelector('#starterPrimaryButton').focus()`);
+    await pressKey(client, 'Enter', 'Enter', 13);
+    starterActivations.push('focus one declared component field');
+    assert.equal(await evaluate(client, `document.activeElement?.closest('.component-editor')?.dataset.componentId`), 'iftar-registration', 'catalog defaults route the starter to the first selected declared field instead of signing');
+    assert.equal(requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview').length, previewRequestsBeforeCustomization, 'catalog-default documents cannot advance through the signed starter action');
+    await evaluate(client, `(() => { const input = document.activeElement; input.value = 'Customized signed registration'; input.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#starterPathStatus').textContent.includes('3 of 5') && document.querySelector('#starterPrimaryButton').textContent === 'Complete app details'`), 'canonical component document differs from its validated catalog default');
+    await evaluate(client, `(() => { for (const [id, value] of [['organizationName', 'QA Community'], ['city', 'Salt Lake City']]) { const input = document.getElementById(id); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); } })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#starterPrimaryButton').textContent === 'Create signed preview'`), 'starter signed-preview action');
+    await evaluate(client, `document.querySelector('#starterPrimaryButton').focus()`);
+    await pressKey(client, 'Enter', 'Enter', 13);
+    starterActivations.push('create signed preview');
+    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Verified staging ready'
+      && document.querySelector('#buildHistoryState').textContent.includes('Exact verified preview track track_browser is confirmed')
+      && document.querySelector('#signedStarterPath').hidden`), 'verified preview and exact history confirmation remain separate and close the ephemeral starter');
+    assert.match(await evaluate(client, `document.querySelector('#starterRecoveryState').textContent`), /Exact workspace-bound signed preview verified; durable history confirmed; this preview is not published.*Track track_browser is a selector, not authority.*session-only acceptance token/isu, 'post-success handoff remains outside the hidden starter with exact trust, publication, selector, and Architect invitation boundaries');
+    assert.deepEqual(await evaluate(client, `({ hidden: document.querySelector('#recoveryInviteButton').hidden, label: document.querySelector('#recoveryInviteButton').textContent, title: document.querySelector('#recoveryInviteButton').title })`), { hidden: false, label: 'Invite a Viewer', title: 'Creates a Viewer invitation whose acceptance token is shown only in this browser session.' }, 'Architect post-success Viewer invitation remains role-valid and session-only');
+    assert.ok((await evaluate(client, `[document.querySelector('#recoveryInviteButton'), document.querySelector('#openNewestBuildButton')].filter((button) => !button.hidden).map((button) => button.getBoundingClientRect().height)`)).every((height) => height >= 44), 'visible post-success handoff actions are at least 44px');
+    const firstTrustedStarterEvidence = await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').srcdoc, raw: document.querySelector('#rawManifest').textContent })`);
+    assert.deepEqual(starterActivations, [
+      'focus explicit template choice',
+      'choose Community Iftar template',
+      'choose Iftar registration',
+      'choose announcements',
+      'choose donation campaign',
+      'focus one declared component field',
+      'create signed preview',
+    ], 'the promoted first-success path records its exact control activations after workspace selection; text entry and network waits are excluded');
+    assert.ok(starterActivations.length <= 8, `signed first-success path must take no more than eight controls; observed ${starterActivations.length}`);
+    const firstPreviewRequest = requests.find((request) => request.method === 'POST' && request.path === '/api/artifacts/preview');
+    assert.equal(firstPreviewRequest.body.components.find((component) => component.id === 'iftar-registration').data.title, 'Customized signed registration', 'the meaningful non-default component document is the exact signed request');
+    assert.equal(JSON.parse(await evaluate(client, `document.querySelector('#rawManifest').textContent`)).components.find((component) => component.id === 'iftar-registration').data.title, 'Customized signed registration', 'the visible verified manifest contains the same meaningful component document');
+
+    const historyRecoveryActivations = [];
+    historyFailNext = true;
+    await evaluate(client, `document.querySelector('#retryBuildHistory').click()`);
+    historyRecoveryActivations.push('test exact-history failure');
+    await waitFor(() => evaluate(client, `document.querySelector('#buildHistoryState').textContent.includes('Exact history confirmation is pending; the verified preview and receipt are retained') && document.querySelector('#signedStarterPath').hidden`), 'history failure retains verified evidence and never revives inferred starter progress');
+    assert.deepEqual(await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').srcdoc, raw: document.querySelector('#rawManifest').textContent })`), firstTrustedStarterEvidence, 'history failure cannot replace trusted preview evidence');
+    await evaluate(client, `document.querySelector('#retryBuildHistory').click()`);
+    historyRecoveryActivations.push('retry exact-history confirmation');
+    await waitFor(() => evaluate(client, `document.querySelector('#buildHistoryState').textContent.includes('Exact verified preview track track_browser is confirmed')`), 'history confirmation retry');
+    assert.deepEqual(historyRecoveryActivations, ['test exact-history failure', 'retry exact-history confirmation'], 'history recovery is measured separately from the first-success activation budget');
+
+    const selectionTrack = structuredClone(activeTrackResponse.track);
+    selectionTrack.id = 'track_selection';
+    selectionTrack.updatedAt = '2026-08-18T03:00:00Z';
+    extraTracks.set(selectionTrack.id, selectionTrack);
+    delayTrackResponse = true;
+    const delayedRecoveryRequestStart = requests.length;
+    await within(client.send('Page.navigate', { url: origin }), 'delayed recovery navigation');
+    await waitFor(() => evaluate(client, `document.readyState === 'complete' && !document.querySelector('#loginForm').hidden`), 'delayed recovery login');
+    await evaluate(client, `(() => {
+      for (const [id, value] of [['loginEmail', 'qa@example.test'], ['loginPassword', 'correct horse battery staple']]) {
+        const input = document.getElementById(id); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      document.getElementById('loginForm').requestSubmit();
+    })()`);
+    await waitFor(() => requests.slice(delayedRecoveryRequestStart).some((request) => request.path === '/api/conductor/tracks/track_browser' && request.search === '?includeVerifiedPreview=true'), 'delayed newest verification request');
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Architect' && document.querySelectorAll('#buildHistoryList li').length === 2`), 'same-workspace alternate history selection');
+    await evaluate(client, `(() => { const item = [...document.querySelectorAll('#buildHistoryList li')].find((candidate) => candidate.querySelector('strong')?.textContent === 'track_selection'); item.querySelector('button').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTrackID').value === 'track_selection'`), 'newer same-workspace selection');
+    await wait(240);
+    assert.deepEqual(await evaluate(client, `({ selected: document.querySelector('#buildRecordTrackID').value, srcdoc: document.querySelector('#previewFrame').srcdoc, verified: document.querySelector('#previewStatus').textContent === 'Verified staging ready' })`), { selected: 'track_selection', srcdoc: '', verified: false }, 'an older automatic newest-track verification cannot overwrite a newer same-workspace history selection');
+    extraTracks.delete(selectionTrack.id);
+
+    includeInapplicableNewest = true;
+    const reloadRequestStart = requests.length;
+    await within(client.send('Page.navigate', { url: origin }), 'starter reload navigation');
+    await waitFor(() => evaluate(client, `document.readyState === 'complete' && !document.querySelector('#loginForm').hidden`), 'starter reload login');
+    await evaluate(client, `(() => {
+      for (const [id, value] of [['loginEmail', 'qa@example.test'], ['loginPassword', 'correct horse battery staple']]) {
+        const input = document.getElementById(id); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      document.getElementById('loginForm').requestSubmit();
+    })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Architect'
+      && document.querySelector('#previewStatus').textContent === 'Verified staging ready'
+      && document.querySelector('#starterRecoveryState').textContent.includes('Exact workspace-bound signed preview verified; durable history confirmed')
+      && document.querySelector('#starterRecoveryState').textContent.includes('exact component documents differ from the current validated catalog defaults')
+      && document.querySelector('#signedStarterPath').hidden
+      && !document.querySelector('#recoveryInviteButton').hidden`), 'fresh login derives customized signed progress from one exact verified track');
+    const reloadRequests = requests.slice(reloadRequestStart);
+    const reloadTrackReads = reloadRequests.filter((request) => request.method === 'GET' && request.path === '/api/conductor/tracks/track_browser');
+    assert.equal(reloadTrackReads.length, 1, 'fresh login verifies only the selected-or-newest history track, never every summary row');
+    assert.equal(reloadTrackReads[0].search, '?includeVerifiedPreview=true', 'fresh login uses the explicit verified-preview trust gate rather than a plain track read');
+    assert.equal(reloadRequests.some((request) => request.path === '/api/conductor/tracks/track_newest_draft'), false, 'newest draft summary without preview/artifact presence is skipped in favor of the older applicable signed preview');
+    assert.equal(reloadRequests.filter((request) => request.method === 'GET' && request.path === '/api/conductor/tracks/track_browser/events').length, 0, 'starter reload performs no event or N+1 inspection reads');
+    assert.equal(JSON.parse(await evaluate(client, `document.querySelector('#rawManifest').textContent`)).components.find((component) => component.id === 'iftar-registration').data.title, 'Customized signed registration', 'reload milestone compares the exact verified component documents with catalog defaults');
+    includeInapplicableNewest = false;
+
+    const evidenceBeforeLoaderFailures = await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').srcdoc, raw: document.querySelector('#rawManifest').textContent })`);
+    delayPeopleResponse = true;
+    failPeopleNext = true;
+    await evaluate(client, `document.querySelector('#retryPeople').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Checking access'
+      && document.querySelector('#recoveryInviteButton').hidden
+      && document.querySelector('#recoveryInviteButton').disabled`), 'People reload immediately withdraws post-success invitation authority while membership is loading');
+    await waitFor(() => evaluate(client, `document.querySelector('#peopleState').textContent.includes('Could not load workspace people')
+      && document.querySelector('#buildHistoryList').textContent.includes('track_browser')
+      && document.querySelector('#domainClaimSelect').value === 'claim_browser'
+      && document.querySelector('#templateSelect').disabled
+      && document.querySelector('#recoveryInviteButton').hidden
+      && document.querySelector('#recoveryInviteButton').disabled`), 'People failure leaves independent history and domain evidence visible while authority-sensitive controls stay disabled');
+    assert.deepEqual(await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').srcdoc, raw: document.querySelector('#rawManifest').textContent })`), evidenceBeforeLoaderFailures, 'People failure retains the trusted signed pair');
+    await evaluate(client, `document.querySelector('#retryPeople').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Architect'
+      && !document.querySelector('#templateSelect').disabled
+      && !document.querySelector('#recoveryInviteButton').hidden
+      && !document.querySelector('#recoveryInviteButton').disabled`), 'People retry restores role-sensitive builder and post-success invitation access');
+
+    domainFailNext = true;
+    await evaluate(client, `document.querySelector('#retryDomainClaims').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainClaimsState').textContent.includes('Domain evidence is unavailable')
+      && document.querySelector('#workspaceRole').textContent === 'Architect'
+      && document.querySelector('#buildHistoryList').textContent.includes('track_browser')
+      && !document.querySelector('#templateSelect').disabled`), 'domain failure leaves People authority and Build history independently usable');
+    assert.deepEqual(await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').srcdoc, raw: document.querySelector('#rawManifest').textContent })`), evidenceBeforeLoaderFailures, 'domain failure retains the trusted signed pair');
+    await evaluate(client, `document.querySelector('#retryDomainClaims').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainClaimSelect').value === 'claim_browser'`), 'domain evidence retry');
+
+    const trackReadsBeforeRecovery = requests.filter((request) => request.method === 'GET' && request.path === '/api/conductor/tracks/track_browser').length;
+    await evaluate(client, `document.querySelector('#openNewestBuildButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildRecordAlert').textContent.includes('Verified preview reopened')`), 'selected-or-newest recovery reopens one exact verified preview');
+    assert.equal(requests.filter((request) => request.method === 'GET' && request.path === '/api/conductor/tracks/track_browser').length - trackReadsBeforeRecovery, 2, 'selected-or-newest recovery performs one plain authorized read and one verified-preview trust-gate read, never an N+1 scan');
+    previewBuilds = 0;
     assert.match(await evaluate(client, `[...document.querySelector('#domainClaimSelect').options].map((option) => option.textContent).join(' ')`), /pending.*revoked.*expired/isu, 'real pending, revoked, and expired claim states render honestly');
     await evaluate(client, `(() => { const select = document.querySelector('#domainClaimSelect'); select.value = 'claim_pending'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#domainClaimsState').textContent.includes('Verify an already-published proof') && document.querySelector('#domainProof').hidden && !document.querySelector('#verifyDomainButton').disabled`), 'pending claim next action never synthesizes a TXT proof');
@@ -1121,9 +1317,12 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       assert.ok(request, `${requiredPath} must be reached through the cockpit`);
       assert.equal(request.authorization, `Bearer ${token}`, `${requiredPath} must use the login token`);
     }
-    const previewRequests = requests.filter((item) => previewFiles.has(item.path) && item.authorization === `Bearer ${token}`);
-    assert.deepEqual(previewRequests.map((item) => item.path).sort(), [...previewFiles.keys()].sort(), 'all signed preview files must be fetched with authentication');
-    const artifactRequest = requests.find((item) => item.path === '/api/artifacts/preview');
+    const previewRequests = requests.filter((item) => previewFiles.has(item.path));
+    assert.ok(previewRequests.length >= previewFiles.size, 'the cockpit must fetch every signed preview file');
+    for (const request of previewRequests) assert.equal(request.authorization, `Bearer ${token}`, `${request.path} must use the login token on every verified reopen`);
+    assert.deepEqual([...new Set(previewRequests.map((item) => item.path))].sort(), [...previewFiles.keys()].sort(), 'authenticated preview fetches must cover the exact signed file set even when verified reopens repeat them');
+    const artifactRequest = requests.filter((item) => item.method === 'POST' && item.path === '/api/artifacts/preview').at(-1);
+    assert.ok(artifactRequest, 'the advanced component matrix must submit a signed preview request');
     assert.equal(artifactRequest.body.workspaceId, 41);
     assert.equal(artifactRequest.body.templateId, 'community-iftar');
     assert.deepEqual(artifactRequest.body.modules, ['iftar-registration', 'announcements', 'donation-campaign']);
@@ -1291,6 +1490,8 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
 
     const runtimeRequestsBeforeScopeSwitch = requests.filter((item) => item.path === '/assets/datastar-v1.0.2.js').length;
     delayRuntimeResponse = true;
+    delaySecondPrincipalHistory = true;
+    const secondPrincipalRequestStart = requests.length;
     await evaluate(client, `(() => { document.querySelector('#trackLookup').value = 'track_browser'; document.querySelector('#loadTrackButton').click(); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTrackID').value === 'track_browser'`), 'principal-switch build inspection');
     await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
@@ -1306,6 +1507,11 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     await waitFor(() => evaluate(client, `!document.querySelector('#appView').hidden && document.querySelector('#profileName').textContent === 'Second Architect' && document.querySelector('#workspaceSelect').value === '41'`), 'second principal workspace');
     await wait(240);
     assert.deepEqual(await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').getAttribute('srcdoc'), manifestHidden: document.querySelector('#manifestList').hidden, template: document.querySelector('#templateSelect').value, selected: document.querySelectorAll('#moduleList input:checked').length })`), { srcdoc: null, manifestHidden: true, template: '', selected: 0 }, 'a delayed runtime response cannot restore another principal\'s preview, receipt, or component draft');
+    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Verified staging ready'
+      && document.querySelector('#starterRecoveryState').textContent.includes('Exact workspace-bound signed preview verified; durable history confirmed')`), 'second principal authorized signed-history recovery');
+    const secondPrincipalRequests = requests.slice(secondPrincipalRequestStart);
+    assert.equal(secondPrincipalRequests.filter((item) => item.method === 'GET' && item.path === '/api/conductor/tracks/track_browser' && item.search === '?includeVerifiedPreview=true' && item.authorization === `Bearer ${secondToken}`).length, 1, 'the new principal performs one independently authorized verified-track reopen');
+    assert.deepEqual(await evaluate(client, `({ manifestHidden: document.querySelector('#manifestList').hidden, template: document.querySelector('#templateSelect').value, selected: document.querySelectorAll('#moduleList input:checked').length })`), { manifestHidden: false, template: '', selected: 0 }, 'authorized recovery restores trusted evidence without copying another principal\'s local component draft');
   } finally {
     await closeChromium(chromium, 'component-journey');
     server.closeAllConnections?.();
@@ -1321,6 +1527,7 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
   const cockpitHTML = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const requests = [];
   let viewerAccepted = false;
+  let roleHistoryEmpty = true;
   let bazaarAttempts = 0;
   let delayedWorkspace41Responses = 0;
   let delayedProposalResponses = 0;
@@ -1430,14 +1637,18 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     if (request.method === 'GET' && pathName === '/api/modules' && actor) return json(200, { modules, componentDocumentPolicy: roleComponentPolicy });
     if (request.method === 'GET' && pathName === '/api/conductor/tracks' && actor) {
       if (bearer === 'viewer-token' && !viewerAccepted) return json(403, { error: { code: 'workspace_forbidden', message: 'Workspace access forbidden.' } });
-      return json(200, { tracks: [{ id: roleTrack.id, templateId: roleTrack.request.templateId, status: roleTrack.status, version: roleTrack.version, updatedAt: roleTrack.updatedAt, previewPresent: true, artifactPresent: true, publicationPresent: false, authorizationExpiresAt: roleTrack.preview.authorizationExpiresAt }] });
+      return json(200, { tracks: roleHistoryEmpty ? [] : [{ id: roleTrack.id, templateId: roleTrack.request.templateId, status: roleTrack.status, version: roleTrack.version, updatedAt: roleTrack.updatedAt, previewPresent: true, artifactPresent: true, publicationPresent: false, authorizationExpiresAt: roleTrack.preview.authorizationExpiresAt }] });
     }
     if (request.method === 'GET' && pathName === `/api/conductor/tracks/${roleTrack.id}` && actor) {
       if (bearer === 'viewer-token' && !viewerAccepted) return json(403, { error: { code: 'workspace_forbidden', message: 'Workspace access forbidden.' } });
       return json(200, roleTrack);
     }
     if (request.method === 'GET' && pathName === `/api/conductor/tracks/${roleTrack.id}/events` && actor) return json(200, { events: [{ type: 'PREVIEW_READY', toStatus: 'PREVIEW_READY', trackVersion: 6, createdAt: roleTrack.updatedAt, detail: { email: 'never-render-role-detail@example.test' } }] });
-    if (request.method === 'GET' && pathName === '/api/workspaces/41/domains' && bearer === 'architect-token') return json(200, { claims: [] });
+    if (request.method === 'GET' && pathName === '/api/workspaces/41/domains' && actor) {
+      return bearer === 'architect-token'
+        ? json(200, { claims: [] })
+        : json(403, { error: { code: 'domain_forbidden', message: 'Domain evidence is unavailable for this membership.' } });
+    }
     if (request.method === 'POST' && pathName === '/api/artifacts/preview' && bearer === 'maintainer-token') return json(422, { error: { code: 'invalid_composition', message: 'Synthetic stop after new-track request capture.' } });
     if (request.method === 'GET' && pathName === '/api/financial/flows' && actor) return json(200, { flows });
     if (request.method === 'POST' && pathName === '/api/shura/v1/invitations' && bearer === 'architect-token') {
@@ -1550,6 +1761,13 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
 
     await login(client, 'architect@example.test');
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Architect' && document.querySelector('#templateCatalogCount').textContent.includes('3 real templates · 11 real modules')`), 'architect workspace and catalog');
+    await waitFor(() => evaluate(client, `!document.querySelector('#signedStarterPath').hidden && !document.querySelector('#starterInviteButton').disabled && document.querySelector('#starterInviteButton').textContent === 'Invite a Viewer'`), 'Architect exact-empty starter invitation action');
+    await evaluate(client, `document.querySelector('#starterInviteButton').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#peopleSurface').hidden && document.activeElement?.id === 'invitee' && document.querySelector('#inviteRole').value === 'Viewer' && document.querySelector('#workspaceAnnouncer').textContent.includes('session-only')`), 'starter Viewer invitation focus and live announcement');
+    await evaluate(client, `(() => { document.querySelector('#invitee').value = 'viewer@example.test'; document.querySelector('#createInviteButton').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#inviteTokenOutput').value === 'accept_browser_viewer' && document.querySelectorAll('#invitationList li').length === 1`), 'starter creates a real session-only Viewer invitation');
+    assert.match(await evaluate(client, `document.querySelector('#peopleSurface').innerText`), /only records created or accepted in this browser session/iu);
+    await evaluate(client, `document.querySelector('#buildTab').click()`);
     const catalog = await evaluate(client, `(() => {
       const select = document.querySelector('#templateSelect'); select.value = 'community-workspace'; select.dispatchEvent(new Event('change', { bubbles: true }));
       return { templates: select.options.length, modules: document.querySelectorAll('#moduleList input[name="selectedModule"]').length, checked: document.querySelectorAll('#moduleList input[name="selectedModule"]:checked').length };
@@ -1557,6 +1775,9 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     assert.deepEqual(catalog, { templates: 4, modules: 11, checked: 0 }, 'real catalog requires explicit template and component choices; no catalog data is invented or implicitly selected');
     await evaluate(client, `(() => { for (let index = 0; index < 3; index += 1) document.querySelector('#moduleList input[name="selectedModule"]:not(:checked)').click(); })()`);
     await waitFor(() => evaluate(client, `document.querySelectorAll('#moduleList input[name="selectedModule"]:checked').length === 3`), 'organizer explicit component choices');
+    roleHistoryEmpty = false;
+    await evaluate(client, `document.querySelector('#retryBuildHistory').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#signedStarterPath').hidden && !document.querySelector('#openNewestBuildButton').hidden && document.querySelector('#buildHistoryList').textContent.includes('track_role_handoff')`), 'real nonempty history replaces the ephemeral starter with selected-or-newest recovery');
 
     delayedWorkspace41Responses = 1;
     await evaluate(client, `(() => {
@@ -1575,10 +1796,7 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '41' && document.querySelectorAll('#peopleList li').length === 2`), 'return to workspace A');
 
     await evaluate(client, `document.querySelector('#peopleTab').click()`);
-    await waitFor(() => evaluate(client, `!document.querySelector('#peopleSurface').hidden && document.querySelectorAll('#peopleList li').length === 2`), 'architect people surface');
-    await evaluate(client, `(() => { document.querySelector('#invitee').value = 'viewer@example.test'; document.querySelector('#inviteRole').value = 'Viewer'; document.querySelector('#createInviteButton').click(); })()`);
-    await waitFor(() => evaluate(client, `document.querySelector('#inviteTokenOutput').value === 'accept_browser_viewer' && document.querySelectorAll('#invitationList li').length === 1`), 'real invitation grant');
-    assert.match(await evaluate(client, `document.querySelector('#peopleSurface').innerText`), /only records created or accepted in this browser session/iu);
+    await waitFor(() => evaluate(client, `!document.querySelector('#peopleSurface').hidden && document.querySelectorAll('#peopleList li').length === 2 && document.querySelectorAll('#invitationList li').length === 1`), 'architect People surface retains only this session’s invitation');
 
     await evaluate(client, `document.querySelector('#shuraTab').click()`);
     assert.equal(await evaluate(client, `document.querySelectorAll('#proposalList li').length`), 0, 'Shura must not synthesize a proposal feed');
@@ -1626,6 +1844,8 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     await waitFor(() => evaluate(client, `document.readyState === 'complete' && !document.querySelector('#loginForm').hidden`), 'session refresh login');
     await login(client, 'architect@example.test');
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Architect'`), 'architect after refresh');
+    assert.deepEqual(await evaluate(client, `({ grantHidden: document.querySelector('#inviteGrant').hidden, token: document.querySelector('#inviteTokenOutput').value, sessionInvites: document.querySelectorAll('#invitationList li').length })`), { grantHidden: true, token: '', sessionInvites: 0 }, 'page reload clears the session-only invitation token, grant, and in-memory invitation list before further work');
+    await waitFor(() => evaluate(client, `document.querySelector('#signedStarterPath').hidden && !document.querySelector('#openNewestBuildButton').hidden && document.querySelector('#buildHistoryList').textContent.includes('track_role_handoff')`), 'reload derives completed starter progress only from real server history');
     await waitFor(() => evaluate(client, `document.querySelector('#templateSelect').value === 'community-workspace' && document.querySelectorAll('#moduleList input:checked').length === 3`), 'principal workspace component draft after page refresh');
     await evaluate(client, `document.querySelector('#shuraTab').click(); document.querySelector('#proposalLookup').value = 'proposal_browser_role'; document.querySelector('#loadProposalButton').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#proposalDecisionID').value === 'decision_browser' && document.querySelector('#financeDecision').value === 'decision_browser'`), 'decision recovery after page refresh');
@@ -1723,15 +1943,20 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     assert.deepEqual(principalBoundary, { grantHidden: true, grantValue: '', decisionHidden: true, financeDecision: '', sessionInvites: 0, people: '', role: 'Select a workspace' }, 'sign-out must reject delayed prior-principal responses and clear invitation and decision handoffs');
     const isolated = await fetch(`${origin}/api/workspaces/41/people`, { headers: { Authorization: 'Bearer viewer-token' } });
     assert.equal(isolated.status, 403, 'Viewer must not see a workspace before accepting its invitation');
+    roleHistoryEmpty = true;
     await evaluate(client, `document.querySelector('#peopleTab').click()`);
     await evaluate(client, `(() => { document.querySelector('#acceptInviteToken').value = 'accept_browser_viewer'; document.querySelector('#acceptInviteButton').click(); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Viewer' && document.querySelector('#workspaceSelect').value === '41'`), 'Viewer invitation acceptance');
     assert.equal(await evaluate(client, `document.querySelector('#templateSelect').value`), '', 'component drafts never cross principal scope');
+    await waitFor(() => evaluate(client, `!document.querySelector('#signedStarterPath').hidden && document.querySelector('#starterPrimaryButton').disabled && document.querySelector('#starterPrimaryButton').textContent === 'Viewer inspect-only' && document.querySelector('#starterInviteButton').disabled`), 'Viewer exact-empty starter is inspect-only');
+    roleHistoryEmpty = false;
+    await evaluate(client, `document.querySelector('#retryBuildHistory').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#buildHistoryList').textContent.includes('track_role_handoff')`), 'Viewer authorized build-history read');
     await evaluate(client, `document.querySelector('#buildHistoryList button').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTrackID').value === 'track_role_handoff'`), 'Viewer build inspection');
     const viewerBuildControls = await evaluate(client, `({ draft: document.querySelector('#restoreBuildDraftButton').disabled, resumeHidden: document.querySelector('#resumeBuildButton').hidden, domain: document.querySelector('#domainOrigin').disabled, issue: document.querySelector('#claimDomainButton').disabled })`);
     assert.deepEqual(viewerBuildControls, { draft: true, resumeHidden: true, domain: true, issue: true }, 'Viewer history is inspect-only and domain mutation remains unavailable');
+    assert.match(await evaluate(client, `document.querySelector('#domainClaimsState').textContent`), /Domain evidence is unavailable.*no mutation controls are enabled/isu, 'Viewer domain authorization failure is honest while history remains independently inspectable');
     assert.doesNotMatch(await evaluate(client, `document.querySelector('#buildTimeline').innerText`), /never-render-role-detail/u, 'Viewer timeline excludes event detail');
     await evaluate(client, `(() => { const select = document.querySelector('#templateSelect'); select.value = 'community-workspace'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelectorAll('#moduleList input[name="selectedModule"]').length === 11`), 'Viewer component catalog');
@@ -1746,9 +1971,15 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     assert.equal(crossWorkspace.status, 403, 'workspace people reads remain isolated');
 
     await evaluate(client, `document.querySelector('#logoutButton').click()`);
+    roleHistoryEmpty = true;
     await login(client, 'maintainer@example.test');
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Maintainer'`), 'Maintainer role');
     assert.equal(await evaluate(client, `document.querySelector('#templateSelect').value`), '', 'Maintainer begins with an independent principal-scoped draft');
+    await waitFor(() => evaluate(client, `!document.querySelector('#signedStarterPath').hidden && !document.querySelector('#starterPrimaryButton').disabled && document.querySelector('#starterInviteButton').disabled && document.querySelector('#starterInviteButton').textContent.includes('Ask an Architect')`), 'Maintainer starter can build but delegates Viewer invitation authority');
+    assert.match(await evaluate(client, `document.querySelector('#starterInviteButton').title`), /existing member/iu);
+    assert.match(await evaluate(client, `document.querySelector('#domainClaimsState').textContent`), /Domain evidence is unavailable.*no mutation controls are enabled/isu, 'Maintainer domain authorization failure does not block the independently authorized starter');
+    roleHistoryEmpty = false;
+    await evaluate(client, `document.querySelector('#retryBuildHistory').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#buildHistoryList').textContent.includes('track_role_handoff')`), 'Maintainer authorized build-history read');
     await evaluate(client, `document.querySelector('#buildHistoryList button').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTrackID').value === 'track_role_handoff' && !document.querySelector('#restoreBuildDraftButton').disabled`), 'Maintainer build inspection and draft permission');
@@ -1761,7 +1992,9 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     assert.equal(maintainerBuild.body.components.find((component) => component.id === 'announcements').data.title, 'Maintainer-owned revision');
     assert.equal(Object.hasOwn(maintainerBuild.body, 'trackId'), false, 'history handoff never transfers the source track identity');
     assert.equal(Object.hasOwn(maintainerBuild.body, 'createdBy'), false, 'history handoff never transfers creator authority');
-    assert.equal(requests.some((request) => request.bearer !== 'architect-token' && request.path === '/api/workspaces/41/domains'), false, 'Viewer and Maintainer never call Architect-only domain claim APIs');
+    const domainReadsByRole = new Set(requests.filter((request) => request.method === 'GET' && request.path === '/api/workspaces/41/domains').map((request) => request.bearer));
+    assert.deepEqual([...domainReadsByRole].sort(), ['architect-token', 'maintainer-token', 'viewer-token'], 'People, history, and domain evidence load independently while the server remains authoritative for each role');
+    assert.equal(requests.some((request) => request.method !== 'GET' && request.path.startsWith('/api/workspaces/41/domains') && request.bearer !== 'architect-token'), false, 'Viewer and Maintainer never attempt domain mutation');
     await evaluate(client, `document.querySelector('#shuraTab').click(); (() => { document.querySelector('#proposalTitle').value = 'Schedule the pantry rota'; document.querySelector('#proposalBody').value = 'Approve the volunteer rota for one month.'; document.querySelector('#createProposalButton').click(); })()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#proposalRecord').hidden && document.querySelector('#proposalLookup').value === 'proposal_maintainer'`), 'Maintainer proposal create');
     const maintainerControls = await evaluate(client, `({ vote: document.querySelector('#approveVoteButton').disabled, decide: document.querySelector('#approveDecisionButton').disabled, create: document.querySelector('#createProposalButton').disabled })`);
