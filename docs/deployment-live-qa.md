@@ -407,3 +407,79 @@ The external Codex Browser trusted-path limitation is recorded in the QA ledger
 but, under the current control-room charter, does not block this deployment or
 replace the promoted real-Chromium evidence with a claimed independent browser
 pass.
+
+## 2026-08-19 Signed Starter Path handoff
+
+Application source checkpoint `f3cc84d` contains feature commit `4064cf9` and
+the canonical approved research/docs commit. The starter is derived, ephemeral
+UI orchestration only: it adds no completion record, endpoint, migration,
+analytics, email, public link, sample activity, or authority type. It appears
+only after the selected authorized workspace's Build History independently
+returns a successful zero-row result. Loading, failure, no-workspace, and
+non-empty history remain distinct, and the existing composer, history, domain
+recovery, and five workspace tools stay available.
+
+The path requires explicit selection from the real template and module catalogs
+and an exact component-document change from the validated catalog default.
+Preview success still requires the complete active manifest, document, file,
+workspace, signature, origin, lifecycle, and expiry verifier. Durable history
+confirmation is a separate outcome; its failure retains the trusted preview and
+reports confirmation pending. On reload, one selected or newest applicable
+summary is reopened through `includeVerifiedPreview=true`; summary presence is
+never treated as verification and no history N+1 is performed. People, history,
+and domain requests retain independent epochs, and invitation output remains
+session-only. Architect, Maintainer, and Viewer handoffs preserve their existing
+server-authorized boundaries.
+
+The final integrated release gate passed every Go package/command test, both
+production binary builds, `git diff --check`, and all 13 Node tests. The promoted
+real-Chromium journeys record seven keyboard control activations from selected
+workspace to active Verified, excluding text entry and network wait. They also
+cover meaningful non-default documents, history-confirmation retry, selected or
+newest applicable recovery without N+1, delayed workspace/principal/track
+responses, independent People/history/domain failures, session-only invitations,
+role-specific actions, 44-pixel targets, and 320/400/effective-200% reflow.
+Independent review approved the final implementation and test contract.
+
+The canonical research note remains byte-for-byte at SHA-256
+`BFB37A0C52E2D308563A3857C9B6CD6B0969F79EB645B68532BF2B93F01BFD10`.
+The independent QA ledger was not rewritten and remains at SHA-256
+`0559B096450C32F94B08ED10995E3CD01F87A26BD3B9CCF58C7C8F9591481D7B`.
+
+Railway deployment `b2fa4543-1627-4d08-b68a-5416f1e0006f` reached terminal
+`SUCCESS` with image digest
+`sha256:92d647c6932534d774ae3baf9bba7e80799844b469b237a0a82b335e24f9d9c2`.
+Eight low-rate health/root pairs returned 16/16 `200` with the expected
+`status=ok` and Taawun document; observed latency was 175–470 ms. The bounded
+runtime readback contains one container start, database initialization, server
+bind, and accepted authentication events. Railway labels the Go process's stderr
+records as `error`, but their messages are informational; no panic, exit, or
+application-error message appeared. The bounded HTTP `>=500` readback was empty.
+
+The corrected live promotion smoke registered organizer `51`, created workspace
+`35`, and read the real three-template/eleven-module catalog. Customized
+`community-iftar` preview request `p0Ue6KUMSYuJfx3n-_9nXA` returned `201` track
+`track_FWatBZgD92IS04sJIjqPsGVH`; the independently recomputed manifest digest
+matched, and the exact custom scalar/array component document round-tripped.
+Authorized history returned the track `200` with `no-store` and `nosniff`.
+After discarding the bearer and signing in again, history and the single exact
+verified reopen both returned `200` with the same manifest digest. Supported
+cleanup deleted workspace `35` and user `51` with `204/204`; the old token then
+returned `401`.
+
+An earlier smoke fixture (`50`/workspace `34`) also built and confirmed history,
+but the PowerShell harness interpolated an undelimited track variable into
+`/api/conductor/tracks/=true`; Railway correctly recorded that malformed path as
+`404`. It was a harness defect, not an application failure. Its `finally` block
+deleted workspace/user through supported routes with `204/204`, and the old token
+returned `401`; no track/artifact identifier or credential from that malformed
+verification attempt was retained, and no orphan remains.
+
+This handoff claims no fresh Codex Browser credit. The external Browser bridge is
+non-blocking under the current charter, while the promoted real-Chromium evidence
+remains the technical UI gate. The real five-person comprehension study is still
+pending post-deploy private-beta product validation; no participants or results
+are fabricated, and it is not a technical deployment blocker. Rollback remains
+application `cedacb0` / Railway deployment
+`d446f826-bb48-4005-afc4-98e7fac8e046`, to be restored through Railway's
+supported release path only for a confirmed application-caused regression.
