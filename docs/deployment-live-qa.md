@@ -483,3 +483,88 @@ are fabricated, and it is not a technical deployment blocker. Rollback remains
 application `cedacb0` / Railway deployment
 `d446f826-bb48-4005-afc4-98e7fac8e046`, to be restored through Railway's
 supported release path only for a confirmed application-caused regression.
+
+## 2026-08-19 signed runtime execution repair handoff
+
+Application commit `c1e4aa5` closes the Signed Starter Path runtime trust P1.
+The cockpit no longer loads its public Datastar asset. After complete active
+manifest attestation and exact track binding, it parses the unique safe
+`manifest.files` descriptors and binds `index.html`, `theme.css`, `app.css`, and
+the bundled runtime to the current authenticated track file route. Every file is
+fetched with the current Bearer token and `cache: no-store`, then checked for
+exact raw byte length and SHA-256 before strict UTF-8 decoding. The document's
+runtime tag must name the manifest runtime, but only the verified track-scoped
+runtime bytes are inlined. No receipt or iframe is committed before all checks
+and the current draft/workspace/principal guard pass.
+
+Missing, duplicate, malformed, wrong-track, query-bearing, 404, byte-length,
+same-length SHA, UTF-8, and stale-response failures retain the prior trusted
+receipt and iframe and keep publication disabled. Promoted Chromium covers each
+signed file independently, the canonical-LF signed runtime versus a byte-
+different CRLF public fixture, anonymous `401` and bearer `200`, zero public
+runtime use, one inline and zero external iframe runtimes, exact sandbox
+`allow-scripts allow-forms`, interaction, draft/workspace/principal races, and
+recovery. Removing the parent runtime's incidental bindings is limited to an
+explicit vanilla App-name presentation sync; no server contract, authority,
+persistence, component, starter-path, DNS, Bazaar, or publication behavior was
+expanded.
+
+The single integrated release sweep passed every Go package/command test, both
+production binary builds, `git diff --check`, and all 13 Node tests. The promoted
+real-Chromium journeys completed in approximately 10.3 and 4.3 seconds.
+Independent security/source review approved the exact URL, descriptor, byte,
+digest, cache, commit-order, recovery, sandbox, and bearer boundaries. The
+verbatim independent QA ledger P1 checkpoint is docs-only commit `772b3f9` and
+has complete-file SHA-256
+`36EED02785F0861C72C193BC55786851C9482E52CA24A8B6327B4C384695C53D`;
+its classification is unchanged pending independent retest.
+
+Railway deployment `431bc9b3-21b2-4e12-a4e1-c2a4a1fbfc39` reached terminal
+`SUCCESS` with image digest
+`sha256:d79c8682c0ca46a3a834901f4fce4083ccf67a63854b689adaac6333c96797a1`.
+Eight low-rate health/root pairs returned 16/16 `200`; health reported
+`status=ok`, the root contained the Taawun title and omitted the public runtime
+import, and observed pair latency was 488–757 ms. Bounded runtime output showed
+one container start, database initialization, and the server binding `:8080`.
+Railway labels the Go process's stderr records as `error`, but both messages are
+informational startup lines; the bounded HTTP `500..599` query was empty.
+A 58-request deployment sample contained 52 `2xx`, six intentional `4xx`, and
+zero `5xx`; p95 was 71 ms, p99 and maximum were 92 ms.
+
+The final live organizer smoke used the real three-template/eleven-module v2
+catalog and created workspace `42`, track
+`track_D7s9u5TeeDHmcnZ4hejtXMRF`, and artifact
+`art_c124a848bc27a178350999f2eecba8b5`. Preview request
+`97_5q6BVTvuUeB866WHkDg` returned `201` in 92 ms. The independently recomputed
+manifest digest was
+`7c6e23da78e167e47a188c6284cb436613ae0c547578e7c2384582d909d35f06`,
+the exact manifest and track relationships matched, and verified reload returned
+the same track and digest.
+
+The authenticated manifest runtime response was exactly 34,083 bytes with
+SHA-256
+`2837d87acf6ee0ba8e4e63765926c25a98d63883b02f88be194a86b81d3fd24a`;
+Railway request `iHDjkhacSWCM0wzX9I3ezw` returned `200` and 34,083 response
+bytes. The same signed-file URL without authority returned `401` under request
+`XFTszPtBRQ6ZCpeC0_TJvA`. For explicit comparison, the unused public asset still
+returned its raw 34,092-byte CRLF body with SHA-256
+`ad76a361fa0ba5dcda7478dc20925ee4cf397dca0619fae0ac848613f31ce662`;
+the deployed root does not import it and the repaired preview path does not fetch
+or execute it. Promoted Chromium proves the iframe source contains the exact
+34,083-byte signed runtime and no external runtime.
+
+Supported cleanup deleted workspace `42` and user `67` with `204/204` under
+requests `fEN-5YguRMGZR9my6WHkDg` and `f2Qy_LJGRwO0dKWHlt7tkg`; the old token
+then returned `401` under `k4PSZMXRSoiTFggh6WHkDg`. Two earlier bounded smoke
+attempts reached the runtime checks but their harnesses compared canonical
+component objects using order-sensitive strings. Both `finally` blocks returned
+workspace/user `204/204` and old-token `401`; the errors were harness-only, no
+credential was retained, and no fixture remains.
+
+This implementation handoff claims no fresh Codex Browser credit and does not
+self-close the independent ledger P1. QA should repeat the exact live runtime
+comparison, organizer history/fresh-login derivation, Viewer inspection/build
+denial, Maintainer actor-bound clone, stale loader recovery, and non-empty
+workspace regression on this deployment. Rollback remains application
+`cedacb0` / Railway `d446f826-bb48-4005-afc4-98e7fac8e046`; use its supported
+redeploy path only for a confirmed application-caused regression.
