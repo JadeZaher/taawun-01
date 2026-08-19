@@ -322,6 +322,7 @@ func main() {
 	api.HandleFunc("/templates", compositionHandler.Templates).Methods(http.MethodGet)
 	api.HandleFunc("/modules", compositionHandler.Modules).Methods(http.MethodGet)
 	api.HandleFunc("/artifacts/preview", compositionHandler.Preview).Methods(http.MethodPost)
+	api.HandleFunc("/conductor/tracks", compositionHandler.ListTracks).Methods(http.MethodGet)
 	api.HandleFunc("/conductor/tracks/{track_id}", compositionHandler.GetTrack).Methods(http.MethodGet)
 	api.HandleFunc("/conductor/tracks/{track_id}/events", compositionHandler.Events).Methods(http.MethodGet)
 	api.HandleFunc("/conductor/tracks/{track_id}/resume", compositionHandler.Resume).Methods(http.MethodPost)

@@ -148,6 +148,16 @@ func TestCompositionPublicationClaimStateIsActionable(t *testing.T) {
 	}
 }
 
+func TestCompositionWorkspaceForbiddenEnvelopeIsIndistinguishable(t *testing.T) {
+	first := httptest.NewRecorder()
+	second := httptest.NewRecorder()
+	writeCompositionServiceError(first, conductor.ErrWorkspaceForbidden)
+	writeCompositionServiceError(second, conductor.ErrWorkspaceForbidden)
+	if first.Code != http.StatusForbidden || second.Code != http.StatusForbidden || first.Body.String() != second.Body.String() || !strings.Contains(first.Body.String(), `"code":"workspace_forbidden"`) {
+		t.Fatalf("workspace denial envelopes = first:%d %s second:%d %s", first.Code, first.Body.String(), second.Code, second.Body.String())
+	}
+}
+
 func TestCompositionPreviewReturnsInvalidCompositionEnvelope(t *testing.T) {
 	service := &compositionServiceStub{composeErr: conductor.ErrInvalidComposition}
 	handler, err := NewCompositionHTTPHandler(service, artifactReaderStub{}, CurrentUser, []string{"http://localhost:8080"})
@@ -242,6 +252,85 @@ func TestCompositionValidationEnvelopeRedactsUntrustedMetadata(t *testing.T) {
 	writeCompositionServiceError(response, errors.Join(conductor.ErrInvalidComposition, &artifacts.ComponentValidationError{ComponentID: secretID, Key: secretKey, Reason: "reserved_key"}))
 	if response.Code != http.StatusUnprocessableEntity || strings.Contains(response.Body.String(), "secret-token") || strings.Contains(response.Body.String(), "credential") || strings.Contains(response.Body.String(), "password") || response.Body.Len() > 400 {
 		t.Fatalf("untrusted component metadata leaked: %s", response.Body.String())
+	}
+}
+
+func TestCompositionListTracksUsesBoundedWorkspaceQuery(t *testing.T) {
+	expiresAt := time.Date(2099, 8, 18, 4, 23, 28, 0, time.UTC)
+	service := &compositionServiceStub{listPage: conductor.TrackSummaryPage{Tracks: []conductor.TrackSummary{{
+		ID: "track-safe", TemplateID: "community-iftar", Status: conductor.TrackPreviewReady, Version: 6,
+		UpdatedAt: expiresAt.Add(-time.Hour), PreviewPresent: true, ArtifactPresent: true, AuthorizationExpiresAt: &expiresAt,
+	}}}}
+	handler, err := NewCompositionHTTPHandler(service, artifactReaderStub{}, CurrentUser, []string{"http://localhost:8080"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/conductor/tracks?workspaceId=42", nil)
+	request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 8, Role: models.RoleUser}))
+	response := httptest.NewRecorder()
+	handler.ListTracks(response, request)
+	if response.Code != http.StatusOK || service.listWorkspaceID != 42 || service.listLimit != conductor.DefaultTrackListLimit || service.listCursor != "" {
+		t.Fatalf("list response = %d %s; request = workspace:%d limit:%d cursor:%q", response.Code, response.Body.String(), service.listWorkspaceID, service.listLimit, service.listCursor)
+	}
+	if response.Header().Get("Cache-Control") != "no-store" || response.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("list response headers = %v", response.Header())
+	}
+	for _, forbidden := range []string{"workspaceId", "components", "createdBy", "signature", "failureCode", "token"} {
+		if strings.Contains(response.Body.String(), forbidden) {
+			t.Fatalf("list response leaked %q: %s", forbidden, response.Body.String())
+		}
+	}
+}
+
+func TestCompositionListTracksCapsLimitAndPreservesCursor(t *testing.T) {
+	service := &compositionServiceStub{listPage: conductor.TrackSummaryPage{Tracks: []conductor.TrackSummary{}, NextCursor: "next-safe"}}
+	handler, err := NewCompositionHTTPHandler(service, artifactReaderStub{}, CurrentUser, []string{"http://localhost:8080"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/conductor/tracks?workspaceId=42&limit=500&cursor=opaque-safe", nil)
+	request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7}))
+	response := httptest.NewRecorder()
+	handler.ListTracks(response, request)
+	if response.Code != http.StatusOK || service.listLimit != conductor.MaximumTrackListLimit || service.listCursor != "opaque-safe" || !strings.Contains(response.Body.String(), `"tracks":[]`) || !strings.Contains(response.Body.String(), `"nextCursor":"next-safe"`) {
+		t.Fatalf("capped list = status:%d body:%s limit:%d cursor:%q", response.Code, response.Body.String(), service.listLimit, service.listCursor)
+	}
+}
+
+func TestCompositionListTracksRejectsInvalidQueries(t *testing.T) {
+	tests := []string{
+		"", "?workspaceId=0", "?workspaceId=-1", "?workspaceId=42&limit=0", "?workspaceId=42&limit=nope",
+		"?workspaceId=42&cursor=", "?workspaceId=42&unexpected=value", "?workspaceId=42&workspaceId=43",
+		"?workspaceId=42&limit=1&limit=2", "?workspaceId=42&cursor=first&cursor=second",
+	}
+	for _, rawQuery := range tests {
+		t.Run(rawQuery, func(t *testing.T) {
+			service := &compositionServiceStub{}
+			handler, err := NewCompositionHTTPHandler(service, artifactReaderStub{}, CurrentUser, []string{"http://localhost:8080"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := httptest.NewRequest(http.MethodGet, "/api/conductor/tracks"+rawQuery, nil)
+			request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7}))
+			response := httptest.NewRecorder()
+			handler.ListTracks(response, request)
+			if response.Code != http.StatusBadRequest || service.listCalls != 0 || !strings.Contains(response.Body.String(), `"error"`) {
+				t.Fatalf("invalid query %q = status:%d body:%s calls:%d", rawQuery, response.Code, response.Body.String(), service.listCalls)
+			}
+		})
+	}
+
+	service := &compositionServiceStub{listErr: conductor.ErrInvalidTrackQuery}
+	handler, err := NewCompositionHTTPHandler(service, artifactReaderStub{}, CurrentUser, []string{"http://localhost:8080"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/conductor/tracks?workspaceId=42&cursor=not-a-valid-keyset", nil)
+	request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7}))
+	response := httptest.NewRecorder()
+	handler.ListTracks(response, request)
+	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), `"code":"invalid_track_query"`) {
+		t.Fatalf("invalid cursor = status:%d body:%s", response.Code, response.Body.String())
 	}
 }
 
@@ -476,6 +565,12 @@ type compositionServiceStub struct {
 	composeErr            error
 	rejectEmptyComponents bool
 	validateComponents    bool
+	listPage              conductor.TrackSummaryPage
+	listErr               error
+	listWorkspaceID       int
+	listLimit             int
+	listCursor            string
+	listCalls             int
 }
 
 func (s *compositionServiceStub) Compose(_ context.Context, actor *models.User, request conductor.CompositionRequest) (*conductor.ComposeResult, error) {
@@ -524,6 +619,14 @@ func (s *compositionServiceStub) RequestPublication(context.Context, *models.Use
 
 func (s *compositionServiceStub) ActivatePublication(context.Context, *models.User, string, int64) (*conductor.Track, error) {
 	return s.track, nil
+}
+
+func (s *compositionServiceStub) ListTracks(_ context.Context, _ *models.User, workspaceID, limit int, cursor string) (conductor.TrackSummaryPage, error) {
+	s.listCalls++
+	s.listWorkspaceID = workspaceID
+	s.listLimit = limit
+	s.listCursor = cursor
+	return s.listPage, s.listErr
 }
 
 func (s *compositionServiceStub) GetTrack(context.Context, *models.User, string) (*conductor.Track, error) {

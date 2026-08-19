@@ -30,3 +30,12 @@ components stay omitted in the legacy composition hash; default documents are
 resolved into the durable build request. Track cloning always deep-copies raw
 documents, and signed-artifact acceptance compares the exact request documents
 to the complete v2 manifest/file binding.
+
+Workspace build discovery is a bounded recovery index, not artifact evidence.
+Track summaries are authorized with the View capability, ordered by
+`(updated_at DESC, id DESC)`, and paged with an opaque keyset cursor. They expose
+only status/presence metadata. Callers must use the existing verified-preview
+reload to reopen and verify the immutable artifact. Resume keeps its stricter
+Build, original-creator, expected-version, and status checks; authorization and
+creator checks happen before version comparison so track IDs cannot be used as
+version oracles.

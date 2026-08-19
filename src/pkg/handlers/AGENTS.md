@@ -34,6 +34,13 @@ raw document. Verified track reload is opt-in and must reopen the immutable
 artifact before returning the same manifest digest/signature receipt used by the
 initial preview; persisted track shape alone is not verification.
 
+Workspace track listing is a recovery/discovery contract, not a global artifact
+registry. Require one positive `workspaceId`, default the limit to 20, cap it at
+50, and accept only the opaque cursor emitted by Conductor. Responses use
+`no-store`/`nosniff` and contain only redacted track summaries; component
+documents, actors, hashes, signatures, claims, publication details, raw failures,
+tokens, and event detail do not belong in the collection response.
+
 ## Railway client attribution
 
 Public throttles may accept Railway's documented `X-Real-IP` only when the

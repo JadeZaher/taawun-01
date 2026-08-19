@@ -16,6 +16,7 @@ import (
 	"net/netip"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -34,6 +35,7 @@ type CompositionService interface {
 	Resume(context.Context, *models.User, string, int64) (*conductor.Track, error)
 	RequestPublication(context.Context, *models.User, string, int64, string) (*conductor.Track, error)
 	ActivatePublication(context.Context, *models.User, string, int64) (*conductor.Track, error)
+	ListTracks(context.Context, *models.User, int, int, string) (conductor.TrackSummaryPage, error)
 	GetTrack(context.Context, *models.User, string) (*conductor.Track, error)
 	Events(context.Context, *models.User, string) ([]conductor.TrackEvent, error)
 }
@@ -217,6 +219,62 @@ func safeCorrelationID(value string) bool {
 		return false
 	}
 	return true
+}
+
+// ListTracks returns a bounded, redacted workspace history for recovery.
+func (h *CompositionHTTPHandler) ListTracks(w http.ResponseWriter, r *http.Request) {
+	actor, ok := h.actor(w, r)
+	if !ok {
+		return
+	}
+	query := r.URL.Query()
+	for key, values := range query {
+		if (key != "workspaceId" && key != "limit" && key != "cursor") || len(values) != 1 {
+			writeCompositionError(w, http.StatusBadRequest, "invalid_track_query", "The track list query is not valid.")
+			return
+		}
+	}
+	workspaceID, valid := positiveDecimal(query.Get("workspaceId"))
+	if !valid {
+		writeCompositionError(w, http.StatusBadRequest, "invalid_workspace", "Workspace ID must be a positive integer.")
+		return
+	}
+	limit := conductor.DefaultTrackListLimit
+	if values, present := query["limit"]; present {
+		parsed, valid := positiveDecimal(values[0])
+		if !valid {
+			writeCompositionError(w, http.StatusBadRequest, "invalid_limit", "Limit must be a positive integer.")
+			return
+		}
+		limit = parsed
+		if limit > conductor.MaximumTrackListLimit {
+			limit = conductor.MaximumTrackListLimit
+		}
+	}
+	cursor := query.Get("cursor")
+	if _, present := query["cursor"]; present && cursor == "" {
+		writeCompositionError(w, http.StatusBadRequest, "invalid_cursor", "Track cursor is not valid.")
+		return
+	}
+	page, err := h.service.ListTracks(r.Context(), actor, workspaceID, limit, cursor)
+	if err != nil {
+		writeCompositionServiceError(w, err)
+		return
+	}
+	writeCompositionJSON(w, http.StatusOK, page)
+}
+
+func positiveDecimal(value string) (int, bool) {
+	if value == "" || len(value) > 10 {
+		return 0, false
+	}
+	for _, character := range value {
+		if character < '0' || character > '9' {
+			return 0, false
+		}
+	}
+	parsed, err := strconv.Atoi(value)
+	return parsed, err == nil && parsed > 0
 }
 
 // GetTrack returns a workspace-authorized composition track.
@@ -436,6 +494,8 @@ func writeCompositionServiceError(w http.ResponseWriter, err error) {
 		writeCompositionError(w, http.StatusForbidden, "workspace_forbidden", "This account is not authorized for that workspace operation.")
 	case errors.Is(err, conductor.ErrTrackNotFound):
 		writeCompositionError(w, http.StatusNotFound, "track_not_found", "Composition track was not found.")
+	case errors.Is(err, conductor.ErrInvalidTrackQuery):
+		writeCompositionError(w, http.StatusBadRequest, "invalid_track_query", "The track list query is not valid.")
 	case errors.Is(err, conductor.ErrInvalidComposition):
 		writeCompositionError(w, http.StatusUnprocessableEntity, "invalid_composition", "The composition is not a valid curated request.")
 	case errors.Is(err, conductor.ErrTrackVersionConflict), errors.Is(err, conductor.ErrIdempotencyConflict), errors.Is(err, conductor.ErrTrackTransition):

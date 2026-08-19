@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS conductor_track_events (
     created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_conductor_events_track ON conductor_track_events(track_id, sequence);
+CREATE INDEX IF NOT EXISTS idx_conductor_tracks_workspace_updated ON conductor_tracks(workspace_id, updated_at DESC, id DESC);
 CREATE TRIGGER IF NOT EXISTS conductor_events_no_update BEFORE UPDATE ON conductor_track_events BEGIN SELECT RAISE(ABORT, 'Conductor events are append-only'); END;
 CREATE TRIGGER IF NOT EXISTS conductor_events_no_delete BEFORE DELETE ON conductor_track_events BEGIN SELECT RAISE(ABORT, 'Conductor events are append-only'); END;`
 	if _, err := r.db.Exec(schema); err != nil {
@@ -231,6 +232,62 @@ func (r *Repository) getTrack(ctx context.Context, trackID string) (*Track, erro
 		return nil, ErrTrackNotFound
 	}
 	return scanTrack(r.db.QueryRowContext(ctx, trackSelect+` WHERE id = ?`, trackID))
+}
+
+func (r *Repository) listTrackSummaries(ctx context.Context, workspaceID, limit int, cursor *trackListCursor) ([]TrackSummary, error) {
+	if workspaceID <= 0 || limit <= 0 {
+		return nil, ErrInvalidTrackQuery
+	}
+	query := `SELECT id, request_json, status, version, updated_at,
+        artifact_json <> '', preview_json <> '', publication_json <> '', preview_json
+        FROM conductor_tracks WHERE workspace_id = ?`
+	arguments := []any{workspaceID}
+	if cursor != nil {
+		query += ` AND (updated_at < ? OR (updated_at = ? AND id < ?))`
+		milliseconds := cursor.UpdatedAt.UnixMilli()
+		arguments = append(arguments, milliseconds, milliseconds, cursor.ID)
+	}
+	query += ` ORDER BY updated_at DESC, id DESC LIMIT ?`
+	arguments = append(arguments, limit)
+	rows, err := r.db.QueryContext(ctx, query, arguments...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	summaries := make([]TrackSummary, 0, limit)
+	for rows.Next() {
+		var summary TrackSummary
+		var requestJSON, previewJSON []byte
+		var status string
+		var updatedAt int64
+		if err := rows.Scan(&summary.ID, &requestJSON, &status, &summary.Version, &updatedAt,
+			&summary.ArtifactPresent, &summary.PreviewPresent, &summary.PublicationPresent, &previewJSON); err != nil {
+			return nil, err
+		}
+		var request struct {
+			TemplateID string `json:"templateId"`
+		}
+		if err := json.Unmarshal(requestJSON, &request); err != nil || !validIdentifier(request.TemplateID) {
+			return nil, fmt.Errorf("decode Conductor track summary")
+		}
+		summary.TemplateID = request.TemplateID
+		summary.Status = TrackStatus(status)
+		summary.UpdatedAt = time.UnixMilli(updatedAt).UTC()
+		if len(previewJSON) > 0 {
+			var preview struct {
+				AuthorizationExpiresAt time.Time `json:"authorizationExpiresAt"`
+			}
+			if err := json.Unmarshal(previewJSON, &preview); err != nil {
+				return nil, fmt.Errorf("decode Conductor preview summary")
+			}
+			if !preview.AuthorizationExpiresAt.IsZero() {
+				expiresAt := preview.AuthorizationExpiresAt.UTC()
+				summary.AuthorizationExpiresAt = &expiresAt
+			}
+		}
+		summaries = append(summaries, summary)
+	}
+	return summaries, rows.Err()
 }
 
 func getTrackTx(ctx context.Context, tx *sql.Tx, trackID string) (*Track, error) {

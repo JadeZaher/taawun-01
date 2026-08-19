@@ -3,6 +3,7 @@ package conductor
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -30,6 +31,12 @@ var (
 	ErrDependencyUnavailable  = errors.New("Conductor dependency unavailable")
 	ErrPublicationClaimState  = errors.New("Conductor publication claim is not currently verified")
 	ErrLegacyWorkflowDisabled = errors.New("legacy Docker/LTAP Conductor workflow is disabled")
+	ErrInvalidTrackQuery      = errors.New("invalid Conductor track list query")
+)
+
+const (
+	DefaultTrackListLimit = 20
+	MaximumTrackListLimit = 50
 )
 
 type TrackStatus string
@@ -125,6 +132,29 @@ type Track struct {
 	CreatedBy    int                     `json:"createdBy"`
 	CreatedAt    time.Time               `json:"createdAt"`
 	UpdatedAt    time.Time               `json:"updatedAt"`
+}
+
+// TrackSummary is the bounded workspace list view; verified reload remains the artifact trust gate.
+type TrackSummary struct {
+	ID                     string      `json:"id"`
+	TemplateID             string      `json:"templateId"`
+	Status                 TrackStatus `json:"status"`
+	Version                int64       `json:"version"`
+	UpdatedAt              time.Time   `json:"updatedAt"`
+	PreviewPresent         bool        `json:"previewPresent"`
+	ArtifactPresent        bool        `json:"artifactPresent"`
+	PublicationPresent     bool        `json:"publicationPresent"`
+	AuthorizationExpiresAt *time.Time  `json:"authorizationExpiresAt,omitempty"`
+}
+
+type TrackSummaryPage struct {
+	Tracks     []TrackSummary `json:"tracks"`
+	NextCursor string         `json:"nextCursor,omitempty"`
+}
+
+type trackListCursor struct {
+	UpdatedAt time.Time
+	ID        string
 }
 
 type TrackResult = Track
@@ -256,15 +286,15 @@ func (s *Service) Resume(ctx context.Context, actor *models.User, trackID string
 	if err != nil {
 		return nil, err
 	}
-	if track.Version != expectedVersion {
-		return nil, ErrTrackVersionConflict
-	}
-	if actor == nil || actor.ID != track.CreatedBy {
-		return nil, ErrWorkspaceForbidden
-	}
 	workspace, err := s.authorize(actor, track.WorkspaceID, models.WorkspaceCapabilityBuild)
 	if err != nil {
 		return nil, err
+	}
+	if actor.ID != track.CreatedBy {
+		return nil, ErrWorkspaceForbidden
+	}
+	if track.Version != expectedVersion {
+		return nil, ErrTrackVersionConflict
 	}
 	if !resumableStatus(track.Status) {
 		return nil, ErrTrackTransition
@@ -525,6 +555,59 @@ func (s *Service) GetTrack(ctx context.Context, actor *models.User, trackID stri
 		return nil, err
 	}
 	return track, nil
+}
+
+// ListTracks returns only safe summaries after a fresh workspace View authorization check.
+func (s *Service) ListTracks(ctx context.Context, actor *models.User, workspaceID, limit int, cursor string) (TrackSummaryPage, error) {
+	if limit < 1 || limit > MaximumTrackListLimit {
+		return TrackSummaryPage{}, ErrInvalidTrackQuery
+	}
+	if _, err := s.authorize(actor, workspaceID, models.WorkspaceCapabilityView); err != nil {
+		return TrackSummaryPage{}, err
+	}
+	var keyset *trackListCursor
+	if cursor != "" {
+		decoded, err := decodeTrackListCursor(cursor)
+		if err != nil {
+			return TrackSummaryPage{}, ErrInvalidTrackQuery
+		}
+		keyset = &decoded
+	}
+	tracks, err := s.repository.listTrackSummaries(ctx, workspaceID, limit+1, keyset)
+	if err != nil {
+		return TrackSummaryPage{}, err
+	}
+	page := TrackSummaryPage{Tracks: tracks}
+	if len(page.Tracks) > limit {
+		page.Tracks = page.Tracks[:limit]
+		last := page.Tracks[len(page.Tracks)-1]
+		page.NextCursor = encodeTrackListCursor(trackListCursor{UpdatedAt: last.UpdatedAt, ID: last.ID})
+	}
+	return page, nil
+}
+
+func encodeTrackListCursor(cursor trackListCursor) string {
+	value := strconv.FormatInt(cursor.UpdatedAt.UnixMilli(), 10) + "\n" + cursor.ID
+	return base64.RawURLEncoding.EncodeToString([]byte(value))
+}
+
+func decodeTrackListCursor(value string) (trackListCursor, error) {
+	if len(value) == 0 || len(value) > 256 {
+		return trackListCursor{}, ErrInvalidTrackQuery
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil || len(decoded) == 0 || len(decoded) > 192 {
+		return trackListCursor{}, ErrInvalidTrackQuery
+	}
+	parts := strings.Split(string(decoded), "\n")
+	if len(parts) != 2 || !validIdentifier(parts[1]) {
+		return trackListCursor{}, ErrInvalidTrackQuery
+	}
+	milliseconds, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil || milliseconds <= 0 || strconv.FormatInt(milliseconds, 10) != parts[0] {
+		return trackListCursor{}, ErrInvalidTrackQuery
+	}
+	return trackListCursor{UpdatedAt: time.UnixMilli(milliseconds).UTC(), ID: parts[1]}, nil
 }
 
 func (s *Service) Events(ctx context.Context, actor *models.User, trackID string) ([]TrackEvent, error) {

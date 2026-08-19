@@ -328,6 +328,44 @@ func TestTransientArtifactFailureCanResumeWithoutDockerFallback(t *testing.T) {
 	}
 }
 
+func TestResumeAuthorizesWorkspaceAndCreatorBeforeVersion(t *testing.T) {
+	harness := newConductorHarness(t)
+	harness.builder.buildErr = errors.New("signer temporarily unavailable")
+	result, err := harness.service.Compose(context.Background(), harness.owner, validCompositionRequest())
+	if !errors.Is(err, ErrDependencyUnavailable) || result == nil || result.Track == nil {
+		t.Fatalf("create resumable track: result=%+v err=%v", result, err)
+	}
+	correctVersion := result.Track.Version
+	wrongVersion := correctVersion + 100
+	for _, test := range []struct {
+		name  string
+		actor *models.User
+	}{
+		{name: "outsider", actor: &models.User{ID: 9}},
+		{name: "different build member", actor: &models.User{ID: 10}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var messages []string
+			for _, expectedVersion := range []int64{correctVersion, wrongVersion} {
+				resumed, err := harness.service.Resume(context.Background(), test.actor, result.Track.ID, expectedVersion)
+				if resumed != nil || !errors.Is(err, ErrWorkspaceForbidden) {
+					t.Fatalf("version %d resume = track:%+v err:%v", expectedVersion, resumed, err)
+				}
+				messages = append(messages, err.Error())
+			}
+			if messages[0] != messages[1] {
+				t.Fatalf("authorization response varied by expected version: %q != %q", messages[0], messages[1])
+			}
+		})
+	}
+	if resumed, err := harness.service.Resume(context.Background(), harness.owner, result.Track.ID, wrongVersion); resumed != nil || !errors.Is(err, ErrTrackVersionConflict) {
+		t.Fatalf("creator stale resume = track:%+v err:%v", resumed, err)
+	}
+	if harness.builder.buildCalls != 1 {
+		t.Fatalf("unauthorized or stale resume advanced build %d times", harness.builder.buildCalls)
+	}
+}
+
 func TestLegacyConductorFailsClosed(t *testing.T) {
 	legacy := NewConductorTrack(nil, nil)
 	if _, err := legacy.ExecuteTrack(context.Background(), &TrackRequest{}); !errors.Is(err, ErrLegacyWorkflowDisabled) {
@@ -381,7 +419,7 @@ func validCompositionRequest() CompositionRequest {
 type fakeWorkspaceAuthorizer struct{}
 
 func (*fakeWorkspaceAuthorizer) AuthorizeWorkspaceCapability(actor *models.User, workspaceID int, capability models.WorkspaceCapability) (*models.Workspace, error) {
-	if actor == nil || workspaceID != 42 || (actor.ID != 7 && !(actor.ID == 8 && capability == models.WorkspaceCapabilityView)) {
+	if actor == nil || workspaceID != 42 || (actor.ID != 7 && !(actor.ID == 8 && capability == models.WorkspaceCapabilityView) && !(actor.ID == 10 && capability == models.WorkspaceCapabilityBuild)) {
 		return nil, errors.New("denied")
 	}
 	return &models.Workspace{ID: 42, Status: models.WorkspaceStatusActive}, nil
