@@ -62,11 +62,14 @@ async function waitFor(check, label, timeout = 8_000) {
 }
 
 class DevToolsClient {
-  constructor(socket) {
+  constructor(socket, closureDetails = () => '') {
     this.socket = socket;
     this.sequence = 0;
     this.pending = new Map();
     this.listeners = new Map();
+    this.closed = false;
+    this.shutdownExpected = false;
+    this.closureDetails = closureDetails;
     socket.addEventListener('message', (event) => {
       const message = JSON.parse(String(event.data));
       if (message.id) {
@@ -78,16 +81,27 @@ class DevToolsClient {
       }
       for (const listener of this.listeners.get(message.method) || []) listener(message.params || {});
     });
+    const rejectPending = () => {
+      if (this.closed) return;
+      this.closed = true;
+      for (const pending of this.pending.values()) {
+        if (this.shutdownExpected && pending.method === 'Browser.close') pending.resolve({});
+        else pending.reject(new Error(`Chromium DevTools connection closed while ${pending.method} was pending${this.closureDetails()}`));
+      }
+      this.pending.clear();
+    };
+    socket.addEventListener('close', rejectPending, { once: true });
+    socket.addEventListener('error', rejectPending, { once: true });
   }
 
-  static async connect(url) {
+  static async connect(url, closureDetails) {
     assert.equal(typeof WebSocket, 'function', 'Node with built-in WebSocket support is required for the Chromium regression');
     const socket = new WebSocket(url);
     await new Promise((resolve, reject) => {
       socket.addEventListener('open', resolve, { once: true });
       socket.addEventListener('error', () => reject(new Error('Could not connect to Chromium DevTools')), { once: true });
     });
-    return new DevToolsClient(socket);
+    return new DevToolsClient(socket, closureDetails);
   }
 
   on(method, listener) {
@@ -95,16 +109,50 @@ class DevToolsClient {
     this.listeners.get(method).add(listener);
   }
 
+  expectShutdown() {
+    this.shutdownExpected = true;
+  }
+
   send(method, params = {}, sessionId) {
+    if (this.closed) return Promise.reject(new Error('Chromium DevTools connection is closed'));
     const id = ++this.sequence;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      this.socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
+      this.pending.set(id, { method, resolve, reject });
+      try {
+        this.socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
+      } catch (error) {
+        this.pending.delete(id);
+        reject(error);
+      }
     });
   }
 
   close() {
-    this.socket.close();
+    if (!this.closed) {
+      this.closed = true;
+      for (const pending of this.pending.values()) pending.reject(new Error('Chromium DevTools client closed'));
+      this.pending.clear();
+      this.socket.close();
+    }
+  }
+}
+
+async function closeChromium(chromium, label) {
+  if (!chromium) return;
+  chromium.client.expectShutdown();
+  try { await within(chromium.client.send('Browser.close'), `${label} browser close`, 1_000); } catch {}
+  chromium.client.close();
+  const waitForExit = async () => {
+    if (chromium.processHandle.exitCode !== null) return;
+    await Promise.race([
+      new Promise((resolve) => chromium.processHandle.once('exit', resolve)),
+      wait(1_000),
+    ]);
+  };
+  await waitForExit();
+  if (chromium.processHandle.exitCode === null) {
+    chromium.processHandle.kill();
+    await waitForExit();
   }
 }
 
@@ -126,8 +174,11 @@ async function launchChromium(executable, profileDirectory) {
   const args = [
     '--headless=new',
     '--disable-background-networking',
+    '--disable-breakpad',
+    '--disable-crash-reporter',
     '--disable-default-apps',
     '--disable-gpu',
+    '--disable-gpu-shader-disk-cache',
     '--no-first-run',
     '--no-default-browser-check',
     '--remote-debugging-address=127.0.0.1',
@@ -153,7 +204,8 @@ async function launchChromium(executable, profileDirectory) {
     const targets = await response.json();
     return targets.find((item) => item.type === 'page' && item.webSocketDebuggerUrl);
   }, 'Chromium page target');
-  return { processHandle, client: await DevToolsClient.connect(target.webSocketDebuggerUrl) };
+  const closureDetails = () => ` (exit=${processHandle.exitCode ?? 'running'}, signal=${processHandle.signalCode ?? 'none'}, stderr=${stderr.trim().slice(-800) || 'empty'})`;
+  return { processHandle, client: await DevToolsClient.connect(target.webSocketDebuggerUrl, closureDetails) };
 }
 
 async function pressKey(client, key, code, windowsVirtualKeyCode) {
@@ -344,22 +396,14 @@ test('mobile auth shell preserves its value and custody explanation with accessi
       }
     }
   } finally {
-    if (chromium) {
-      try { await chromium.client.send('Browser.close'); } catch {}
-      chromium.client.close();
-      await Promise.race([
-        new Promise((resolve) => chromium.processHandle.once('exit', resolve)),
-        wait(1_000),
-      ]);
-      if (chromium.processHandle.exitCode === null) chromium.processHandle.kill();
-    }
+    await closeChromium(chromium, 'responsive-journey');
     server.closeAllConnections?.();
     await new Promise((resolve) => server.close(resolve));
     await rm(tempDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
-test('customer cockpit renders an authenticated signed preview in the exact sandbox', async () => {
+test('customer cockpit renders an authenticated signed preview in the exact sandbox', { timeout: 90_000 }, async () => {
   const browser = await installedChromium();
   assert.ok(browser, 'Chromium is required; the cockpit browser regression cannot be skipped');
 
@@ -421,9 +465,38 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     'component-substitution-attested',
     'component-missing',
     'missing-fields',
+    'track-missing',
+    'track-id-missing',
+    'track-workspace',
+    'track-artifact',
+    'track-hash',
+    'track-preview-missing',
+    'track-preview-artifact',
+    'track-preview-hash',
+    'track-preview-workspace',
+    'track-preview-subject',
+    'track-preview-origins',
+    'track-preview-expiry',
+    'track-preview-public',
   ];
   let previewBuilds = 0;
   let activeTrackResponse = null;
+  let historyFailNext = false;
+  let delayHistoryResponse = false;
+  let resumeConflictOnce = true;
+  let activationFailNext = true;
+  let delayClaimResponse = false;
+  let delayVerifyResponse = false;
+  let delayPublicationRequest = false;
+  const trackEvents = new Map();
+  const extraTracks = new Map();
+  let domainClaims = [
+    { id: 'claim_browser', workspaceId: 41, origin: 'https://app.community.example', host: 'app.community.example', status: 'verified', challengeExpiresAt: '2099-08-17T00:00:00Z', verifiedAt: '2026-08-18T00:00:00Z', verificationExpiresAt: '2099-08-18T00:00:00Z', createdAt: '2026-08-18T00:00:00Z', updatedAt: '2026-08-18T00:00:00Z' },
+    { id: 'claim_pending', workspaceId: 41, origin: 'https://pending.community.example', host: 'pending.community.example', status: 'pending', challengeExpiresAt: '2099-08-18T12:00:00Z', createdAt: '2026-08-18T00:10:00Z', updatedAt: '2026-08-18T00:10:00Z' },
+    { id: 'claim_revoked', workspaceId: 41, origin: 'https://revoked.community.example', host: 'revoked.community.example', status: 'revoked', revocationReason: 'user', challengeExpiresAt: '2026-08-18T00:00:00Z', createdAt: '2026-08-18T00:20:00Z', updatedAt: '2026-08-18T00:20:00Z' },
+    { id: 'claim_expired', workspaceId: 41, origin: 'https://expired.community.example', host: 'expired.community.example', status: 'revoked', revocationReason: 'expired', challengeExpiresAt: '2026-08-18T00:00:00Z', createdAt: '2026-08-18T00:30:00Z', updatedAt: '2026-08-18T00:30:00Z' },
+  ];
+  let domainPublications = [];
   let failNextPreview = false;
   let delayTrackResponse = false;
   let incompleteCatalogNext = false;
@@ -434,9 +507,11 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     const chunks = [];
     for await (const chunk of request) chunks.push(chunk);
     const rawBody = Buffer.concat(chunks).toString('utf8');
+    const requestURL = new URL(request.url, 'http://localhost');
     const record = {
       method: request.method,
-      path: new URL(request.url, 'http://localhost').pathname,
+      path: requestURL.pathname,
+      search: requestURL.search,
       authorization: request.headers.authorization || '',
       body: rawBody ? JSON.parse(rawBody) : null,
     };
@@ -508,12 +583,97 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
         { id: 'donation-campaign', title: 'Donation campaign', dataClassifications: ['donation-intents'], allowedServerSignals: ['taawun_donation_status'], documentFields, defaultDocument: { title: 'Donation campaign', summary: 'Sandbox intent only.' } },
       ] });
     }
+    if (record.method === 'GET' && record.path === '/api/conductor/tracks') {
+      if (historyFailNext) {
+        historyFailNext = false;
+        return json(503, { error: { code: 'composition_dependency_unavailable', message: 'Synthetic history interruption.' } });
+      }
+      if (delayHistoryResponse) {
+        delayHistoryResponse = false;
+        await wait(180);
+      }
+      const workspaceID = Number(requestURL.searchParams.get('workspaceId'));
+      const all = [activeTrackResponse?.track, ...extraTracks.values()].filter((track) => track && Number(track.workspaceId) === workspaceID);
+      const tracks = all.map((track) => ({ id: track.id, templateId: track.request?.templateId || '', status: track.status, version: track.version, updatedAt: track.updatedAt, previewPresent: Boolean(track.preview), artifactPresent: Boolean(track.artifact), publicationPresent: Boolean(track.publication), authorizationExpiresAt: track.preview?.authorizationExpiresAt }));
+      return json(200, { tracks });
+    }
+    if (record.method === 'GET' && record.path === '/api/workspaces/41/domains') return json(200, { claims: domainClaims });
+    if (record.method === 'GET' && record.path === '/api/workspaces/42/domains') return json(200, { claims: [] });
+    if (record.method === 'GET' && /^\/api\/workspaces\/41\/domains\/[^/]+\/publications$/u.test(record.path)) return json(200, { publications: domainPublications });
+    if (record.method === 'POST' && record.path === '/api/workspaces/41/domains') {
+      const claim = { id: 'claim_rotated', workspaceId: 41, origin: record.body.origin, host: new URL(record.body.origin).host, status: 'pending', challengeExpiresAt: '2099-08-18T12:00:00Z', createdAt: '2026-08-18T01:00:00Z', updatedAt: '2026-08-18T01:00:00Z' };
+      domainClaims = [claim, ...domainClaims.filter((entry) => entry.origin !== claim.origin)];
+      if (delayClaimResponse) {
+        delayClaimResponse = false;
+        await wait(180);
+      }
+      return json(201, { claim, verification: { recordType: 'TXT', recordName: `_taawun.${claim.host}`, value: 'taawun-verify=synthetic-new-proof', expiresAt: claim.challengeExpiresAt } });
+    }
+    if (record.method === 'GET' && /^\/api\/workspaces\/41\/domains\/[^/]+$/u.test(record.path)) {
+      const claimID = record.path.split('/').at(-1);
+      const claim = domainClaims.find((entry) => entry.id === claimID);
+      return claim ? json(200, claim) : json(404, { error: { code: 'domain_claim_not_found', message: 'Domain claim not found.' } });
+    }
+    if (record.method === 'POST' && /^\/api\/workspaces\/41\/domains\/[^/]+\/verify$/u.test(record.path)) {
+      const claimID = record.path.split('/').at(-2);
+      const claim = domainClaims.find((entry) => entry.id === claimID);
+      Object.assign(claim, { status: 'verified', verifiedAt: '2026-08-18T02:00:00Z', verificationExpiresAt: '2099-08-19T00:00:00Z', updatedAt: '2026-08-18T02:00:00Z' });
+      if (delayVerifyResponse) {
+        delayVerifyResponse = false;
+        await wait(180);
+      }
+      return json(200, claim);
+    }
     if (record.method === 'GET' && record.path === '/api/conductor/tracks/track_browser' && activeTrackResponse) {
       if (delayTrackResponse) {
         delayTrackResponse = false;
         await wait(180);
       }
-      return json(200, activeTrackResponse);
+      return json(200, requestURL.searchParams.get('includeVerifiedPreview') === 'true' ? activeTrackResponse : activeTrackResponse.track);
+    }
+    if (record.method === 'GET' && /^\/api\/conductor\/tracks\/[^/]+$/u.test(record.path)) {
+      const trackID = record.path.split('/').at(-1);
+      const track = extraTracks.get(trackID);
+      return track ? json(200, track) : json(404, { error: { code: 'track_not_found', message: 'Composition track was not found.' } });
+    }
+    if (record.method === 'GET' && /^\/api\/conductor\/tracks\/[^/]+\/events$/u.test(record.path)) {
+      const trackID = record.path.split('/').at(-2);
+      return json(200, { events: trackEvents.get(trackID) || [] });
+    }
+    if (record.method === 'POST' && /^\/api\/conductor\/tracks\/[^/]+\/resume$/u.test(record.path)) {
+      const trackID = record.path.split('/').at(-2);
+      const track = extraTracks.get(trackID);
+      if (!track) return json(404, { error: { code: 'track_not_found', message: 'Composition track was not found.' } });
+      if (resumeConflictOnce) {
+        resumeConflictOnce = false;
+        track.version += 1;
+        track.updatedAt = '2026-08-18T05:00:00Z';
+        return json(409, { error: { code: 'composition_conflict', message: 'Composition track version conflict.' } });
+      }
+      Object.assign(track, { status: 'VALIDATED', version: track.version + 1, updatedAt: '2026-08-18T05:01:00Z' });
+      return json(200, track);
+    }
+    if (record.method === 'POST' && record.path === '/api/conductor/tracks/track_browser/publication' && activeTrackResponse) {
+      Object.assign(activeTrackResponse.track, { status: 'PUBLICATION_REQUESTED', version: activeTrackResponse.track.version + 1, claimId: record.body.claimId, updatedAt: '2026-08-18T06:00:00Z' });
+      trackEvents.set('track_browser', [...(trackEvents.get('track_browser') || []), { type: 'PUBLICATION_REQUESTED', toStatus: 'PUBLICATION_REQUESTED', trackVersion: activeTrackResponse.track.version, createdAt: '2026-08-18T06:00:00Z', detail: { secret: 'never-render-this-detail' } }]);
+      if (delayPublicationRequest) {
+        delayPublicationRequest = false;
+        await wait(180);
+      }
+      return json(200, activeTrackResponse.track);
+    }
+    if (record.method === 'POST' && record.path === '/api/conductor/tracks/track_browser/activate' && activeTrackResponse) {
+      if (activationFailNext) {
+        activationFailNext = false;
+        activeTrackResponse.track.version += 2;
+        activeTrackResponse.track.updatedAt = '2026-08-18T06:01:00Z';
+        trackEvents.set('track_browser', [...(trackEvents.get('track_browser') || []), { type: 'PUBLICATION_ACTIVATION_BLOCKED', toStatus: 'PUBLICATION_REQUESTED', trackVersion: activeTrackResponse.track.version, createdAt: '2026-08-18T06:01:00Z', detail: { token: 'never-render-this-token' } }]);
+        return json(502, { error: { code: 'composition_dependency_unavailable', message: 'Synthetic activation interruption.' } });
+      }
+      const publication = { id: 'publication_browser', workspaceId: 41, claimId: 'claim_browser', origin: 'https://app.community.example', artifactId: 'browser-signed-artifact', contentHash: 'a'.repeat(64), active: true, activatedAt: '2026-08-18T06:02:00Z' };
+      Object.assign(activeTrackResponse.track, { status: 'PUBLISHED', version: activeTrackResponse.track.version + 1, publication, updatedAt: publication.activatedAt });
+      domainPublications = [publication];
+      return json(201, activeTrackResponse.track);
     }
     if (record.method === 'POST' && record.path === '/api/artifacts/preview') {
       if (failNextPreview) {
@@ -546,7 +706,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
         authorization: {
           subject: { id: record.authorization === `Bearer ${secondToken}` ? 'user:8' : 'user:7', userId: record.authorization === `Bearer ${secondToken}` ? 8 : 7, workspaceId: record.body.workspaceId },
           allowedOrigins: {
-            surfaces: [origin],
+            surfaces: record.body.requestedOrigins?.surfaces?.length ? record.body.requestedOrigins.surfaces : [origin],
             embedders: ['https://community.example'],
             connections: ['https://relay.example'],
             resources: ['https://assets.example'],
@@ -610,9 +770,37 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
           themeUrl: `${previewPrefix}theme.css`,
           stylesUrl: `${previewPrefix}app.css`,
         },
-        track: { id: 'track_browser', preview: { allowedOrigins: { surfaces: [] } } },
+        track: {
+          id: 'track_browser', workspaceId: record.body.workspaceId, request: structuredClone(record.body), status: 'PREVIEW_READY', version: 6,
+          createdBy: record.authorization === `Bearer ${secondToken}` ? 8 : 7, createdAt: '2026-08-18T04:00:00Z', updatedAt: '2026-08-18T04:23:28Z',
+          artifact: { artifactId: 'browser-signed-artifact', contentHash: 'a'.repeat(64) },
+          preview: {
+            artifactId: 'browser-signed-artifact', contentHash: 'a'.repeat(64), workspaceId: record.body.workspaceId,
+            subject: { id: attestedManifest.authorization.subject.id, userId: attestedManifest.authorization.subject.userId }, allowedOrigins: structuredClone(attestedManifest.authorization.allowedOrigins),
+            authorizationExpiresAt: attestedManifest.authorization.expiresAt, authenticationRequired: true,
+          },
+        },
       };
-      if (variant === 'active') activeTrackResponse = structuredClone(result);
+      if (variant === 'track-missing') delete result.track;
+      if (variant === 'track-id-missing') result.track.id = '';
+      if (variant === 'track-workspace') result.track.workspaceId = 42;
+      if (variant === 'track-artifact') result.track.artifact.artifactId = 'tampered-track-artifact';
+      if (variant === 'track-hash') result.track.artifact.contentHash = 'b'.repeat(64);
+      if (variant === 'track-preview-missing') delete result.track.preview;
+      if (variant === 'track-preview-artifact') result.track.preview.artifactId = 'tampered-preview-artifact';
+      if (variant === 'track-preview-hash') result.track.preview.contentHash = 'b'.repeat(64);
+      if (variant === 'track-preview-workspace') result.track.preview.workspaceId = 42;
+      if (variant === 'track-preview-subject') result.track.preview.subject.userId = 99;
+      if (variant === 'track-preview-origins') result.track.preview.allowedOrigins.surfaces = ['https://tampered-track-origin.example'];
+      if (variant === 'track-preview-expiry') result.track.preview.authorizationExpiresAt = '2098-08-18T04:23:28Z';
+      if (variant === 'track-preview-public') result.track.preview.authenticationRequired = false;
+      if (variant === 'active') {
+        activeTrackResponse = structuredClone(result);
+        trackEvents.set('track_browser', [
+          { type: 'TRACK_CREATED', toStatus: 'DRAFT', trackVersion: 1, createdAt: '2026-08-18T04:00:00Z', detail: { principal: 'never-render-this-principal' } },
+          { type: 'PREVIEW_READY', toStatus: 'PREVIEW_READY', trackVersion: 6, createdAt: '2026-08-18T04:23:28Z', detail: { raw: 'never-render-this-detail' } },
+        ]);
+      }
       return json(200, result);
     }
     return json(404, { error: { code: 'not_found', message: 'Not found.' } });
@@ -653,6 +841,25 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       && document.querySelector('#templateSelect').options.length === 3
       && document.querySelector('#templateSelect').value === ''
       && document.querySelector('#previewButton').disabled`), 'workspace and explicit catalog choice');
+    await waitFor(() => evaluate(client, `document.querySelector('#buildHistoryState').textContent.includes('No workspace build records yet') && document.querySelector('#domainClaimSelect').value === 'claim_browser'`), 'honest empty build history and recovered verified domain readiness');
+    assert.match(await evaluate(client, `[...document.querySelector('#domainClaimSelect').options].map((option) => option.textContent).join(' ')`), /pending.*revoked.*expired/isu, 'real pending, revoked, and expired claim states render honestly');
+    await evaluate(client, `(() => { const select = document.querySelector('#domainClaimSelect'); select.value = 'claim_pending'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainClaimsState').textContent.includes('Verify an already-published proof') && document.querySelector('#domainProof').hidden && !document.querySelector('#verifyDomainButton').disabled`), 'pending claim next action never synthesizes a TXT proof');
+    delayVerifyResponse = true;
+    await evaluate(client, `(() => { document.querySelector('#verifyDomainButton').click(); const select = document.querySelector('#domainClaimSelect'); select.value = 'claim_browser'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await wait(240);
+    assert.equal(await evaluate(client, `document.querySelector('#domainClaimSelect').value`), 'claim_browser', 'delayed verify response cannot overwrite a newer same-workspace claim selection');
+    delayClaimResponse = true;
+    await evaluate(client, `(() => {
+      const input = document.querySelector('#domainOrigin');
+      input.value = 'https://first-delayed.community.example'; input.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector('#claimDomainButton').click();
+      input.value = 'https://newer-edit.community.example'; input.dispatchEvent(new Event('input', { bubbles: true }));
+    })()`);
+    await wait(240);
+    assert.deepEqual(await evaluate(client, `({ origin: document.querySelector('#domainOrigin').value, selected: document.querySelector('#domainClaimSelect').value, proofHidden: document.querySelector('#domainProof').hidden })`), { origin: 'https://newer-edit.community.example', selected: '', proofHidden: true }, 'delayed claim response cannot overwrite a newer same-workspace origin edit');
+    await evaluate(client, `document.querySelector('#retryDomainClaims').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainClaimSelect').value === 'claim_browser'`), 'domain claim recovery after stale operations');
 
     await evaluate(client, `(() => {
       const select = document.querySelector('#templateSelect');
@@ -818,9 +1025,26 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.equal(receipt['Signing key'], 'Ed25519 · railway-artifact-v1');
     assert.equal(receipt['Workspace binding'], 'Workspace 41');
     assert.equal(receipt['Lifecycle / expiry'], 'preview · expires 2099-08-18T04:23:28.000Z');
-    assert.equal(receipt['Exact allowed origins'], `Surface: ${origin} · Embedder: https://community.example · Connection: https://relay.example · Resource: https://assets.example`);
+    assert.equal(receipt['Exact allowed origins'], `Surface: ${origin} · Surface: https://app.community.example · Embedder: https://community.example · Connection: https://relay.example · Resource: https://assets.example`);
     assert.equal(receipt['Review references'], 'ref-iftar-1 (pending-qualified-review) · Reference-only; not scholar approval');
     assert.match(receipt['Component documents'], /announcements · [0-9a-f]{64}/u);
+    await waitFor(() => evaluate(client, `document.querySelectorAll('#buildHistoryList li').length === 1 && document.querySelector('#buildHistoryList').textContent.includes('track_browser') && document.querySelector('#buildRecordTrackID').value === 'track_browser'`), 'successful preview refreshes real build history and current record');
+    historyFailNext = true;
+    await evaluate(client, `document.querySelector('#retryBuildHistory').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildHistoryState').textContent.includes('Synthetic history interruption') && document.querySelectorAll('#buildHistoryList li').length === 1`), 'history error retains last real records');
+    extraTracks.set('track_partial', {
+      id: 'track_partial', workspaceId: 41, request: structuredClone(activeTrackResponse.track.request), status: 'STAGED', version: 1, createdBy: 7,
+      createdAt: '2026-08-18T04:30:00Z', updatedAt: '2026-08-18T04:30:00Z',
+    });
+    trackEvents.set('track_partial', [{ type: 'TRACK_STAGED', toStatus: 'STAGED', trackVersion: 1, createdAt: '2026-08-18T04:30:00Z', detail: { credential: 'never-render-this-credential' } }]);
+    await evaluate(client, `document.querySelector('#retryBuildHistory').click()`);
+    await waitFor(() => evaluate(client, `document.querySelectorAll('#buildHistoryList li').length === 2 && document.querySelector('#buildHistoryList').textContent.includes('track_partial')`), 'history retry loads real records');
+    await evaluate(client, `[...document.querySelectorAll('#buildHistoryList li')].find((item) => item.textContent.includes('track_partial')).querySelector('button').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTrackID').value === 'track_partial' && !document.querySelector('#resumeBuildButton').disabled`), 'creator resumable track selection');
+    await evaluate(client, `document.querySelector('#resumeBuildButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildRecordMeta').textContent.includes('Version 2') && document.querySelector('#buildRecordAlert').textContent.includes('changed before resume')`), 'resume conflict refreshes authoritative version');
+    await evaluate(client, `document.querySelector('#resumeBuildButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTitle').textContent.includes('VALIDATED') && document.querySelector('#buildRecordMeta').textContent.includes('Version 3')`), 'resumable track advances without replacing trusted preview');
 
     const trustedUnicodeBoundary = await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').srcdoc, raw: document.querySelector('#rawManifest').textContent })`);
     await evaluate(client, `(() => {
@@ -916,11 +1140,25 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] input'); const heading = [...document.querySelectorAll('[data-component-id="announcements"] .field input')][0]; heading.value = 'Unsaved replacement'; heading.dispatchEvent(new Event('input', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#previewFrame').dataset.stale === 'true' && document.querySelector('#deployButton').disabled`), 'dirty verified preview state');
     await evaluate(client, `(() => { document.querySelector('#trackLookup').value = 'track_browser'; document.querySelector('#loadTrackButton').click(); })()`);
-    await wait(500);
+    await waitFor(() => evaluate(client, `!document.querySelector('#buildRecord').hidden && document.querySelector('#buildRecordTrackID').value === 'track_browser' && document.querySelectorAll('#buildEventList li').length === 2`), 'plain build inspection and safe event timeline');
+    assert.doesNotMatch(await evaluate(client, `document.querySelector('#buildTimeline').innerText`), /never-render-this/u, 'event detail must never render');
+    assert.match(await evaluate(client, `document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value`), /Unsaved replacement/u, 'plain inspection does not replace the current draft');
+    await evaluate(client, `document.querySelector('#restoreBuildDraftButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value.includes('students')`), 'exact request components start a new local draft');
+    await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#previewFrame').dataset.stale === 'false'`), 'history verified-preview reopen');
     const trackRestore = await evaluate(client, `({ status: document.querySelector('#previewStatus').textContent, stale: document.querySelector('#previewFrame').dataset.stale, alert: document.querySelector('#builderAlert').textContent, document: document.querySelector('[data-component-id="announcements"] .advanced-document textarea')?.value || '' })`);
     assert.equal(trackRestore.status, 'Verified staging ready', `track restore status: ${JSON.stringify(trackRestore)}`);
     assert.equal(trackRestore.stale, 'false');
     assert.match(trackRestore.document, /students/u, 'verified track restores exact component document');
+    const trustedPairBeforeTrackSubstitution = await evaluate(client, `({ receipt: document.querySelector('#manifestList').textContent, raw: document.querySelector('#rawManifest').textContent, srcdoc: document.querySelector('#previewFrame').srcdoc })`);
+    activeTrackResponse.track.id = 'track_substituted';
+    await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildRecordAlert').textContent.includes('track does not exactly bind') && document.querySelector('#previewFrame').dataset.stale === 'true' && document.querySelector('#deployButton').disabled`), 'selected track ID substitution fails before trust commit');
+    assert.deepEqual(await evaluate(client, `({ receipt: document.querySelector('#manifestList').textContent, raw: document.querySelector('#rawManifest').textContent, srcdoc: document.querySelector('#previewFrame').srcdoc })`), trustedPairBeforeTrackSubstitution, 'a substituted selected track ID must retain the prior trusted receipt and iframe bytes');
+    activeTrackResponse.track.id = 'track_browser';
+    await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#previewFrame').dataset.stale === 'false' && document.querySelector('#previewStatus').textContent === 'Verified staging ready'`), 'exact selected track ID recovery');
     const trackRequest = requests.find((item) => item.path === '/api/conductor/tracks/track_browser');
     assert.equal(trackRequest.authorization, `Bearer ${token}`, 'verified track reload must remain authenticated');
     const verifiedSourceBeforeFailure = await evaluate(client, `document.querySelector('#previewFrame').srcdoc`);
@@ -929,17 +1167,51 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     await waitFor(() => evaluate(client, `document.querySelector('#builderAlert').textContent.includes('last valid draft and last verified preview were not replaced') && document.querySelector('#previewFrame').dataset.stale === 'true' && document.querySelector('#deployButton').disabled`), 'network failure recovery');
     assert.equal(await evaluate(client, `document.querySelector('#previewFrame').srcdoc`), verifiedSourceBeforeFailure, 'network failure must retain the last verified iframe bytes');
     await evaluate(client, `document.querySelector('#loadTrackButton').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#buildRecord').hidden && document.querySelector('#buildRecordTrackID').value === 'track_browser'`), 'build inspect after network failure');
+    await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#previewFrame').dataset.stale === 'false'`), 'verified track recovery after network failure');
     delayTrackResponse = true;
-    await evaluate(client, `(() => { document.querySelector('#loadTrackButton').click(); const select = document.querySelector('#workspaceSelect'); select.value = '42'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    delayHistoryResponse = true;
+    await evaluate(client, `(() => { document.querySelector('#loadTrackButton').click(); document.querySelector('#retryBuildHistory').click(); const select = document.querySelector('#workspaceSelect'); select.value = '42'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '42' && document.querySelector('#workspaceRole').textContent === 'Architect'`), 'component track workspace switch');
     await wait(240);
-    const staleTrackBoundary = await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').getAttribute('srcdoc'), manifestHidden: document.querySelector('#manifestList').hidden, template: document.querySelector('#templateSelect').value, selected: document.querySelectorAll('#moduleList input:checked').length })`);
-    assert.deepEqual(staleTrackBoundary, { srcdoc: null, manifestHidden: true, template: '', selected: 0 }, 'a delayed prior-workspace track must not restore preview or documents into another workspace');
+    const staleTrackBoundary = await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').getAttribute('srcdoc'), manifestHidden: document.querySelector('#manifestList').hidden, template: document.querySelector('#templateSelect').value, selected: document.querySelectorAll('#moduleList input:checked').length, history: document.querySelectorAll('#buildHistoryList li').length, recordHidden: document.querySelector('#buildRecord').hidden })`);
+    assert.deepEqual(staleTrackBoundary, { srcdoc: null, manifestHidden: true, template: '', selected: 0, history: 0, recordHidden: true }, 'delayed prior-workspace track/history must not restore records, preview, or documents into another workspace');
     await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '41'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '41' && document.querySelector('#templateSelect').value === 'community-iftar' && document.querySelectorAll('#moduleList input:checked').length === 3`), 'component draft workspace recovery');
     await evaluate(client, `document.querySelector('#loadTrackButton').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#buildRecord').hidden && document.querySelector('#buildRecordTrackID').value === 'track_browser'`), 'build inspect after workspace return');
+    await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#previewFrame').dataset.stale === 'false'`), 'verified track after workspace return');
+    await waitFor(() => evaluate(client, `document.querySelector('#domainClaimSelect').value === 'claim_browser' && !document.querySelector('#deployButton').disabled`), 'reloaded domain claim is ready for the exact signed origin');
+
+    delayPublicationRequest = true;
+    await evaluate(client, `(() => { document.querySelector('#deployButton').click(); const select = document.querySelector('#domainClaimSelect'); select.value = 'claim_pending'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await wait(240);
+    assert.deepEqual(await evaluate(client, `({ claim: document.querySelector('#domainClaimSelect').value, track: document.querySelector('#buildRecordTitle').textContent, published: document.querySelector('#deployStateText').textContent })`), { claim: 'claim_pending', track: 'community-iftar · PREVIEW_READY', published: 'Domain verification required' }, 'delayed publication request cannot overwrite a newer same-workspace claim selection');
+    Object.assign(activeTrackResponse.track, { status: 'PREVIEW_READY', version: 6, claimId: '', publication: undefined, updatedAt: '2026-08-18T04:23:28Z' });
+    await evaluate(client, `(() => { const select = document.querySelector('#domainClaimSelect'); select.value = 'claim_browser'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#deployButton').disabled`), 'publication claim reset');
+
+    delayPublicationRequest = true;
+    await evaluate(client, `(() => { document.querySelector('#deployButton').click(); const input = document.querySelector('#appName'); input.value = 'Newer same-workspace preview'; input.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#builderForm').requestSubmit(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#previewLoading').hidden && document.querySelector('#builderAlert').textContent.includes('last verified preview was retained')`), 'newer same-workspace preview generation');
+    await wait(240);
+    assert.notEqual(await evaluate(client, `document.querySelector('#buildRecordTitle').textContent`), 'community-iftar · PUBLICATION_REQUESTED', 'delayed publication request cannot overwrite a newer preview generation');
+    previewBuilds = 1;
+    Object.assign(activeTrackResponse.track, { status: 'PREVIEW_READY', version: 6, claimId: '', publication: undefined, updatedAt: '2026-08-18T04:23:28Z' });
+    await evaluate(client, `(() => { document.querySelector('#trackLookup').value = 'track_browser'; document.querySelector('#loadTrackButton').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTrackID').value === 'track_browser'`), 'publication race build recovery');
+    await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#previewFrame').dataset.stale === 'false' && !document.querySelector('#deployButton').disabled`), 'publication race verified preview recovery');
+
+    const publicationRequestsBeforeActivation = requests.filter((request) => request.path === '/api/conductor/tracks/track_browser/publication').length;
+    await evaluate(client, `document.querySelector('#deployButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainStatus').textContent.includes('durably recorded') && document.querySelector('#deployButton').textContent === 'Retry activation' && document.querySelector('#buildRecordTitle').textContent.includes('PUBLICATION_REQUESTED')`), 'activation failure reconciles durable publication request');
+    assert.doesNotMatch(await evaluate(client, `document.querySelector('#buildTimeline').innerText`), /never-render-this/u, 'publication event detail must remain hidden');
+    await evaluate(client, `document.querySelector('#deployButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#deployStateText').textContent === 'Published' && document.querySelector('#domainPublicationList').textContent.includes('publication_browser')`), 'activation retry publishes without a second publication request');
+    assert.equal(requests.filter((request) => request.path === '/api/conductor/tracks/track_browser/publication').length, publicationRequestsBeforeActivation + 1, 'activation retry must not repeat the durable publication request');
     const trustedReceiptBeforeNegatives = await evaluate(client, `Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent]))`);
     const trustedRawBeforeNegatives = await evaluate(client, `document.querySelector('#rawManifest').textContent`);
     const trustedSourceBeforeNegatives = await evaluate(client, `document.querySelector('#previewFrame').srcdoc`);
@@ -949,9 +1221,10 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
 
     for (let index = 1; index < receiptVariants.length; index += 1) {
       const variant = receiptVariants[index];
+      const previewFileRequestsBefore = requests.filter((item) => previewFiles.has(item.path)).length;
       await evaluate(client, `document.querySelector('#builderForm').requestSubmit()`);
       await waitFor(async () => previewBuilds === index + 1
-        && await evaluate(client, `document.querySelector('#previewLoading').hidden && ['Verification unavailable', 'Signed authorization expired'].includes(document.querySelector('#previewStatus').textContent)`), `${variant} receipt response`);
+        && await evaluate(client, `document.querySelector('#previewLoading').hidden && ['Verification unavailable', 'Signed authorization expired', 'Last verified preview retained'].includes(document.querySelector('#previewStatus').textContent)`), `${variant} receipt response`);
       const retainedEvidence = await evaluate(client, `({
         receipt: Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent])),
         raw: document.querySelector('#rawManifest').textContent,
@@ -965,7 +1238,11 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       assert.equal(retainedEvidence.srcdoc, trustedSourceBeforeNegatives, `${variant} must retain the last verified iframe bytes`);
       assert.equal(retainedEvidence.stale, 'true');
       assert.equal(retainedEvidence.publishDisabled, true);
-      assert.match(retainedEvidence.alert, /returned evidence is not actively verified|last verified preview was retained/iu);
+      assert.match(retainedEvidence.alert, /returned evidence is not actively verified|last verified preview (?:was retained|were not replaced)/iu);
+      if (variant.startsWith('track-')) {
+        assert.equal(requests.filter((item) => previewFiles.has(item.path)).length, previewFileRequestsBefore, `${variant} must fail before fetching or committing preview files`);
+        assert.match(retainedEvidence.alert, /track does not exactly bind/iu, `${variant} must explain the track binding failure without trusting it`);
+      }
     }
 
     const delayedBuildRequests = requests.filter((item) => item.path === '/api/artifacts/preview').length;
@@ -1003,7 +1280,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.deepEqual(await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').getAttribute('srcdoc'), manifestHidden: document.querySelector('#manifestList').hidden, template: document.querySelector('#templateSelect').value })`), { srcdoc: null, manifestHidden: true, template: '' }, 'a delayed preview-file response cannot repopulate a cleared workspace scope');
 
     await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '41'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '41' && document.querySelector('#templateSelect').value === 'bazaar-cooperative' && document.querySelectorAll('#moduleList input:checked').length === 2`), 'second template scoped draft recovery');
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '41' && document.querySelector('#templateSelect').value === 'bazaar-cooperative' && document.querySelectorAll('#moduleList input:checked').length === 2 && document.querySelector('#domainClaimSelect').value === 'claim_browser'`), 'second template scoped draft and domain recovery');
     const secondTemplateRequestIndex = requests.filter((item) => item.path === '/api/artifacts/preview').length;
     await evaluate(client, `document.querySelector('#builderForm').requestSubmit()`);
     await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Verified staging ready' && document.querySelector('#previewFrame').dataset.stale === 'false'`), 'second real template signed build');
@@ -1015,6 +1292,8 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     const runtimeRequestsBeforeScopeSwitch = requests.filter((item) => item.path === '/assets/datastar-v1.0.2.js').length;
     delayRuntimeResponse = true;
     await evaluate(client, `(() => { document.querySelector('#trackLookup').value = 'track_browser'; document.querySelector('#loadTrackButton').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTrackID').value === 'track_browser'`), 'principal-switch build inspection');
+    await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
     await waitFor(() => requests.filter((item) => item.path === '/assets/datastar-v1.0.2.js').length > runtimeRequestsBeforeScopeSwitch, 'delayed runtime reload request');
     await evaluate(client, `document.querySelector('#logoutButton').click()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#authView').hidden`), 'principal switch sign-out');
@@ -1028,18 +1307,10 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     await wait(240);
     assert.deepEqual(await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').getAttribute('srcdoc'), manifestHidden: document.querySelector('#manifestList').hidden, template: document.querySelector('#templateSelect').value, selected: document.querySelectorAll('#moduleList input:checked').length })`), { srcdoc: null, manifestHidden: true, template: '', selected: 0 }, 'a delayed runtime response cannot restore another principal\'s preview, receipt, or component draft');
   } finally {
-    if (chromium) {
-      try { await chromium.client.send('Browser.close'); } catch {}
-      chromium.client.close();
-      await Promise.race([
-        new Promise((resolve) => chromium.processHandle.once('exit', resolve)),
-        wait(1_000),
-      ]);
-      if (chromium.processHandle.exitCode === null) chromium.processHandle.kill();
-    }
+    await closeChromium(chromium, 'component-journey');
     server.closeAllConnections?.();
     await new Promise((resolve) => server.close(resolve));
-    await rm(tempDirectory, { recursive: true, force: true });
+    await rm(tempDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -1085,12 +1356,32 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
   const modules = moduleIDs.map((id) => ({ id, title: id.replaceAll('-', ' '), dataClassifications: [`${id}-records`], documentFields: roleDocumentFields, defaultDocument: { title: id.replaceAll('-', ' '), summary: `Curated ${id} summary.` } }));
   const flows = ['donation', 'marketplace-escrow', 'multi-party-approval', 'qard-hasan', 'revenue-split', 'volunteer-stipend', 'zakat'].map((id, index) => ({ id, title: id.replaceAll('-', ' '), defaultApprovals: index ? 2 : 1, minimumParties: index ? 2 : 1 }));
   const publishedListing = { id: 'listing_browser', state: 'published', version: 3, revision: { title: 'Synthetic cooperative template', summary: 'A clearly labelled browser-test listing.', currency: 'USD', priceMinor: 1200, license: 'private-beta-sandbox' } };
+  const roleTrack = {
+    id: 'track_role_handoff', workspaceId: 41, status: 'PREVIEW_READY', version: 6, createdBy: 7,
+    createdAt: '2026-08-18T03:00:00Z', updatedAt: '2026-08-18T03:10:00Z',
+    request: {
+      workspaceId: 41, appName: 'Cooperative handoff', organizationName: 'QA Community', city: 'Denver', madhhab: 'hanafi', templateId: 'bazaar-cooperative',
+      theme: { accentColor: '#57A68E' }, modules: ['announcements', 'shura-governance'],
+      components: [
+        { id: 'announcements', type: 'announcements', data: { title: 'Handoff announcements', summary: 'Exact Architect-authored request.' } },
+        { id: 'shura-governance', type: 'shura-governance', data: { title: 'Handoff governance', summary: 'Review before creating a new draft.' } },
+      ],
+      requestedOrigins: { surfaces: [], embedders: [], connections: [], resources: [] }, ttlHours: 24,
+    },
+    artifact: { artifactId: 'artifact_role_handoff', contentHash: 'c'.repeat(64) },
+    preview: {
+      artifactId: 'artifact_role_handoff', contentHash: 'c'.repeat(64), workspaceId: 41,
+      subject: { id: 'user:7', userId: 7 },
+      authorizationExpiresAt: '2099-08-18T03:10:00Z', allowedOrigins: { surfaces: [], embedders: [], connections: [], resources: [] }, authenticationRequired: true,
+    },
+  };
 
   const server = createServer(async (request, response) => {
     const chunks = [];
     for await (const chunk of request) chunks.push(chunk);
     const rawBody = Buffer.concat(chunks).toString('utf8');
-    const pathName = new URL(request.url, 'http://localhost').pathname;
+    const requestURL = new URL(request.url, 'http://localhost');
+    const pathName = requestURL.pathname;
     const bearer = String(request.headers.authorization || '').replace(/^Bearer\s+/iu, '');
     const body = rawBody ? JSON.parse(rawBody) : null;
     requests.push({ method: request.method, path: pathName, bearer, body });
@@ -1137,6 +1428,17 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     }
     if (request.method === 'GET' && pathName === '/api/templates' && actor) return json(200, { templates });
     if (request.method === 'GET' && pathName === '/api/modules' && actor) return json(200, { modules, componentDocumentPolicy: roleComponentPolicy });
+    if (request.method === 'GET' && pathName === '/api/conductor/tracks' && actor) {
+      if (bearer === 'viewer-token' && !viewerAccepted) return json(403, { error: { code: 'workspace_forbidden', message: 'Workspace access forbidden.' } });
+      return json(200, { tracks: [{ id: roleTrack.id, templateId: roleTrack.request.templateId, status: roleTrack.status, version: roleTrack.version, updatedAt: roleTrack.updatedAt, previewPresent: true, artifactPresent: true, publicationPresent: false, authorizationExpiresAt: roleTrack.preview.authorizationExpiresAt }] });
+    }
+    if (request.method === 'GET' && pathName === `/api/conductor/tracks/${roleTrack.id}` && actor) {
+      if (bearer === 'viewer-token' && !viewerAccepted) return json(403, { error: { code: 'workspace_forbidden', message: 'Workspace access forbidden.' } });
+      return json(200, roleTrack);
+    }
+    if (request.method === 'GET' && pathName === `/api/conductor/tracks/${roleTrack.id}/events` && actor) return json(200, { events: [{ type: 'PREVIEW_READY', toStatus: 'PREVIEW_READY', trackVersion: 6, createdAt: roleTrack.updatedAt, detail: { email: 'never-render-role-detail@example.test' } }] });
+    if (request.method === 'GET' && pathName === '/api/workspaces/41/domains' && bearer === 'architect-token') return json(200, { claims: [] });
+    if (request.method === 'POST' && pathName === '/api/artifacts/preview' && bearer === 'maintainer-token') return json(422, { error: { code: 'invalid_composition', message: 'Synthetic stop after new-track request capture.' } });
     if (request.method === 'GET' && pathName === '/api/financial/flows' && actor) return json(200, { flows });
     if (request.method === 'POST' && pathName === '/api/shura/v1/invitations' && bearer === 'architect-token') {
       return json(201, { invitation: { id: 'invite_browser', workspace_id: 41, invitee: body.invitee, role: body.role, status: 'PENDING', version: 1 }, token: 'accept_browser_viewer' });
@@ -1425,6 +1727,12 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     await evaluate(client, `(() => { document.querySelector('#acceptInviteToken').value = 'accept_browser_viewer'; document.querySelector('#acceptInviteButton').click(); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Viewer' && document.querySelector('#workspaceSelect').value === '41'`), 'Viewer invitation acceptance');
     assert.equal(await evaluate(client, `document.querySelector('#templateSelect').value`), '', 'component drafts never cross principal scope');
+    await waitFor(() => evaluate(client, `document.querySelector('#buildHistoryList').textContent.includes('track_role_handoff')`), 'Viewer authorized build-history read');
+    await evaluate(client, `document.querySelector('#buildHistoryList button').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTrackID').value === 'track_role_handoff'`), 'Viewer build inspection');
+    const viewerBuildControls = await evaluate(client, `({ draft: document.querySelector('#restoreBuildDraftButton').disabled, resumeHidden: document.querySelector('#resumeBuildButton').hidden, domain: document.querySelector('#domainOrigin').disabled, issue: document.querySelector('#claimDomainButton').disabled })`);
+    assert.deepEqual(viewerBuildControls, { draft: true, resumeHidden: true, domain: true, issue: true }, 'Viewer history is inspect-only and domain mutation remains unavailable');
+    assert.doesNotMatch(await evaluate(client, `document.querySelector('#buildTimeline').innerText`), /never-render-role-detail/u, 'Viewer timeline excludes event detail');
     await evaluate(client, `(() => { const select = document.querySelector('#templateSelect'); select.value = 'community-workspace'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelectorAll('#moduleList input[name="selectedModule"]').length === 11`), 'Viewer component catalog');
     assert.equal(await evaluate(client, `document.querySelector('#previewButton').disabled`), true, 'Viewer cannot build');
@@ -1441,8 +1749,19 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     await login(client, 'maintainer@example.test');
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Maintainer'`), 'Maintainer role');
     assert.equal(await evaluate(client, `document.querySelector('#templateSelect').value`), '', 'Maintainer begins with an independent principal-scoped draft');
-    await evaluate(client, `(() => { const select = document.querySelector('#templateSelect'); select.value = 'bazaar-cooperative'; select.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('#moduleList input[name="selectedModule"]').click(); })()`);
-    await waitFor(() => evaluate(client, `document.querySelector('#templateSelect').value === 'bazaar-cooperative' && document.querySelector('#moduleList input:checked') && !document.querySelector('[data-component-id="announcements"] .field input').disabled`), 'Maintainer editable component document');
+    await waitFor(() => evaluate(client, `document.querySelector('#buildHistoryList').textContent.includes('track_role_handoff')`), 'Maintainer authorized build-history read');
+    await evaluate(client, `document.querySelector('#buildHistoryList button').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTrackID').value === 'track_role_handoff' && !document.querySelector('#restoreBuildDraftButton').disabled`), 'Maintainer build inspection and draft permission');
+    await evaluate(client, `document.querySelector('#restoreBuildDraftButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#templateSelect').value === 'bazaar-cooperative' && document.querySelectorAll('#moduleList input:checked').length === 2 && !document.querySelector('[data-component-id="announcements"] .field input').disabled`), 'Maintainer exact request becomes an editable new local draft');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .field input'); input.value = 'Maintainer-owned revision'; input.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#builderForm').requestSubmit(); })()`);
+    await waitFor(() => requests.some((request) => request.method === 'POST' && request.path === '/api/artifacts/preview' && request.bearer === 'maintainer-token'), 'Maintainer submits a new composition request');
+    await waitFor(() => evaluate(client, `document.querySelector('#builderAlert').textContent.includes('Synthetic stop after new-track request capture') && document.querySelector('#previewLoading').hidden`), 'Maintainer new-track request returns without adopting the source track');
+    const maintainerBuild = requests.find((request) => request.method === 'POST' && request.path === '/api/artifacts/preview' && request.bearer === 'maintainer-token');
+    assert.equal(maintainerBuild.body.components.find((component) => component.id === 'announcements').data.title, 'Maintainer-owned revision');
+    assert.equal(Object.hasOwn(maintainerBuild.body, 'trackId'), false, 'history handoff never transfers the source track identity');
+    assert.equal(Object.hasOwn(maintainerBuild.body, 'createdBy'), false, 'history handoff never transfers creator authority');
+    assert.equal(requests.some((request) => request.bearer !== 'architect-token' && request.path === '/api/workspaces/41/domains'), false, 'Viewer and Maintainer never call Architect-only domain claim APIs');
     await evaluate(client, `document.querySelector('#shuraTab').click(); (() => { document.querySelector('#proposalTitle').value = 'Schedule the pantry rota'; document.querySelector('#proposalBody').value = 'Approve the volunteer rota for one month.'; document.querySelector('#createProposalButton').click(); })()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#proposalRecord').hidden && document.querySelector('#proposalLookup').value === 'proposal_maintainer'`), 'Maintainer proposal create');
     const maintainerControls = await evaluate(client, `({ vote: document.querySelector('#approveVoteButton').disabled, decide: document.querySelector('#approveDecisionButton').disabled, create: document.querySelector('#createProposalButton').disabled })`);
@@ -1487,12 +1806,7 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     assert.deepEqual(byRole.Maintainer, ['shura:read', 'shura:deliberate', 'shura:vote', 'shura:propose']);
     assert.ok(byRole.Architect.includes('shura:decide') && byRole.Architect.includes('shura:invite'));
   } finally {
-    if (chromium) {
-      try { await within(chromium.client.send('Browser.close'), 'role-journey browser close', 1_000); } catch {}
-      chromium.client.close();
-      await Promise.race([new Promise((resolve) => chromium.processHandle.once('exit', resolve)), wait(1_000)]);
-      if (chromium.processHandle.exitCode === null) chromium.processHandle.kill();
-    }
+    await closeChromium(chromium, 'role-journey');
     server.closeAllConnections?.();
     await new Promise((resolve) => server.close(resolve));
     await rm(tempDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });

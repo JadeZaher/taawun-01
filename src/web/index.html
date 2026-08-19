@@ -604,10 +604,32 @@
                 <div class="build-actions">
                   <button id="previewButton" class="button" type="submit" disabled>Create staging preview</button>
                   <div class="track-recovery">
-                    <div class="field"><label for="trackLookup">Reload a verified signed track</label><input id="trackLookup" autocomplete="off" placeholder="track_…" aria-describedby="trackRecoveryHelp"></div>
-                    <button id="loadTrackButton" class="button tertiary" type="button">Reload verified preview</button>
+                    <div class="field"><label for="trackLookup">Open a signed build by track ID</label><input id="trackLookup" autocomplete="off" placeholder="track_…" aria-describedby="trackRecoveryHelp"></div>
+                    <button id="loadTrackButton" class="button tertiary" type="button">Inspect build</button>
                   </div>
-                  <div id="trackRecoveryHelp" class="field-help">Workspace authorization is rechecked. A verified track restores the exact signed component documents; a stale or tampered receipt is not loaded.</div>
+                  <div id="trackRecoveryHelp" class="field-help">Track IDs are selectors, not credentials. Workspace authorization is rechecked before any build record or signed preview is shown.</div>
+                  <section aria-labelledby="buildHistoryTitle">
+                    <div class="component-head">
+                      <div><strong id="buildHistoryTitle">Build history</strong><small>Real workspace tracks · newest activity first</small></div>
+                      <button id="retryBuildHistory" class="button tertiary" type="button">Reload history</button>
+                    </div>
+                    <div id="buildHistoryState" class="compact-state" role="status">Select a workspace to load its signed build records.</div>
+                    <ul id="buildHistoryList" class="surface-list" aria-label="Workspace build history"></ul>
+                    <button id="loadMoreBuildHistory" class="button tertiary" type="button" hidden>Load older builds</button>
+                    <article id="buildRecord" class="surface-record" aria-labelledby="buildRecordTitle" hidden>
+                      <strong id="buildRecordTitle"></strong>
+                      <span id="buildRecordMeta"></span>
+                      <span id="buildRecordExpiry"></span>
+                      <div class="copy-field"><input id="buildRecordTrackID" readonly aria-label="Selected build track ID"><button id="copyBuildTrackButton" class="button secondary" type="button">Copy track ID</button></div>
+                      <div class="surface-actions">
+                        <button id="reopenBuildPreviewButton" class="button secondary" type="button">Reopen verified preview</button>
+                        <button id="restoreBuildDraftButton" class="button secondary" type="button">Start new draft from build</button>
+                        <button id="resumeBuildButton" class="button tertiary" type="button">Resume build</button>
+                      </div>
+                      <div id="buildRecordAlert" class="notice" role="status" hidden></div>
+                      <details id="buildTimeline"><summary>Inspect safe build timeline</summary><ol id="buildEventList" class="surface-list" aria-label="Selected build timeline"></ol></details>
+                    </article>
+                  </section>
                   <p class="privacy-copy">Explicit build action sends workspace identity, curated component IDs, their bounded JSON content documents, theme token, and approved origins. JSON never becomes code, routes, permissions, authority, custody, or settlement.</p>
                 </div>
               </form>
@@ -667,10 +689,15 @@
                 <details class="create-workspace">
                   <summary>Verify a delivery domain</summary>
                   <div class="create-fields">
+                    <div id="domainAccessHelp" class="field-help">Only an Architect may manage exact delivery origins.</div>
+                    <div class="field"><label for="domainClaimSelect">Existing domain claim</label><select id="domainClaimSelect" disabled><option value="">No claim selected</option></select></div>
+                    <button id="retryDomainClaims" class="button tertiary" type="button">Reload domain claims</button>
+                    <div id="domainClaimsState" class="compact-state" role="status">Select an Architect workspace to load real domain claims.</div>
                     <div class="field"><label for="domainOrigin">Exact HTTPS origin</label><input id="domainOrigin" type="url" placeholder="https://app.community.example"></div>
-                    <button id="claimDomainButton" class="button tertiary" type="button">Create DNS proof</button>
+                    <button id="claimDomainButton" class="button tertiary" type="button">Issue DNS proof</button>
                     <div id="domainProof" class="field-help" hidden></div>
                     <button id="verifyDomainButton" class="button tertiary" type="button" disabled>Verify DNS proof</button>
+                    <ul id="domainPublicationList" class="surface-list" aria-label="Selected domain publication history"></ul>
                     <div id="domainStatus" class="notice" role="status" hidden></div>
                   </div>
                 </details>
@@ -834,10 +861,21 @@
       workspacesEpoch: 0,
       workspaceEpoch: 0,
       proposalEpoch: 0,
+      buildHistoryEpoch: 0,
+      trackRecordEpoch: 0,
+      domainEpoch: 0,
+      domainPublicationEpoch: 0,
+      publicationEpoch: 0,
       previewReady: false,
       building: false,
       publishing: false,
       track: null,
+      buildHistory: [],
+      buildHistoryCursor: '',
+      selectedTrack: null,
+      trackEvents: [],
+      domainClaims: [],
+      domainPublications: [],
       domainClaim: null,
       domainOrigin: '',
     };
@@ -845,10 +883,13 @@
     const element = (id) => document.getElementById(id);
 
     class ApiError extends Error {
-      constructor(message, status) {
+      constructor(message, status, code = '', details = null, requestID = '') {
         super(message);
         this.name = 'ApiError';
         this.status = status;
+        this.code = code;
+        this.details = details;
+        this.requestID = requestID;
       }
     }
 
@@ -876,11 +917,12 @@
         try { data = JSON.parse(text); } catch { data = text; }
       }
       if (!response.ok) {
+        const errorEnvelope = typeof data === 'object' && data && typeof data.error === 'object' ? data.error : null;
         const message = typeof data === 'object' && data && (data.error || data.message)
           ? String((data.error && typeof data.error === 'object' && data.error.message) || data.error || data.message)
           : (typeof data === 'string' && data.trim() ? data.trim() : `Request failed (${response.status})`);
         if (response.status === 401 && options.auth !== false && !options.bearer && currentSession(requestSessionEpoch) && requestBearer === state.token) showAuth('Your session expired. Please sign in again.');
-        throw new ApiError(message, response.status);
+        throw new ApiError(message, response.status, String(errorEnvelope && errorEnvelope.code || ''), errorEnvelope && errorEnvelope.details || null, response.headers.get('X-Request-ID') || '');
       }
       return data;
     }
@@ -919,6 +961,11 @@
       state.sessionEpoch += 1;
       state.workspacesEpoch += 1;
       state.workspaceEpoch += 1;
+      state.buildHistoryEpoch += 1;
+      state.trackRecordEpoch += 1;
+      state.domainEpoch += 1;
+      state.domainPublicationEpoch += 1;
+      state.publicationEpoch += 1;
       state.token = '';
       state.user = null;
       state.previewReady = false;
@@ -953,6 +1000,12 @@
       state.listings = [];
       state.purchase = null;
       state.track = null;
+      state.buildHistory = [];
+      state.buildHistoryCursor = '';
+      state.selectedTrack = null;
+      state.trackEvents = [];
+      state.domainClaims = [];
+      state.domainPublications = [];
       state.domainClaim = null;
       state.domainOrigin = '';
       const frame = element('previewFrame');
@@ -961,7 +1014,7 @@
       frame.hidden = true;
       element('previewEmpty').hidden = false;
       element('previewLoading').hidden = true;
-      setBusy(element('loadTrackButton'), false, 'Verifying…', 'Reload verified preview');
+      setBusy(element('loadTrackButton'), false, 'Inspecting…', 'Inspect build');
       element('manifestList').replaceChildren();
       element('manifestList').hidden = true;
       element('manifestEmpty').hidden = false;
@@ -977,6 +1030,14 @@
       element('moduleList').replaceChildren();
       element('templateReconcile').hidden = true;
       element('trackLookup').value = '';
+      element('buildHistoryList').replaceChildren();
+      element('loadMoreBuildHistory').hidden = true;
+      element('buildEventList').replaceChildren();
+      element('buildRecord').hidden = true;
+      element('buildRecordTrackID').value = '';
+      element('buildHistoryState').textContent = 'Select a workspace to load its signed build records.';
+      element('buildHistoryState').hidden = false;
+      setNotice(element('buildRecordAlert'), '');
       element('peopleList').replaceChildren();
       element('invitationList').replaceChildren();
       element('proposalList').replaceChildren();
@@ -1003,6 +1064,11 @@
       renderWorkspaceAccess();
       element('previewButton').textContent = 'Create staging preview';
       element('domainOrigin').value = '';
+      element('domainClaimSelect').replaceChildren(new Option('No claim selected', ''));
+      element('domainClaimSelect').disabled = true;
+      element('domainClaimsState').textContent = 'Select an Architect workspace to load real domain claims.';
+      element('domainClaimsState').hidden = false;
+      element('domainPublicationList').replaceChildren();
       element('domainProof').textContent = '';
       element('domainProof').hidden = true;
       element('verifyDomainButton').disabled = true;
@@ -1126,6 +1192,8 @@
       const publishAllowed = workspaceID > 0 && canPublishWorkspace();
       element('templateSelect').disabled = !workspaceID || !state.templates.length || !state.catalogHealthy;
       if (element('loadTrackButton').getAttribute('aria-busy') !== 'true') element('loadTrackButton').disabled = !workspaceID;
+      element('retryBuildHistory').disabled = !workspaceID;
+      element('loadMoreBuildHistory').disabled = !workspaceID;
       element('createInviteButton').disabled = !publishAllowed;
       element('createInviteButton').title = publishAllowed ? '' : 'Only an Architect may invite workspace members.';
       element('createProposalButton').disabled = !workspaceID || !['Architect', 'Maintainer'].includes(state.productRole);
@@ -1154,6 +1222,14 @@
         element(id).title = allowed ? '' : (!publishAllowed ? 'Only an Architect may advance a sandbox quest.' : 'This action is not available in the quest’s current durable state.');
       }
       element('shuraCapability').textContent = state.shuraToken ? `${state.productRole} capability active` : (workspaceID ? `${roleLabel} · capability on demand` : 'No workspace capability');
+      element('domainAccessHelp').textContent = publishAllowed
+        ? 'Architect access: claims and publication history are loaded from this exact workspace.'
+        : (workspaceID ? `${roleLabel} access is read-only here. Only an Architect may issue DNS proof, verify, or publish.` : 'Select an Architect workspace to manage exact delivery origins.');
+      element('domainClaimSelect').disabled = !publishAllowed || !state.domainClaims.length;
+      element('domainOrigin').disabled = !publishAllowed;
+      element('retryDomainClaims').disabled = !publishAllowed;
+      if (element('claimDomainButton').getAttribute('aria-busy') !== 'true') element('claimDomainButton').disabled = !publishAllowed;
+      if (element('verifyDomainButton').getAttribute('aria-busy') !== 'true') element('verifyDomainButton').disabled = !publishAllowed || !state.domainClaim || String(state.domainClaim.status).toLowerCase() !== 'pending';
       renderApprovedDecisions();
       if (!buildAllowed && workspaceID) {
         element('workspaceHelp').textContent = 'This workspace is read-only for your Viewer role. Ask an Architect to assign Maintainer access to build.';
@@ -1177,6 +1253,173 @@
         meta.textContent = summary.meta;
         item.append(strong, meta);
         target.append(item);
+      }
+    }
+
+    const RESUMABLE_TRACK_STATUSES = new Set(['DRAFT', 'STAGED', 'VALIDATED', 'COMPLIANCE_AUDITED', 'ARTIFACT_SIGNED']);
+
+    function formatCockpitTime(value, empty = 'Not recorded') {
+      if (!value) return empty;
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.valueOf()) ? empty : parsed.toLocaleString();
+    }
+
+    function clearSelectedBuildRecord() {
+      state.selectedTrack = null;
+      state.trackEvents = [];
+      element('buildRecord').hidden = true;
+      element('buildRecordTrackID').value = '';
+      element('buildEventList').replaceChildren();
+      setNotice(element('buildRecordAlert'), '');
+    }
+
+    function renderBuildHistory() {
+      const target = element('buildHistoryList');
+      target.replaceChildren();
+      for (const summary of state.buildHistory) {
+        const item = document.createElement('li');
+        item.className = 'surface-record';
+        const title = document.createElement('strong');
+        title.textContent = String(summary.id || 'Invalid track');
+        const meta = document.createElement('span');
+        meta.textContent = `${summary.templateId || 'Unknown template'} · ${summary.status || 'UNKNOWN'} · version ${summary.version || '?'} · updated ${formatCockpitTime(summary.updatedAt)}`;
+        const expiry = document.createElement('span');
+        expiry.textContent = summary.authorizationExpiresAt
+          ? `Preview authorization expires ${formatCockpitTime(summary.authorizationExpiresAt)}`
+          : 'No preview authorization expiry is present in this summary.';
+        const inspect = document.createElement('button');
+        inspect.type = 'button';
+        inspect.className = 'button tertiary';
+        inspect.textContent = 'Inspect build';
+        inspect.disabled = !summary.id;
+        inspect.addEventListener('click', () => inspectBuildTrack(String(summary.id || '')));
+        item.append(title, meta, expiry, inspect);
+        target.append(item);
+      }
+    }
+
+    function renderBuildEvents() {
+      const target = element('buildEventList');
+      target.replaceChildren();
+      for (const event of state.trackEvents) {
+        const item = document.createElement('li');
+        item.className = 'surface-record';
+        const title = document.createElement('strong');
+        title.textContent = String(event.type || 'TRACK_UPDATED');
+        const meta = document.createElement('span');
+        meta.textContent = `${event.toStatus || 'UNKNOWN'} · version ${event.trackVersion || '?'} · ${formatCockpitTime(event.createdAt)}`;
+        item.append(title, meta);
+        target.append(item);
+      }
+      if (!state.trackEvents.length) {
+        const item = document.createElement('li');
+        item.className = 'surface-record';
+        const title = document.createElement('strong');
+        title.textContent = 'No timeline events returned';
+        const meta = document.createElement('span');
+        meta.textContent = 'No activity is synthesized. Retry the build inspection if events should exist.';
+        item.append(title, meta);
+        target.append(item);
+      }
+    }
+
+    function renderSelectedBuild() {
+      const track = state.selectedTrack;
+      const record = element('buildRecord');
+      record.hidden = !track;
+      if (!track) return;
+      element('buildRecordTitle').textContent = `${track.request && track.request.templateId || 'Unknown template'} · ${track.status || 'UNKNOWN'}`;
+      element('buildRecordMeta').textContent = `Version ${track.version || '?'} · updated ${formatCockpitTime(track.updatedAt)}${track.failureCode ? ` · failure ${track.failureCode}` : ''}`;
+      element('buildRecordExpiry').textContent = track.preview && track.preview.authorizationExpiresAt
+        ? `Preview authorization expires ${formatCockpitTime(track.preview.authorizationExpiresAt)}`
+        : 'No preview authorization expiry is present on this record.';
+      element('buildRecordTrackID').value = String(track.id || '');
+      element('reopenBuildPreviewButton').disabled = !track.preview || !track.artifact;
+      element('restoreBuildDraftButton').disabled = !canBuildWorkspace() || !track.request || Number(track.workspaceId) !== currentWorkspaceID();
+      element('restoreBuildDraftButton').title = canBuildWorkspace() ? 'Creates a new local draft from curated request data only; signer and creator authority are never copied.' : 'Viewer access is inspect-only.';
+      const resumable = RESUMABLE_TRACK_STATUSES.has(String(track.status || '').toUpperCase());
+      const ownTrack = Number(track.createdBy) === Number(state.user && state.user.id);
+      element('resumeBuildButton').disabled = !canBuildWorkspace() || !resumable || !ownTrack;
+      element('resumeBuildButton').hidden = !resumable;
+      element('resumeBuildButton').title = ownTrack ? 'The server rechecks creator, workspace capability, status, and version.' : 'Only the original authenticated creator may resume this partial track.';
+      renderBuildEvents();
+    }
+
+    async function loadBuildHistory({ append = false } = {}) {
+      const workspaceID = currentWorkspaceID();
+      if (!workspaceID) {
+        state.buildHistory = [];
+        state.buildHistoryCursor = '';
+        renderBuildHistory();
+        element('buildHistoryState').textContent = 'Select a workspace to load its signed build records.';
+        element('buildHistoryState').hidden = false;
+        element('loadMoreBuildHistory').hidden = true;
+        return;
+      }
+      const marker = workspaceMarker();
+      const requestEpoch = ++state.buildHistoryEpoch;
+      const cursor = append ? state.buildHistoryCursor : '';
+      element('buildHistoryState').textContent = append ? 'Loading older real build records…' : 'Loading real workspace build records…';
+      element('buildHistoryState').hidden = false;
+      element('retryBuildHistory').disabled = true;
+      element('loadMoreBuildHistory').disabled = true;
+      try {
+        const query = new URLSearchParams({ workspaceId: String(workspaceID), limit: '20' });
+        if (cursor) query.set('cursor', cursor);
+        const payload = await api(`/conductor/tracks?${query}`);
+        if (!currentWorkspace(marker) || requestEpoch !== state.buildHistoryEpoch) return;
+        const tracks = normalizeCollection(payload, 'tracks');
+        state.buildHistory = append ? [...state.buildHistory, ...tracks] : tracks;
+        state.buildHistoryCursor = String(payload && payload.nextCursor || '');
+        renderBuildHistory();
+        element('buildHistoryState').textContent = state.buildHistory.length
+          ? `${state.buildHistory.length} real workspace build record${state.buildHistory.length === 1 ? '' : 's'} loaded. Presence does not mean a preview is verified.`
+          : 'No workspace build records yet. Create a staging preview to add the first real record.';
+        element('loadMoreBuildHistory').hidden = !state.buildHistoryCursor;
+      } catch (error) {
+        if (!currentWorkspace(marker) || requestEpoch !== state.buildHistoryEpoch) return;
+        element('buildHistoryState').textContent = `${error.message || 'Build history could not be loaded.'} ${state.buildHistory.length ? 'The last loaded records are retained.' : 'Use Reload history to retry.'}`;
+        element('loadMoreBuildHistory').hidden = !state.buildHistoryCursor;
+      } finally {
+        if (currentWorkspace(marker) && requestEpoch === state.buildHistoryEpoch) {
+          element('retryBuildHistory').disabled = false;
+          element('loadMoreBuildHistory').disabled = false;
+        }
+      }
+    }
+
+    async function inspectBuildTrack(trackID, { quiet = false } = {}) {
+      if (!/^track_[A-Za-z0-9_-]+$/.test(trackID)) {
+        setNotice(element('builderAlert'), 'Enter a valid track ID before inspecting.', 'error');
+        element('trackLookup').focus();
+        return null;
+      }
+      const marker = workspaceMarker();
+      const requestEpoch = ++state.trackRecordEpoch;
+      if (!quiet) setNotice(element('builderAlert'), 'Inspecting the authorized build record without changing your draft or trusted preview…', 'gold');
+      try {
+        const track = await api(`/conductor/tracks/${encodeURIComponent(trackID)}`);
+        if (!currentWorkspace(marker) || requestEpoch !== state.trackRecordEpoch) return null;
+        if (!track || track.id !== trackID || Number(track.workspaceId) !== marker.workspaceID) throw new Error('The returned build record does not match this workspace.');
+        state.selectedTrack = track;
+        state.trackEvents = [];
+        element('trackLookup').value = trackID;
+        renderSelectedBuild();
+        try {
+          const payload = await api(`/conductor/tracks/${encodeURIComponent(trackID)}/events`);
+          if (!currentWorkspace(marker) || requestEpoch !== state.trackRecordEpoch) return null;
+          state.trackEvents = normalizeCollection(payload, 'events');
+          renderSelectedBuild();
+          if (!quiet) setNotice(element('builderAlert'), 'Build record loaded. Reopen verifies the signed preview; starting a draft copies curated request data only.', 'success');
+        } catch (eventError) {
+          if (!currentWorkspace(marker) || requestEpoch !== state.trackRecordEpoch) return null;
+          setNotice(element('buildRecordAlert'), `${eventError.message || 'The build timeline could not be loaded.'} The build record remains available.`, 'error');
+        }
+        return track;
+      } catch (error) {
+        if (!currentWorkspace(marker) || requestEpoch !== state.trackRecordEpoch) return null;
+        setNotice(element('builderAlert'), `${error.message || 'The build record could not be inspected.'} Your current draft and last verified preview were not replaced.`, 'error');
+        return null;
       }
     }
 
@@ -1229,6 +1472,9 @@
           meta: `${productRoleForWorkspaceRole(String(member.role || '')) || 'Unknown role'} · workspace role ${member.role || 'unknown'}`,
         }));
         element('peopleState').textContent = state.members.length ? `${state.members.length} real workspace member${state.members.length === 1 ? '' : 's'}.` : 'No active workspace members were returned.';
+        renderWorkspaceAccess();
+        await Promise.allSettled([loadBuildHistory(), loadDomainClaims()]);
+        if (!currentWorkspace(marker)) return;
       } catch (error) {
         if (!currentWorkspace(marker)) return;
         element('peopleState').textContent = `Could not load workspace people: ${error.message || 'request failed'}. Use Reload people to retry.`;
@@ -1735,7 +1981,10 @@
         control.addEventListener('input', () => {
           const candidate = cloneDocument(state.componentDocuments[id]);
           candidate[descriptor.key] = control.value;
-          setComponentDocument(id, candidate, error);
+          if (setComponentDocument(id, candidate, error)) {
+            const advancedInput = card.querySelector('.advanced-document textarea');
+            if (advancedInput) advancedInput.value = JSON.stringify(state.componentDocuments[id], null, 2);
+          }
         });
         fields.append(wrapper);
       }
@@ -1993,23 +2242,187 @@
     function updateDeploymentAvailability() {
       if (state.track && String(state.track.status).toLowerCase() === 'published') {
         element('deployButton').disabled = true;
+        element('deployButton').textContent = 'Published';
         return;
       }
-      const canPublish = state.previewReady && claimIsVerified() && currentPreviewIncludesDomain() && !state.building && !state.publishing;
+      const publicationRequested = state.track && String(state.track.status).toUpperCase() === 'PUBLICATION_REQUESTED' && state.domainClaim && state.track.claimId === state.domainClaim.id;
+      const canPublish = canPublishWorkspace() && state.previewReady && claimIsVerified() && currentPreviewIncludesDomain() && !state.building && !state.publishing;
       element('deployButton').disabled = !canPublish;
-      if (state.previewReady && claimIsVerified() && !currentPreviewIncludesDomain()) {
-        element('deployStateText').textContent = 'Refresh preview required';
-        element('deployStateHelp').textContent = 'The verified origin must be included in a fresh signed staging preview before publication can be requested.';
+      element('deployButton').textContent = publicationRequested ? 'Retry activation' : 'Publish verified domain';
+      if (publicationRequested) {
+        element('deployStateText').textContent = 'Publication requested · activation pending';
+        element('deployStateHelp').textContent = 'The request is durably recorded. Retry activation against the latest track version.';
+      }
+      if (state.previewReady && !publicationRequested) {
+        if (!state.domainClaim) {
+          element('deployStateText').textContent = 'Verified domain required';
+          element('deployStateHelp').textContent = 'Choose or create a real domain claim before publication.';
+        } else if (!claimIsVerified()) {
+          element('deployStateText').textContent = 'Domain verification required';
+          element('deployStateHelp').textContent = 'Complete the existing DNS verification before publication; no proof is synthesized.';
+        } else if (!currentPreviewIncludesDomain()) {
+          element('deployStateText').textContent = 'Refresh preview required';
+          element('deployStateHelp').textContent = 'The verified origin must be included in a fresh signed staging preview before publication can be requested.';
+        } else {
+          element('deployStateText').textContent = 'Ready for review';
+          element('deployStateHelp').textContent = 'The selected verified origin is bound into the active signed preview. Publication still requires server authorization.';
+        }
+      }
+      if (state.previewReady && claimIsVerified()) {
+        element('domainClaimsState').textContent = `Verified until ${formatCockpitTime(state.domainClaim.verificationExpiresAt)}. ${currentPreviewIncludesDomain() ? 'Bound into the current signed preview.' : 'Refresh the signed preview to bind this exact origin before publication.'}`;
+      }
+    }
+
+    function domainClaimLabel(claim) {
+      const status = String(claim && claim.status || 'unknown').toLowerCase();
+      return status === 'revoked' && String(claim.revocationReason || '').toLowerCase() === 'expired' ? 'expired' : status;
+    }
+
+    function renderDomainPublications() {
+      const target = element('domainPublicationList');
+      target.replaceChildren();
+      for (const publication of state.domainPublications) {
+        const item = document.createElement('li');
+        item.className = 'surface-record';
+        const title = document.createElement('strong');
+        title.textContent = `${publication.active ? 'Active' : 'Inactive'} publication · ${publication.id || 'unknown ID'}`;
+        const meta = document.createElement('span');
+        meta.textContent = `${publication.origin || 'Unknown origin'} · activated ${formatCockpitTime(publication.activatedAt)}`;
+        item.append(title, meta);
+        target.append(item);
+      }
+    }
+
+    function renderDomainClaims() {
+      const select = element('domainClaimSelect');
+      const selectedID = String(state.domainClaim && state.domainClaim.id || '');
+      select.replaceChildren(new Option(state.domainClaims.length ? 'Choose a real domain claim' : 'No domain claims yet', ''));
+      for (const claim of state.domainClaims) {
+        const option = new Option(`${claim.origin || 'Unknown origin'} · ${domainClaimLabel(claim)}`, String(claim.id || ''));
+        select.append(option);
+      }
+      select.value = state.domainClaims.some((claim) => String(claim.id) === selectedID) ? selectedID : '';
+      select.disabled = !canPublishWorkspace() || !state.domainClaims.length;
+    }
+
+    async function loadDomainPublications(claim) {
+      const workspaceID = currentWorkspaceID();
+      if (!claim || !claim.id || !workspaceID || !canPublishWorkspace()) {
+        state.domainPublications = [];
+        renderDomainPublications();
+        return;
+      }
+      const marker = workspaceMarker();
+      const claimID = String(claim.id);
+      const requestEpoch = ++state.domainPublicationEpoch;
+      try {
+        const payload = await api(`/workspaces/${workspaceID}/domains/${encodeURIComponent(claimID)}/publications`);
+        if (!currentWorkspace(marker) || requestEpoch !== state.domainPublicationEpoch || !state.domainClaim || String(state.domainClaim.id) !== claimID) return;
+        state.domainPublications = normalizeCollection(payload, 'publications');
+        renderDomainPublications();
+      } catch (error) {
+        if (!currentWorkspace(marker) || requestEpoch !== state.domainPublicationEpoch || !state.domainClaim || String(state.domainClaim.id) !== claimID) return;
+        state.domainPublications = [];
+        renderDomainPublications();
+        setNotice(element('domainStatus'), `${error.message || 'Publication history could not be loaded.'} Domain claim readiness is still shown.`, 'error');
+      }
+    }
+
+    async function selectDomainClaim(claimID, { loadPublications = true } = {}) {
+      const claim = state.domainClaims.find((entry) => String(entry.id || '') === String(claimID || '')) || null;
+      state.domainClaim = claim;
+      state.domainPublications = [];
+      renderDomainPublications();
+      element('domainProof').textContent = '';
+      element('domainProof').hidden = true;
+      if (!claim) {
+        state.domainOrigin = '';
+        element('domainClaimSelect').value = '';
+        element('verifyDomainButton').disabled = true;
+        element('claimDomainButton').textContent = 'Issue DNS proof';
+        updateDeploymentAvailability();
+        return;
+      }
+      state.domainOrigin = String(claim.origin || '');
+      element('domainOrigin').value = state.domainOrigin;
+      element('domainClaimSelect').value = String(claim.id);
+      const status = domainClaimLabel(claim);
+      element('verifyDomainButton').disabled = status !== 'pending' || !canPublishWorkspace();
+      element('claimDomainButton').textContent = status === 'pending' ? 'Rotate DNS proof' : 'Issue DNS proof';
+      const next = status === 'verified'
+        ? `Verified until ${formatCockpitTime(claim.verificationExpiresAt)}. ${currentPreviewIncludesDomain() ? 'Bound into the current signed preview.' : 'Refresh the signed preview to bind this exact origin before publication.'}`
+        : status === 'pending'
+          ? `Pending until ${formatCockpitTime(claim.challengeExpiresAt)}. Verify an already-published proof, or rotate to display a new TXT value.`
+          : `${status[0]?.toUpperCase() || ''}${status.slice(1)} claim. Issue a new DNS proof to continue; no proof value is reconstructed.`;
+      element('domainClaimsState').textContent = next;
+      element('domainClaimsState').hidden = false;
+      updateDeploymentAvailability();
+      if (loadPublications) await loadDomainPublications(claim);
+    }
+
+    async function loadDomainClaims() {
+      const workspaceID = currentWorkspaceID();
+      if (!workspaceID || !canPublishWorkspace()) {
+        state.domainClaims = [];
+        state.domainPublications = [];
+        state.domainClaim = null;
+        state.domainOrigin = '';
+        renderDomainClaims();
+        renderDomainPublications();
+        element('domainClaimsState').textContent = workspaceID ? 'Viewer and Maintainer access is inspect-only; an Architect manages delivery claims.' : 'Select an Architect workspace to load real domain claims.';
+        element('domainClaimsState').hidden = false;
+        renderWorkspaceAccess();
+        return;
+      }
+      const marker = workspaceMarker();
+      const requestEpoch = ++state.domainEpoch;
+      const previousID = String(state.domainClaim && state.domainClaim.id || '');
+      element('domainClaimsState').textContent = 'Loading real domain claims for this workspace…';
+      element('domainClaimsState').hidden = false;
+      element('retryDomainClaims').disabled = true;
+      try {
+        const payload = await api(`/workspaces/${workspaceID}/domains`);
+        if (!currentWorkspace(marker) || requestEpoch !== state.domainEpoch) return;
+        state.domainClaims = normalizeCollection(payload, 'claims');
+        const selected = state.domainClaims.find((claim) => String(claim.id) === previousID)
+          || state.domainClaims.find((claim) => domainClaimLabel(claim) === 'verified')
+          || state.domainClaims.find((claim) => domainClaimLabel(claim) === 'pending')
+          || state.domainClaims[0]
+          || null;
+        state.domainClaim = selected;
+        renderDomainClaims();
+        if (selected) await selectDomainClaim(selected.id);
+        else {
+          state.domainOrigin = '';
+          state.domainPublications = [];
+          renderDomainPublications();
+          element('domainClaimsState').textContent = 'No domain claims yet. Issue a DNS proof for one exact HTTPS origin; external DNS remains required.';
+        }
+      } catch (error) {
+        if (!currentWorkspace(marker) || requestEpoch !== state.domainEpoch) return;
+        element('domainClaimsState').textContent = `${error.message || 'Domain claims could not be loaded.'} Use Reload domain claims to retry.`;
+      } finally {
+        if (currentWorkspace(marker) && requestEpoch === state.domainEpoch) {
+          element('retryDomainClaims').disabled = false;
+          renderWorkspaceAccess();
+        }
       }
     }
 
     function resetDomainClaim(clearOrigin = false) {
+      state.domainEpoch += 1;
+      state.domainPublicationEpoch += 1;
       state.domainClaim = null;
+      state.domainPublications = [];
       state.domainOrigin = '';
       if (clearOrigin) element('domainOrigin').value = '';
+      element('domainClaimSelect').value = '';
+      renderDomainPublications();
       element('domainProof').textContent = '';
       element('domainProof').hidden = true;
       element('verifyDomainButton').disabled = true;
+      element('claimDomainButton').textContent = 'Issue DNS proof';
+      if (canPublishWorkspace()) element('domainClaimsState').textContent = 'Enter a new exact origin, or choose an existing claim above.';
       setNotice(element('domainStatus'), '');
       updateDeploymentAvailability();
     }
@@ -2188,6 +2601,39 @@
       return JSON.stringify(project(components)) === JSON.stringify(project(expectedComponents));
     }
 
+    function exactOriginPolicyMatch(left, right) {
+      if (!left || typeof left !== 'object' || Array.isArray(left) || !right || typeof right !== 'object' || Array.isArray(right)) return false;
+      const fields = ['surfaces', 'embedders', 'connections', 'resources'];
+      if (Object.keys(left).some((key) => !fields.includes(key)) || Object.keys(right).some((key) => !fields.includes(key))) return false;
+      return fields.every((field) => {
+        if (left[field] !== undefined && !Array.isArray(left[field])) return false;
+        if (right[field] !== undefined && !Array.isArray(right[field])) return false;
+        return JSON.stringify(left[field] || []) === JSON.stringify(right[field] || []);
+      });
+    }
+
+    function verifiedTrackBinding(result, manifest, expectedTrackID = '') {
+      const track = result && result.track;
+      const artifact = track && track.artifact;
+      const preview = track && track.preview;
+      const authorization = manifest && manifest.authorization;
+      const manifestSubject = authorization && authorization.subject;
+      const previewSubject = preview && preview.subject;
+      if (!track || typeof track !== 'object' || !/^track_[A-Za-z0-9_-]+$/.test(String(track.id || ''))
+        || (expectedTrackID && track.id !== expectedTrackID)
+        || track.workspaceId !== manifest.workspaceId
+        || !artifact || artifact.artifactId !== manifest.artifactId || artifact.contentHash !== manifest.contentHash
+        || !preview || preview.artifactId !== manifest.artifactId || preview.contentHash !== manifest.contentHash
+        || preview.workspaceId !== manifest.workspaceId || preview.authenticationRequired !== true
+        || !previewSubject || !manifestSubject || previewSubject.id !== manifestSubject.id || previewSubject.userId !== manifestSubject.userId
+        || preview.workspaceId !== manifestSubject.workspaceId
+        || !authorization || !exactOriginPolicyMatch(preview.allowedOrigins, authorization.allowedOrigins)
+        || String(preview.authorizationExpiresAt || '') !== String(authorization.expiresAt || '')) {
+        throw new Error('The composition track does not exactly bind this signed preview manifest.');
+      }
+      return track;
+    }
+
     async function verifiedManifestReceipt(source, verification, expectedComponents) {
       if (!verification || verification.verified !== true || verification.status !== 'verified'
         || typeof verification.manifestJson !== 'string' || !/^[0-9a-f]{64}$/.test(verification.manifestDigest || '')) {
@@ -2327,7 +2773,7 @@
       return { ids: components.map((component) => component.id), documents };
     }
 
-    async function applyVerifiedPreview(result, requestGuard, { restoreDraft = false, requireActive = true, expectedComponents } = {}) {
+    async function applyVerifiedPreview(result, requestGuard, { restoreDraft = false, requireActive = true, expectedComponents, expectedTrackID = '' } = {}) {
       if (!result || !result.manifest || typeof result.manifest !== 'object') throw new Error('The build did not return an artifact manifest.');
       const receipt = await verifiedManifestReceipt(result.manifest, result.verification, expectedComponents);
       requirePreviewGuard(requestGuard);
@@ -2343,6 +2789,7 @@
         updateDeploymentAvailability();
         return false;
       }
+      const verifiedTrack = verifiedTrackBinding(result, result.manifest, expectedTrackID);
       if (Number(result.manifest.workspaceId) !== currentWorkspaceID()) throw new Error('The signed track belongs to another workspace.');
       const templateID = String(result.manifest.template && result.manifest.template.id || '');
       if (!state.templates.some((template) => String(template.id || template.template?.id || '') === templateID)) throw new Error('The signed track template is not in the current approved catalog.');
@@ -2353,8 +2800,7 @@
       requirePreviewGuard(requestGuard);
       await loadPreviewFrame(frame, preview, requestGuard, () => commitPreparedManifest(preparedManifest));
       requirePreviewGuard(requestGuard);
-      state.track = result.track || null;
-      if (!state.track || !state.track.id) throw new Error('The build did not return a composition track.');
+      state.track = verifiedTrack;
       if (restoreDraft) {
         state.selectedTemplateId = templateID;
         state.selectedComponentIds = restored.ids;
@@ -2375,15 +2821,28 @@
       element('deployStateHelp').textContent = 'Inspect the staging app, exact signed component documents, references, and trust boundary. Publication remains review-gated.';
       element('previewButton').textContent = 'Refresh staging preview';
       setLifecycle(2);
+      updateDeploymentAvailability();
+      return true;
     }
 
     async function loadVerifiedTrack() {
       const trackID = element('trackLookup').value.trim();
       if (!/^track_[A-Za-z0-9_-]+$/.test(trackID)) {
-        setNotice(element('builderAlert'), 'Enter a valid track ID before reloading.', 'error');
+        setNotice(element('builderAlert'), 'Enter a valid track ID before inspecting.', 'error');
         element('trackLookup').focus();
         return;
       }
+      setBusy(element('loadTrackButton'), true, 'Inspecting…', 'Inspect build');
+      try {
+        await inspectBuildTrack(trackID);
+      } finally {
+        setBusy(element('loadTrackButton'), false, 'Inspecting…', 'Inspect build');
+      }
+    }
+
+    async function reopenSelectedBuildPreview() {
+      const selected = state.selectedTrack;
+      if (!selected || !selected.id) return;
       const sessionEpoch = state.sessionEpoch;
       const workspaceEpoch = state.workspaceEpoch;
       const workspaceID = currentWorkspaceID();
@@ -2391,21 +2850,110 @@
       const marker = draftMarker();
       const operationCurrent = () => currentSession(sessionEpoch) && workspaceEpoch === state.workspaceEpoch && workspaceID === currentWorkspaceID() && previewEpoch === state.previewEpoch;
       const guard = () => operationCurrent() && currentDraft(marker);
-      setBusy(element('loadTrackButton'), true, 'Verifying…', 'Reload verified preview');
-      setNotice(element('builderAlert'), 'Loading and verifying the signed track without replacing your current draft…', 'gold');
+      const button = element('reopenBuildPreviewButton');
+      setBusy(button, true, 'Verifying…', 'Reopen verified preview');
+      setNotice(element('buildRecordAlert'), 'Fetching and verifying the exact signed preview without changing the local draft…', 'gold');
       try {
-        const result = await api(`/conductor/tracks/${encodeURIComponent(trackID)}?includeVerifiedPreview=true`);
+        const result = await api(`/conductor/tracks/${encodeURIComponent(selected.id)}?includeVerifiedPreview=true`);
         if (!guard()) return;
-        await applyVerifiedPreview(result, guard, { restoreDraft: true });
-        setNotice(element('builderAlert'), 'Verified track restored with its exact signed component documents. Viewer access remains read-only.', 'success');
+        const active = await applyVerifiedPreview(result, guard, { restoreDraft: false, expectedTrackID: selected.id });
+        if (!active) throw new Error('The signed preview is not actively verified.');
+        state.selectedTrack = state.track;
+        renderSelectedBuild();
+        setNotice(element('buildRecordAlert'), 'Verified preview reopened. The local component draft was not replaced.', 'success');
       } catch (error) {
         if (!operationCurrent()) return;
         const frame = element('previewFrame');
+        state.previewReady = false;
         if (!frame.srcdoc) element('previewEmpty').hidden = false;
+        else frame.dataset.stale = 'true';
         setPreviewState('error', frame.srcdoc ? 'Last verified preview retained' : 'Track unavailable');
-        setNotice(element('builderAlert'), `${error.message || 'The verified track could not be restored'} Your last valid draft and last verified preview were not replaced.`, 'error');
+        element('deployStateText').textContent = 'Not ready · verified reload required';
+        element('deployStateHelp').textContent = 'The selected track must exactly bind the signed artifact, preview authorization, workspace, origins, and expiry.';
+        updateDeploymentAvailability();
+        setNotice(element('buildRecordAlert'), `${error.message || 'The signed preview could not be reopened.'} Your current draft and last trusted iframe/receipt were not replaced.`, 'error');
       } finally {
-        if (operationCurrent()) setBusy(element('loadTrackButton'), false, 'Verifying…', 'Reload verified preview');
+        if (operationCurrent()) setBusy(button, false, 'Verifying…', 'Reopen verified preview');
+      }
+    }
+
+    function curatedDraftFromTrack(track) {
+      const request = track && track.request;
+      if (!request || Number(track.workspaceId) !== currentWorkspaceID() || Number(request.workspaceId) !== currentWorkspaceID()) throw new Error('The build request is not bound to this workspace.');
+      const template = state.templates.find((entry) => String(entry.id || entry.template?.id || '') === String(request.templateId || ''));
+      if (!template) throw new Error('The build template is not in the current approved catalog.');
+      const allowed = new Set(Array.isArray(template.allowedModules) ? template.allowedModules : []);
+      const components = Array.isArray(request.components) ? request.components : [];
+      if (!components.length) throw new Error('This build has no exact component documents to start from.');
+      const ids = [];
+      const documents = {};
+      for (const component of components) {
+        const id = String(component && component.id || '');
+        if (!id || id !== String(component && component.type || '') || !allowed.has(id) || ids.includes(id)) throw new Error('The build component relationship is not valid in the current catalog.');
+        ids.push(id);
+        documents[id] = validateComponentDocument(id, component.data);
+      }
+      return { request, templateID: String(request.templateId), ids, documents };
+    }
+
+    function restoreSelectedBuildAsDraft() {
+      if (!canBuildWorkspace()) {
+        setNotice(element('buildRecordAlert'), 'Viewer access is inspect-only. Ask an Architect for Maintainer access to start a new draft.', 'error');
+        return;
+      }
+      try {
+        const restored = curatedDraftFromTrack(state.selectedTrack);
+        state.selectedTemplateId = restored.templateID;
+        state.selectedComponentIds = restored.ids;
+        state.componentDocuments = restored.documents;
+        element('templateSelect').value = restored.templateID;
+        element('appName').value = String(restored.request.appName || 'Community app');
+        element('organizationName').value = String(restored.request.organizationName || '');
+        element('city').value = String(restored.request.city || '');
+        if ([...element('madhhab').options].some((option) => option.value === restored.request.madhhab)) element('madhhab').value = restored.request.madhhab;
+        const accent = String(restored.request.theme && restored.request.theme.accentColor || '').toUpperCase();
+        if (/^#[0-9A-F]{6}$/.test(accent)) {
+          element('accentColor').value = accent;
+          element('accentHex').value = accent;
+        }
+        renderComponentEditors();
+        markPreviewDirty();
+        saveComponentDraft();
+        setNotice(element('builderAlert'), 'New local draft created from exact curated request components. Creator, signer, lifecycle, origins, and idempotency authority were not copied.', 'success');
+        element('templateSelect').focus();
+      } catch (error) {
+        setNotice(element('buildRecordAlert'), `${error.message || 'The build request could not start a new draft.'} The current draft and verified preview were retained.`, 'error');
+      }
+    }
+
+    async function resumeSelectedBuild() {
+      const selected = state.selectedTrack;
+      if (!selected || !selected.id || !RESUMABLE_TRACK_STATUSES.has(String(selected.status || '').toUpperCase())) return;
+      const marker = workspaceMarker();
+      const requestEpoch = ++state.trackRecordEpoch;
+      const button = element('resumeBuildButton');
+      setBusy(button, true, 'Resuming…', 'Resume build');
+      try {
+        const track = await api(`/conductor/tracks/${encodeURIComponent(selected.id)}/resume`, { method: 'POST', body: { expectedVersion: selected.version } });
+        if (!currentWorkspace(marker) || requestEpoch !== state.trackRecordEpoch) return;
+        state.selectedTrack = track;
+        state.trackEvents = [];
+        renderSelectedBuild();
+        await inspectBuildTrack(track.id, { quiet: true });
+        if (!currentWorkspace(marker)) return;
+        await loadBuildHistory();
+        if (state.selectedTrack && state.selectedTrack.preview && state.selectedTrack.artifact) await reopenSelectedBuildPreview();
+        if (currentWorkspace(marker)) setNotice(element('buildRecordAlert'), 'Build resumed from its server-authorized durable state.', 'success');
+      } catch (error) {
+        if (!currentWorkspace(marker) || requestEpoch !== state.trackRecordEpoch) return;
+        if (error.code === 'composition_conflict' || error.status === 409) {
+          await inspectBuildTrack(selected.id, { quiet: true });
+          if (currentWorkspace(marker)) setNotice(element('buildRecordAlert'), 'This build changed before resume. The latest status/version is loaded; review it before retrying.', 'gold');
+        } else {
+          setNotice(element('buildRecordAlert'), `${error.message || 'The build could not be resumed.'} The current draft and trusted preview were retained.`, 'error');
+        }
+      } finally {
+        if (currentWorkspace(marker)) setBusy(button, false, 'Resuming…', 'Resume build');
       }
     }
 
@@ -2432,10 +2980,17 @@
       let artifactBuilt = false;
       try {
         const result = await api('/artifacts/preview', { method: 'POST', body: payload });
-        if (!guard()) return;
+        if (!guard()) throw new Error('The local draft changed while the build was running. Review the current values and create a fresh preview.');
         artifactBuilt = true;
         setPreviewState('loading', 'Loading staging app');
         const active = await applyVerifiedPreview(result, guard, { requireActive: false, expectedComponents: payload.components });
+        if (active && state.track) {
+          state.selectedTrack = state.track;
+          state.trackEvents = [];
+          renderSelectedBuild();
+          await Promise.allSettled([inspectBuildTrack(state.track.id, { quiet: true }), loadBuildHistory()]);
+          if (!guard()) return;
+        }
         setNotice(element('builderAlert'), active
           ? 'Staging artifact created. Review the preview and manifest before deployment.'
           : 'The returned evidence is not actively verified. Your last verified preview was retained and publication is disabled.', active ? 'success' : 'error');
@@ -2481,10 +3036,19 @@
 
     function clearVerifiedPreviewForScope() {
       state.previewEpoch += 1;
+      state.trackRecordEpoch += 1;
+      state.buildHistoryEpoch += 1;
       state.draftRevision += 1;
       state.building = false;
       state.previewReady = false;
       state.track = null;
+      state.buildHistory = [];
+      state.buildHistoryCursor = '';
+      clearSelectedBuildRecord();
+      renderBuildHistory();
+      element('buildHistoryState').textContent = currentWorkspaceID() ? 'Loading real workspace build records…' : 'Select a workspace to load its signed build records.';
+      element('buildHistoryState').hidden = false;
+      element('loadMoreBuildHistory').hidden = true;
       const frame = element('previewFrame');
       frame.removeAttribute('src');
       frame.removeAttribute('srcdoc');
@@ -2492,7 +3056,7 @@
       frame.hidden = true;
       element('previewEmpty').hidden = false;
       element('previewLoading').hidden = true;
-      setBusy(element('loadTrackButton'), false, 'Verifying…', 'Reload verified preview');
+      setBusy(element('loadTrackButton'), false, 'Inspecting…', 'Inspect build');
       element('manifestList').replaceChildren();
       element('manifestList').hidden = true;
       element('manifestEmpty').hidden = false;
@@ -2519,6 +3083,7 @@
 
     async function claimDomain() {
       const workspaceID = currentWorkspaceID();
+      const marker = workspaceMarker();
       const origin = element('domainOrigin').value.trim();
       if (!workspaceID) {
         setNotice(element('domainStatus'), 'Select a workspace before claiming a domain.', 'error');
@@ -2529,44 +3094,73 @@
         element('domainOrigin').focus();
         return;
       }
+      const operationEpoch = ++state.domainEpoch;
+      const operationCurrent = () => currentWorkspace(marker)
+        && operationEpoch === state.domainEpoch
+        && element('domainOrigin').value.trim() === origin;
       const button = element('claimDomainButton');
       setBusy(button, true, 'Creating…', 'Create DNS proof');
       setNotice(element('domainStatus'), '');
       try {
         const result = await api(`/workspaces/${workspaceID}/domains`, { method: 'POST', body: { origin } });
+        if (!operationCurrent()) return;
         if (!result || !result.claim || !result.verification) throw new Error('The domain claim response was incomplete.');
+        if (String(result.claim.origin || '') !== origin || Number(result.claim.workspaceId) !== workspaceID) throw new Error('The domain claim response did not match this exact workspace origin.');
+        state.domainClaims = [result.claim, ...state.domainClaims.filter((claim) => String(claim.id) !== String(result.claim.id))];
         state.domainClaim = result.claim;
-        state.domainOrigin = String(result.claim.origin || origin);
-        element('domainOrigin').value = state.domainOrigin;
+        renderDomainClaims();
+        await selectDomainClaim(result.claim.id, { loadPublications: false });
+        if (!operationCurrent() || !state.domainClaim || String(state.domainClaim.id) !== String(result.claim.id)) return;
         element('domainProof').textContent = `Create DNS TXT ${result.verification.recordName}: ${result.verification.value}`;
         element('domainProof').hidden = false;
         element('verifyDomainButton').disabled = false;
         setNotice(element('domainStatus'), 'DNS proof created. Publish the TXT record, then verify it here.', 'success');
         updateDeploymentAvailability();
       } catch (error) {
+        if (!operationCurrent()) return;
         setNotice(element('domainStatus'), error.message || 'Could not create the DNS proof.', 'error');
       } finally {
-        setBusy(button, false, 'Creating…', 'Create DNS proof');
+        setBusy(button, false, 'Creating…', state.domainClaim && domainClaimLabel(state.domainClaim) === 'pending' ? 'Rotate DNS proof' : 'Issue DNS proof');
+        if (currentWorkspace(marker)) {
+          renderWorkspaceAccess();
+        }
       }
     }
 
     async function verifyDomain() {
       const workspaceID = currentWorkspaceID();
+      const marker = workspaceMarker();
       if (!workspaceID || !state.domainClaim || !state.domainClaim.id) {
         setNotice(element('domainStatus'), 'Create a DNS proof before verifying it.', 'error');
         return;
       }
+      const claimID = String(state.domainClaim.id);
+      const origin = String(state.domainClaim.origin || state.domainOrigin || '');
+      const operationEpoch = ++state.domainEpoch;
+      const operationCurrent = () => currentWorkspace(marker)
+        && operationEpoch === state.domainEpoch
+        && state.domainClaim
+        && String(state.domainClaim.id) === claimID
+        && String(state.domainClaim.origin || '') === origin
+        && state.domainOrigin === origin
+        && element('domainClaimSelect').value === claimID;
       const button = element('verifyDomainButton');
       setBusy(button, true, 'Verifying…', 'Verify DNS proof');
       try {
-        const path = `/workspaces/${workspaceID}/domains/${encodeURIComponent(state.domainClaim.id)}`;
+        const path = `/workspaces/${workspaceID}/domains/${encodeURIComponent(claimID)}`;
         const inspected = await api(path);
+        if (!operationCurrent()) return;
+        if (!inspected || String(inspected.id || '') !== claimID || String(inspected.origin || '') !== origin || Number(inspected.workspaceId) !== workspaceID) throw new Error('The inspected domain claim did not match the selected workspace origin.');
         const claim = String(inspected.status).toLowerCase() === 'verified'
           ? inspected
           : await api(`${path}/verify`, { method: 'POST' });
+        if (!operationCurrent()) return;
+        if (!claim || String(claim.id || '') !== claimID || String(claim.origin || '') !== origin || Number(claim.workspaceId) !== workspaceID) throw new Error('The verified domain claim did not match the selected workspace origin.');
+        state.domainClaims = [claim, ...state.domainClaims.filter((entry) => String(entry.id) !== String(claim.id))];
         state.domainClaim = claim;
-        state.domainOrigin = String(claim.origin || state.domainOrigin);
-        element('domainOrigin').value = state.domainOrigin;
+        renderDomainClaims();
+        await selectDomainClaim(claim.id);
+        if (!operationCurrent()) return;
         element('domainProof').hidden = true;
         const message = currentPreviewIncludesDomain()
           ? 'Domain verified. This signed preview includes the delivery origin and can be published.'
@@ -2574,9 +3168,13 @@
         setNotice(element('domainStatus'), message, 'success');
         updateDeploymentAvailability();
       } catch (error) {
+        if (!operationCurrent()) return;
         setNotice(element('domainStatus'), error.message || 'The DNS proof could not be verified yet.', 'error');
       } finally {
         setBusy(button, false, 'Verifying…', 'Verify DNS proof');
+        if (currentWorkspace(marker)) {
+          renderWorkspaceAccess();
+        }
       }
     }
 
@@ -2586,28 +3184,104 @@
         return;
       }
       const button = element('deployButton');
+      const marker = workspaceMarker();
+      const trackID = String(state.track.id);
+      const trackVersion = Number(state.track.version);
+      const claimID = String(state.domainClaim.id);
+      const claimOrigin = String(state.domainClaim.origin || state.domainOrigin || '');
+      const previewEpoch = state.previewEpoch;
+      const domainEpoch = state.domainEpoch;
+      const draft = draftMarker();
+      const operationEpoch = ++state.publicationEpoch;
+      const selectionCurrent = () => currentWorkspace(marker)
+        && operationEpoch === state.publicationEpoch
+        && previewEpoch === state.previewEpoch
+        && domainEpoch === state.domainEpoch
+        && currentDraft(draft)
+        && state.track
+        && String(state.track.id) === trackID
+        && state.domainClaim
+        && String(state.domainClaim.id) === claimID
+        && String(state.domainClaim.origin || '') === claimOrigin
+        && state.domainOrigin === claimOrigin;
+      const reconcileCapturedTrack = async () => {
+        if (!selectionCurrent()) return null;
+        const latest = await api(`/conductor/tracks/${encodeURIComponent(trackID)}`);
+        if (!selectionCurrent()) return null;
+        if (!latest || String(latest.id || '') !== trackID || Number(latest.workspaceId) !== marker.workspaceID) throw new Error('The reconciled publication track did not match the selected workspace build.');
+        let events = [];
+        try {
+          const payload = await api(`/conductor/tracks/${encodeURIComponent(trackID)}/events`);
+          if (!selectionCurrent()) return null;
+          events = normalizeCollection(payload, 'events');
+        } catch {
+          if (!selectionCurrent()) return null;
+        }
+        state.track = latest;
+        state.selectedTrack = latest;
+        state.trackEvents = events;
+        renderSelectedBuild();
+        return latest;
+      };
       state.publishing = true;
       updateDeploymentAvailability();
       setBusy(button, true, 'Publishing…', 'Publish verified domain');
       try {
-        const requested = await api(`/conductor/tracks/${encodeURIComponent(state.track.id)}/publication`, {
-          method: 'POST', body: { expectedVersion: state.track.version, claimId: state.domainClaim.id },
-        });
+        let requested = state.track;
+        if (String(requested.status || '').toUpperCase() !== 'PUBLICATION_REQUESTED' || requested.claimId !== claimID) {
+          requested = await api(`/conductor/tracks/${encodeURIComponent(trackID)}/publication`, {
+            method: 'POST', body: { expectedVersion: trackVersion, claimId: claimID },
+          });
+          if (!selectionCurrent() || Number(state.track.version) !== trackVersion) return;
+          if (!requested || String(requested.id || '') !== trackID || Number(requested.workspaceId) !== marker.workspaceID || String(requested.claimId || '') !== claimID || String(requested.status || '').toUpperCase() !== 'PUBLICATION_REQUESTED') throw new Error('The publication request response did not match the selected build and claim.');
+          state.track = requested;
+          state.selectedTrack = requested;
+          renderSelectedBuild();
+          element('deployStateText').textContent = 'Publication requested · activation in progress';
+        }
         const activated = await api(`/conductor/tracks/${encodeURIComponent(requested.id)}/activate`, {
           method: 'POST', body: { expectedVersion: requested.version },
         });
+        if (!selectionCurrent() || Number(state.track.version) !== Number(requested.version)) return;
+        if (!activated || String(activated.id || '') !== trackID || Number(activated.workspaceId) !== marker.workspaceID || String(activated.claimId || '') !== claimID || String(activated.status || '').toUpperCase() !== 'PUBLISHED' || !activated.publication || String(activated.publication.claimId || '') !== claimID || String(activated.publication.origin || '') !== claimOrigin) throw new Error('The activated publication did not match the selected build, claim, and exact origin.');
         state.track = activated;
+        state.selectedTrack = activated;
+        renderSelectedBuild();
         const origin = activated.publication && activated.publication.origin ? activated.publication.origin : state.domainOrigin;
         element('deployStateText').textContent = 'Published';
         element('deployStateHelp').textContent = `The signed card is active at ${origin}.`;
         setNotice(element('domainStatus'), `Published and active at ${origin}.`, 'success');
         setLifecycle(4);
+        await Promise.allSettled([loadBuildHistory(), loadDomainPublications(state.domainClaim)]);
       } catch (error) {
-        setNotice(element('domainStatus'), error.message || 'Publication could not be activated.', 'error');
+        if (!selectionCurrent()) return;
+        let latest;
+        try {
+          latest = await reconcileCapturedTrack();
+        } catch (reconcileError) {
+          if (selectionCurrent()) setNotice(element('domainStatus'), `${error.message || 'Publication could not be activated.'} ${reconcileError.message || 'The latest track could not be reloaded.'} The trusted preview was retained.`, 'error');
+          return;
+        }
+        if (!selectionCurrent()) return;
+        if (latest && String(latest.status || '').toUpperCase() === 'PUBLISHED') {
+          const origin = latest.publication && latest.publication.origin ? latest.publication.origin : state.domainOrigin;
+          element('deployStateText').textContent = 'Published';
+          element('deployStateHelp').textContent = `The signed card is active at ${origin}.`;
+          setNotice(element('domainStatus'), `Publication completed and was reconciled at ${origin}.`, 'success');
+          setLifecycle(4);
+        } else if (latest && String(latest.status || '').toUpperCase() === 'PUBLICATION_REQUESTED') {
+          setNotice(element('domainStatus'), `${error.message || 'Activation is temporarily unavailable.'} The publication request is durably recorded at version ${latest.version}; retry activation without requesting again.`, 'gold');
+        } else {
+          setNotice(element('domainStatus'), `${error.message || 'Publication could not be activated.'} The latest build status was reloaded; review it before retrying.`, 'error');
+        }
       } finally {
-        state.publishing = false;
-        setBusy(button, false, 'Publishing…', 'Publish verified domain');
-        updateDeploymentAvailability();
+        if (operationEpoch === state.publicationEpoch) {
+          state.publishing = false;
+          setBusy(button, false, 'Publishing…', 'Publish verified domain');
+        }
+        if (currentWorkspace(marker)) {
+          updateDeploymentAvailability();
+        }
       }
     }
 
@@ -3240,6 +3914,12 @@
     element('createWorkspaceButton').addEventListener('click', createWorkspace);
     element('workspaceSelect').addEventListener('change', async () => {
       seedOrganizationFromWorkspace();
+      state.domainEpoch += 1;
+      state.domainPublicationEpoch += 1;
+      state.domainClaims = [];
+      state.domainPublications = [];
+      renderDomainClaims();
+      renderDomainPublications();
       resetDomainClaim();
       clearVerifiedPreviewForScope();
       state.selectedTemplateId = '';
@@ -3254,7 +3934,27 @@
       if (!event.target.closest('#moduleList') && event.target !== element('trackLookup')) markPreviewDirty();
     });
     element('loadTrackButton').addEventListener('click', loadVerifiedTrack);
+    element('retryBuildHistory').addEventListener('click', () => loadBuildHistory());
+    element('loadMoreBuildHistory').addEventListener('click', () => loadBuildHistory({ append: true }));
+    element('copyBuildTrackButton').addEventListener('click', async () => {
+      const trackID = element('buildRecordTrackID').value;
+      try {
+        await navigator.clipboard.writeText(trackID);
+        setNotice(element('buildRecordAlert'), 'Track ID copied. It grants no access; workspace membership is still required.', 'success');
+      } catch {
+        element('buildRecordTrackID').select();
+        setNotice(element('buildRecordAlert'), 'Copy was unavailable. The track ID is selected for manual copy.', 'gold');
+      }
+    });
+    element('reopenBuildPreviewButton').addEventListener('click', reopenSelectedBuildPreview);
+    element('restoreBuildDraftButton').addEventListener('click', restoreSelectedBuildAsDraft);
+    element('resumeBuildButton').addEventListener('click', resumeSelectedBuild);
     element('domainOrigin').addEventListener('input', () => resetDomainClaim());
+    element('domainClaimSelect').addEventListener('change', () => {
+      state.domainEpoch += 1;
+      selectDomainClaim(element('domainClaimSelect').value);
+    });
+    element('retryDomainClaims').addEventListener('click', loadDomainClaims);
     element('claimDomainButton').addEventListener('click', claimDomain);
     element('verifyDomainButton').addEventListener('click', verifyDomain);
     element('deployButton').addEventListener('click', publishVerifiedDomain);
