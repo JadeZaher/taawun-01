@@ -6,7 +6,6 @@
   <meta name="theme-color" content="#11161a">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
   <title>Taawun Builder</title>
-  <script type="module" src="/assets/datastar-v1.0.2.js"></script>
   <style>
     :root {
       color-scheme: dark;
@@ -2578,7 +2577,13 @@
       }
     }
 
+    function syncSampleTitle() {
+      const title = element('appName').value.trim() || 'Community app';
+      document.querySelectorAll('.sample-title').forEach((target) => { target.textContent = title; });
+    }
+
     function updatePreviewAvailability() {
+      syncSampleTitle();
       const hasWorkspace = state.workspacesReady && element('workspaceSelect').options.length > 0;
       const allowed = hasWorkspace && canBuildWorkspace();
       element('previewButton').disabled = state.building || !state.templateReady || !selectedModules().length || !allowed;
@@ -2903,34 +2908,76 @@
       if (!requestGuard()) throw new StaleWorkspaceView();
     }
 
-    async function readPreviewFile(url, requestGuard) {
-      requirePreviewGuard(requestGuard);
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${state.token}` },
-        credentials: 'same-origin',
-      });
-      requirePreviewGuard(requestGuard);
-      const body = await response.text();
-      requirePreviewGuard(requestGuard);
-      if (!response.ok) throw new Error(body || 'The preview file could not be loaded.');
-      return body;
+    function signedPreviewFiles(manifest, preview, trackID) {
+      const descriptors = new Map();
+      const files = manifest && Array.isArray(manifest.files) ? manifest.files : [];
+      for (const file of files) {
+        const path = String(file && file.path || '');
+        if (!/^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/.test(path)
+          || path.split('/').some((segment) => segment === '.' || segment === '..')
+          || !/^[0-9a-f]{64}$/.test(String(file && file.sha256 || ''))
+          || !Number.isInteger(file && file.bytes) || file.bytes < 0 || descriptors.has(path)) {
+          throw new Error('The signed manifest file descriptors are incomplete or ambiguous.');
+        }
+        descriptors.set(path, { path, sha256: file.sha256, bytes: file.bytes });
+      }
+      const runtime = manifest && manifest.runtime;
+      const publicRuntimePath = String(runtime && runtime.path || '');
+      const runtimePath = publicRuntimePath.startsWith('/') ? publicRuntimePath.slice(1) : '';
+      if (!runtime || runtime.bundled !== true || !runtimePath || runtime.sha256 !== descriptors.get(runtimePath)?.sha256
+        || String(manifest && manifest.theme && manifest.theme.stylesheet || '') !== 'theme.css') {
+        throw new Error('The signed runtime and theme descriptors are missing or inconsistent.');
+      }
+      const basePath = `/api/conductor/tracks/${encodeURIComponent(trackID)}/preview/files/`;
+      const bind = (label, suppliedURL, path) => {
+        const descriptor = descriptors.get(path);
+        if (!descriptor || descriptor.bytes <= 0) throw new Error(`The signed ${label} file descriptor is missing or empty.`);
+        const expected = new URL(`${basePath}${path}`, window.location.origin);
+        const supplied = new URL(safePreviewURL(suppliedURL));
+        if (supplied.href !== expected.href || supplied.search || supplied.hash) throw new Error(`The ${label} URL is not bound to the exact signed track file.`);
+        return { ...descriptor, url: expected.href, label };
+      };
+      const runtimeURL = new URL(`${basePath}${runtimePath}`, window.location.origin).href;
+      return {
+        document: bind('document', preview.documentUrl, 'index.html'),
+        theme: bind('theme', preview.themeUrl, 'theme.css'),
+        styles: bind('styles', preview.stylesUrl, 'app.css'),
+        runtime: bind('runtime', runtimeURL, runtimePath),
+        publicRuntimePath,
+      };
     }
 
-    async function loadPreviewFrame(frame, preview, requestGuard, beforeCommit) {
+    async function readSignedPreviewFile(descriptor, requestGuard) {
       requirePreviewGuard(requestGuard);
-      const [document, theme, styles] = await Promise.all([
-        readPreviewFile(preview.documentUrl, requestGuard),
-        readPreviewFile(preview.themeUrl, requestGuard),
-        readPreviewFile(preview.stylesUrl, requestGuard),
+      const response = await fetch(descriptor.url, {
+        headers: { Authorization: `Bearer ${state.token}` },
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      requirePreviewGuard(requestGuard);
+      if (!response.ok) throw new Error(`The signed preview ${descriptor.label} could not be loaded.`);
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      requirePreviewGuard(requestGuard);
+      if (bytes.byteLength !== descriptor.bytes || await sha256Hex(bytes) !== descriptor.sha256) {
+        throw new Error(`The signed preview ${descriptor.label} digest does not match its manifest descriptor.`);
+      }
+      requirePreviewGuard(requestGuard);
+      try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { throw new Error(`The signed preview ${descriptor.label} is not valid UTF-8.`); }
+    }
+
+    async function loadPreviewFrame(frame, preview, manifest, trackID, requestGuard, beforeCommit) {
+      requirePreviewGuard(requestGuard);
+      const signedFiles = signedPreviewFiles(manifest, preview, trackID);
+      const [document, theme, styles, runtime] = await Promise.all([
+        readSignedPreviewFile(signedFiles.document, requestGuard),
+        readSignedPreviewFile(signedFiles.theme, requestGuard),
+        readSignedPreviewFile(signedFiles.styles, requestGuard),
+        readSignedPreviewFile(signedFiles.runtime, requestGuard),
       ]);
       requirePreviewGuard(requestGuard);
       const runtimeTag = document.match(/<script type="module" src="([^"]+)"[^>]*><\/script>/);
       if (!runtimeTag) throw new Error('The preview does not declare its approved runtime.');
-      requirePreviewGuard(requestGuard);
-      const runtimeResponse = await fetch(runtimeTag[1], { credentials: 'same-origin' });
-      requirePreviewGuard(requestGuard);
-      if (!runtimeResponse.ok) throw new Error('The approved preview runtime could not be loaded.');
-      const runtime = await runtimeResponse.text();
+      if (runtimeTag[1] !== signedFiles.publicRuntimePath) throw new Error('The preview runtime tag does not match the signed manifest requirement.');
       requirePreviewGuard(requestGuard);
       const inlineStyles = `<style>${theme}\n${styles}</style>`;
       const source = document
@@ -2979,7 +3026,11 @@
 
     async function sha256Hex(value) {
       if (!globalThis.crypto || !globalThis.crypto.subtle) return '';
-      const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+      const bytes = typeof value === 'string' ? new TextEncoder().encode(value)
+        : value instanceof Uint8Array ? value
+          : value instanceof ArrayBuffer ? new Uint8Array(value) : null;
+      if (!bytes) return '';
+      const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
       return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
     }
 
@@ -3191,7 +3242,7 @@
       const frame = element('previewFrame');
       const preparedManifest = await prepareManifest(result.manifest, result.verification, expectedComponents);
       requirePreviewGuard(requestGuard);
-      await loadPreviewFrame(frame, preview, requestGuard, () => commitPreparedManifest(preparedManifest));
+      await loadPreviewFrame(frame, preview, result.manifest, verifiedTrack.id, requestGuard, () => commitPreparedManifest(preparedManifest));
       requirePreviewGuard(requestGuard);
       state.track = verifiedTrack;
       if (restoreDraft) {
@@ -4342,6 +4393,7 @@
     element('builderForm').addEventListener('input', (event) => {
       if (!event.target.closest('#moduleList') && event.target !== element('trackLookup')) markPreviewDirty();
     });
+    element('appName').addEventListener('input', syncSampleTitle);
     element('loadTrackButton').addEventListener('click', loadVerifiedTrack);
     element('retryBuildHistory').addEventListener('click', () => loadBuildHistory());
     element('loadMoreBuildHistory').addEventListener('click', () => loadBuildHistory({ append: true }));
@@ -4420,6 +4472,7 @@
     element('questCancelButton').addEventListener('click', () => mutateQuest('cancel'));
     element('retryBazaar').addEventListener('click', loadBazaar);
 
+    syncSampleTitle();
     showAuth();
   </script>
 </body>

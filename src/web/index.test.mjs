@@ -408,8 +408,10 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
   assert.ok(browser, 'Chromium is required; the cockpit browser regression cannot be skipped');
 
   const cockpitHTML = await readFile(new URL('./index.html', import.meta.url), 'utf8');
-  const runtime = await readFile(new URL('./assets/datastar-v1.0.2.js', import.meta.url), 'utf8');
-  assert.match(runtime, /\$&/u, 'the exact pinned runtime fixture must retain its literal $&');
+  const runtimeSource = await readFile(new URL('./assets/datastar-v1.0.2.js', import.meta.url), 'utf8');
+  const signedRuntime = runtimeSource.replaceAll('\r\n', '\n');
+  const publicRuntime = signedRuntime.replaceAll('\n', '\r\n');
+  assert.match(signedRuntime, /\$&/u, 'the exact pinned runtime fixture must retain its literal $&');
 
   const token = 'browser-signed-preview-token';
   const secondToken = 'browser-second-principal-token';
@@ -419,7 +421,11 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
   ];
   const reservedKeyParts = ['proto', 'prototype', 'constructor', 'script', 'html', 'css', 'style', 'endpoint', 'url', 'uri', 'origin', 'surface', 'embedder', 'connection', 'resource', 'authority', 'permission', 'capability', 'workspace', 'principal', 'subject', 'user', 'actor', 'signer', 'signature', 'auth', 'lifecycle', 'expiry', 'expires', 'shura', 'finance', 'payment', 'settlement', 'escrow', 'artifactid', 'contenthash', 'manifestdigest', 'contractversion', 'templateid', 'moduleid', 'componentid', 'token', 'password', 'credential', 'secret', 'cookie', 'apikey'];
   const componentPolicy = { contractVersion: 'taawun.artifact/v2', rootType: 'object', stableIdRule: 'one instance per allowed module; id equals type', keyGrammar: 'ASCII letter first', numberFormat: 'canonical base-10 JSON', allowedValueTypes: ['null', 'boolean', 'number', 'string', 'array', 'object'], reservedKeyParts, maxComponentBytes: 8192, maxTotalBytes: 32768, maxDepth: 6, maxKeyBytes: 64, maxObjectFields: 32, maxArrayItems: 32, maxTotalKeys: 128, maxStringRunes: 2048, maxNumberBytes: 64 };
-  const previewPrefix = '/api/conductor/tracks/browser-track/preview/files/';
+  const previewPrefix = '/api/conductor/tracks/track_browser/preview/files/';
+  const runtimeBundlePath = 'assets/datastar-v1.0.2.js';
+  const signedRuntimePath = `${previewPrefix}${runtimeBundlePath}`;
+  const runtimeDigest = createHash('sha256').update(Buffer.from(signedRuntime, 'utf8')).digest('hex');
+  assert.notEqual(createHash('sha256').update(Buffer.from(publicRuntime, 'utf8')).digest('hex'), runtimeDigest, 'the CRLF public fixture must not match the canonical LF signed runtime digest');
   const previewDocument = `<!doctype html>
 <html lang="en"><head>
   <meta charset="utf-8">
@@ -438,7 +444,13 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     [`${previewPrefix}index.html`, ['text/html; charset=utf-8', previewDocument]],
     [`${previewPrefix}theme.css`, ['text/css; charset=utf-8', ':root{--taawun-color-accent:#57a68e}']],
     [`${previewPrefix}app.css`, ['text/css; charset=utf-8', 'body{margin:0}main{padding:2rem}']],
+    [signedRuntimePath, ['text/javascript; charset=utf-8', signedRuntime]],
   ]);
+  const manifestFiles = [...previewFiles.entries()].map(([url, [, contents]]) => ({
+    path: url.slice(previewPrefix.length),
+    sha256: createHash('sha256').update(Buffer.from(contents, 'utf8')).digest('hex'),
+    bytes: Buffer.byteLength(contents, 'utf8'),
+  }));
   const requests = [];
   const receiptVariants = [
     'active',
@@ -506,8 +518,11 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
   let delayTrackResponse = false;
   let incompleteCatalogNext = false;
   let delayPreviewResponse = false;
-  let delayPreviewFiles = false;
-  let delayRuntimeResponse = false;
+  let delaySignedRuntimeResponse = false;
+  let corruptSignedFileNext = '';
+  let lengthMismatchSignedFileNext = '';
+  let missingSignedFileNext = '';
+  let signedFileVariantNext = '';
   const server = createServer(async (request, response) => {
     const chunks = [];
     for await (const chunk of request) chunks.push(chunk);
@@ -518,6 +533,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       path: requestURL.pathname,
       search: requestURL.search,
       authorization: request.headers.authorization || '',
+      cacheControl: request.headers['cache-control'] || '',
       body: rawBody ? JSON.parse(rawBody) : null,
     };
     requests.push(record);
@@ -529,11 +545,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
 
     if (record.method === 'GET' && record.path === '/') return send(200, 'text/html; charset=utf-8', cockpitHTML);
     if (record.method === 'GET' && record.path === '/assets/datastar-v1.0.2.js') {
-      if (delayRuntimeResponse) {
-        delayRuntimeResponse = false;
-        await wait(180);
-      }
-      return send(200, 'text/javascript; charset=utf-8', runtime);
+      return send(200, 'text/javascript; charset=utf-8', publicRuntime);
     }
     if (record.method === 'POST' && record.path === '/api/login') {
       const second = record.body?.email === 'second@example.test';
@@ -541,11 +553,25 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     }
     if (previewFiles.has(record.path)) {
       if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(401, { error: { code: 'unauthorized', message: 'Authentication required.' } });
-      if (delayPreviewFiles) {
-        delayPreviewFiles = false;
+      if (record.path === missingSignedFileNext) {
+        missingSignedFileNext = '';
+        return json(404, { error: { code: 'preview_file_not_found', message: 'Signed preview file not found.' } });
+      }
+      if (record.path === signedRuntimePath && delaySignedRuntimeResponse) {
+        delaySignedRuntimeResponse = false;
         await wait(180);
       }
-      const [contentType, body] = previewFiles.get(record.path);
+      const [contentType, storedBody] = previewFiles.get(record.path);
+      const corrupt = record.path === corruptSignedFileNext;
+      const lengthMismatch = record.path === lengthMismatchSignedFileNext;
+      if (corrupt) corruptSignedFileNext = '';
+      if (lengthMismatch) lengthMismatchSignedFileNext = '';
+      let body = storedBody;
+      if (corrupt) {
+        body = Buffer.from(storedBody, 'utf8');
+        body[body.byteLength - 1] = body[body.byteLength - 1] === 0x20 ? 0x21 : 0x20;
+      }
+      if (lengthMismatch) body = Buffer.concat([Buffer.from(storedBody, 'utf8'), Buffer.from([0x20])]);
       return send(200, contentType, body);
     }
     const authenticated = ['/api/profile', '/api/workspaces', '/api/workspaces/41/people', '/api/templates', '/api/modules', '/api/artifacts/preview'];
@@ -656,7 +682,20 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
         delayTrackResponse = false;
         await wait(180);
       }
-      return json(200, requestURL.searchParams.get('includeVerifiedPreview') === 'true' ? activeTrackResponse : activeTrackResponse.track);
+      if (requestURL.searchParams.get('includeVerifiedPreview') !== 'true') return json(200, activeTrackResponse.track);
+      const result = structuredClone(activeTrackResponse);
+      if (signedFileVariantNext === 'missing-runtime') result.manifest.files = result.manifest.files.filter((file) => file.path !== runtimeBundlePath);
+      if (signedFileVariantNext === 'runtime-descriptor-mismatch') result.manifest.runtime.sha256 = '0'.repeat(64);
+      if (signedFileVariantNext === 'duplicate-descriptor') result.manifest.files.push(structuredClone(result.manifest.files[0]));
+      if (signedFileVariantNext === 'malformed-descriptor-path') result.manifest.files.push({ path: '../runtime.js', sha256: '0'.repeat(64), bytes: 1 });
+      if (signedFileVariantNext === 'theme-url-query') result.preview.themeUrl = `${previewPrefix}theme.css?untrusted=1`;
+      if (signedFileVariantNext === 'document-wrong-track') result.preview.documentUrl = '/api/conductor/tracks/track_other/preview/files/index.html';
+      if (signedFileVariantNext) {
+        signedFileVariantNext = '';
+        result.verification.manifestJson = JSON.stringify(result.manifest);
+        result.verification.manifestDigest = createHash('sha256').update(result.verification.manifestJson).digest('hex');
+      }
+      return json(200, result);
     }
     if (record.method === 'GET' && /^\/api\/conductor\/tracks\/[^/]+$/u.test(record.path)) {
       const trackID = record.path.split('/').at(-1);
@@ -730,6 +769,12 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
           references: [{ id: 'ref-iftar-1', title: 'Iftar reference', status: 'pending-qualified-review' }],
         },
         financial: { status: 'sandbox' },
+        runtime: {
+          name: 'Datastar', version: '1.0.2', path: '/assets/datastar-v1.0.2.js', sha256: runtimeDigest,
+          requiredBy: ['standalone'], bundled: true, packagingRequirement: 'served from the signed artifact bundle',
+        },
+        theme: { stylesheet: 'theme.css', tokenNames: [] },
+        files: structuredClone(manifestFiles),
         authorization: {
           subject: { id: record.authorization === `Bearer ${secondToken}` ? 'user:8' : 'user:7', userId: record.authorization === `Bearer ${secondToken}` ? 8 : 7, workspaceId: record.body.workspaceId },
           allowedOrigins: {
@@ -841,6 +886,13 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
   const unauthenticatedPreview = await fetch(`${origin}${previewPrefix}index.html`);
   await unauthenticatedPreview.text();
   assert.equal(unauthenticatedPreview.status, 401, 'signed preview files must reject unauthenticated reads');
+  const unauthenticatedRuntime = await fetch(`${origin}${signedRuntimePath}`);
+  await unauthenticatedRuntime.text();
+  assert.equal(unauthenticatedRuntime.status, 401, 'the manifest-listed signed runtime must reject anonymous reads');
+  const authenticatedRuntime = await fetch(`${origin}${signedRuntimePath}`, { headers: { Authorization: `Bearer ${token}` } });
+  const authenticatedRuntimeBytes = Buffer.from(await authenticatedRuntime.arrayBuffer());
+  assert.equal(authenticatedRuntime.status, 200, 'the manifest-listed signed runtime must be available to an authorized track reader');
+  assert.equal(createHash('sha256').update(authenticatedRuntimeBytes).digest('hex'), runtimeDigest, 'authorized signed runtime bytes must match the manifest SHA-256 fixture');
   requests.length = 0;
 
   const tempDirectory = await mkdtemp(path.join(tmpdir(), 'taawun-cockpit-browser-'));
@@ -919,7 +971,8 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.equal(requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview').length, previewRequestsBeforeCustomization, 'catalog-default documents cannot advance through the signed starter action');
     await evaluate(client, `(() => { const input = document.activeElement; input.value = 'Customized signed registration'; input.dispatchEvent(new Event('input', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#starterPathStatus').textContent.includes('3 of 5') && document.querySelector('#starterPrimaryButton').textContent === 'Complete app details'`), 'canonical component document differs from its validated catalog default');
-    await evaluate(client, `(() => { for (const [id, value] of [['organizationName', 'QA Community'], ['city', 'Salt Lake City']]) { const input = document.getElementById(id); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); } })()`);
+    await evaluate(client, `(() => { for (const [id, value] of [['appName', 'Signed starter app'], ['organizationName', 'QA Community'], ['city', 'Salt Lake City']]) { const input = document.getElementById(id); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); } })()`);
+    assert.equal(await evaluate(client, `document.querySelector('.sample-title').textContent`), 'Signed starter app', 'vanilla app-name input keeps the visible sample title in sync without loading the public runtime');
     await waitFor(() => evaluate(client, `document.querySelector('#starterPrimaryButton').textContent === 'Create signed preview'`), 'starter signed-preview action');
     await evaluate(client, `document.querySelector('#starterPrimaryButton').focus()`);
     await pressKey(client, 'Enter', 'Enter', 13);
@@ -1276,7 +1329,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.equal(cockpitState.srcdoc.indexOf(runtimeStartTag, runtimeStart + runtimeStartTag.length), -1, 'srcdoc must contain one inline module');
     assert.doesNotMatch(cockpitState.srcdoc, /<script type="module" src=/u, 'external runtime tag must be replaced');
     const sourceRuntime = cockpitState.srcdoc.slice(runtimeStart + runtimeStartTag.length, runtimeEnd);
-    assert.equal(sourceRuntime, runtime, 'srcdoc must contain the intact approved runtime');
+    assert.equal(sourceRuntime, signedRuntime, 'srcdoc must contain the intact canonical-LF signed runtime');
     assert.match(sourceRuntime, /\$&/u, 'the intact inline runtime must retain literal $&');
 
     const frameTarget = await waitFor(async () => {
@@ -1303,7 +1356,11 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.doesNotMatch(frameState.bodyText, /datastar-patch-elements|UndefinedAction/u, 'Datastar source must not be visible');
     assert.equal(frameState.scripts.length, 1, 'parsed sandbox must contain one module script');
     assert.equal(frameState.scripts[0].src, null, 'approved runtime must remain inline in the sandbox');
-    assert.equal(frameState.scripts[0].text.replaceAll('\r', ''), runtime.replaceAll('\r', ''), 'parsed runtime must remain intact');
+    assert.equal(frameState.scripts[0].text, signedRuntime, 'parsed runtime must remain the exact canonical-LF signed bytes after UTF-8 decode');
+    const signedRuntimeContract = JSON.parse(await evaluate(client, `document.querySelector('#rawManifest').textContent`));
+    const signedRuntimeDescriptor = signedRuntimeContract.files.find((file) => file.path === runtimeBundlePath);
+    assert.deepEqual({ path: signedRuntimeContract.runtime.path, sha256: signedRuntimeContract.runtime.sha256, bundled: signedRuntimeContract.runtime.bundled }, { path: '/assets/datastar-v1.0.2.js', sha256: runtimeDigest, bundled: true }, 'visible signed runtime requirement must bind the canonical runtime digest');
+    assert.deepEqual(signedRuntimeDescriptor, { path: runtimeBundlePath, sha256: runtimeDigest, bytes: Buffer.byteLength(signedRuntime, 'utf8') }, 'visible manifest must list the exact signed runtime bytes executed by the iframe');
 
     const interaction = await evaluate(client, `new Promise((resolve) => {
       document.querySelector('#card-control').click();
@@ -1320,6 +1377,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     const previewRequests = requests.filter((item) => previewFiles.has(item.path));
     assert.ok(previewRequests.length >= previewFiles.size, 'the cockpit must fetch every signed preview file');
     for (const request of previewRequests) assert.equal(request.authorization, `Bearer ${token}`, `${request.path} must use the login token on every verified reopen`);
+    for (const request of previewRequests) assert.match(request.cacheControl, /(?:^|,)\s*no-cache\s*(?:,|$)/iu, `${request.path} must bypass shared/browser cache on every signed-file read`);
     assert.deepEqual([...new Set(previewRequests.map((item) => item.path))].sort(), [...previewFiles.keys()].sort(), 'authenticated preview fetches must cover the exact signed file set even when verified reopens repeat them');
     const artifactRequest = requests.filter((item) => item.method === 'POST' && item.path === '/api/artifacts/preview').at(-1);
     assert.ok(artifactRequest, 'the advanced component matrix must submit a signed preview request');
@@ -1394,6 +1452,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
 
     delayPublicationRequest = true;
     await evaluate(client, `(() => { document.querySelector('#deployButton').click(); const input = document.querySelector('#appName'); input.value = 'Newer same-workspace preview'; input.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#builderForm').requestSubmit(); })()`);
+    assert.equal(await evaluate(client, `document.querySelector('.sample-title').textContent`), 'Newer same-workspace preview', 'vanilla app-name sync remains live after a previously verified preview becomes a newer draft');
     await waitFor(() => evaluate(client, `document.querySelector('#previewLoading').hidden && document.querySelector('#builderAlert').textContent.includes('last verified preview was retained')`), 'newer same-workspace preview generation');
     await wait(240);
     assert.notEqual(await evaluate(client, `document.querySelector('#buildRecordTitle').textContent`), 'community-iftar · PUBLICATION_REQUESTED', 'delayed publication request cannot overwrite a newer preview generation');
@@ -1414,9 +1473,52 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     const trustedReceiptBeforeNegatives = await evaluate(client, `Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent]))`);
     const trustedRawBeforeNegatives = await evaluate(client, `document.querySelector('#rawManifest').textContent`);
     const trustedSourceBeforeNegatives = await evaluate(client, `document.querySelector('#previewFrame').srcdoc`);
-    for (const runtimeRequest of requests.filter((item) => item.path === '/assets/datastar-v1.0.2.js')) {
-      assert.equal(runtimeRequest.authorization, '', 'the bearer token must not leak to the public pinned runtime');
+    assert.equal(requests.filter((item) => item.path === '/assets/datastar-v1.0.2.js').length, 0, 'the mismatched public runtime path must never be fetched or executed');
+    const signedRuntimeRequests = requests.filter((item) => item.path === signedRuntimePath);
+    assert.ok(signedRuntimeRequests.length > 0, 'the track-scoped manifest-listed runtime must be fetched');
+    assert.ok(signedRuntimeRequests.every((item) => item.authorization === `Bearer ${token}`), 'every signed runtime fetch must use the current track reader Bearer token');
+
+    for (const failure of [
+      { name: 'missing runtime descriptor', variant: 'missing-runtime', preflight: true, message: /runtime and theme descriptors are missing|file descriptor is missing/iu },
+      { name: 'runtime descriptor mismatch', variant: 'runtime-descriptor-mismatch', preflight: true, message: /runtime and theme descriptors are missing|inconsistent/iu },
+      { name: 'duplicate signed descriptor', variant: 'duplicate-descriptor', preflight: true, message: /descriptors are incomplete or ambiguous/iu },
+      { name: 'malformed signed descriptor path', variant: 'malformed-descriptor-path', preflight: true, message: /descriptors are incomplete or ambiguous/iu },
+      { name: 'theme query substitution', variant: 'theme-url-query', preflight: true, message: /theme URL is not bound/iu },
+      { name: 'document wrong-track substitution', variant: 'document-wrong-track', preflight: true, message: /document URL is not bound/iu },
+      { name: 'missing signed runtime response', missing: signedRuntimePath, message: /signed preview runtime could not be loaded/iu },
+      { name: 'document same-length SHA corruption', corrupt: `${previewPrefix}index.html`, message: /document digest does not match/iu },
+      { name: 'theme same-length SHA corruption', corrupt: `${previewPrefix}theme.css`, message: /theme digest does not match/iu },
+      { name: 'styles same-length SHA corruption', corrupt: `${previewPrefix}app.css`, message: /styles digest does not match/iu },
+      { name: 'runtime same-length SHA corruption', corrupt: signedRuntimePath, message: /runtime digest does not match/iu },
+      { name: 'runtime byte-length mismatch', lengthMismatch: signedRuntimePath, message: /runtime digest does not match/iu },
+    ]) {
+      const signedFileFetchesBefore = requests.filter((item) => previewFiles.has(item.path)).length;
+      if (failure.variant) signedFileVariantNext = failure.variant;
+      if (failure.corrupt) corruptSignedFileNext = failure.corrupt;
+      if (failure.lengthMismatch) lengthMismatchSignedFileNext = failure.lengthMismatch;
+      if (failure.missing) missingSignedFileNext = failure.missing;
+      await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
+      await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Last verified preview retained' && document.querySelector('#previewFrame').dataset.stale === 'true' && document.querySelector('#deployButton').disabled`), `${failure.name} fail-closed preview`);
+      const failureState = await evaluate(client, `({ receipt: Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent])), raw: document.querySelector('#rawManifest').textContent, srcdoc: document.querySelector('#previewFrame').srcdoc, alert: document.querySelector('#buildRecordAlert').textContent })`);
+      assert.deepEqual(failureState.receipt, trustedReceiptBeforeNegatives, `${failure.name} must retain the trusted receipt`);
+      assert.equal(failureState.raw, trustedRawBeforeNegatives, `${failure.name} must retain the trusted raw manifest`);
+      assert.equal(failureState.srcdoc, trustedSourceBeforeNegatives, `${failure.name} must retain the trusted iframe bytes`);
+      assert.match(failureState.alert, failure.message, `${failure.name} must expose the bounded signed-file reason`);
+      if (failure.preflight) assert.equal(requests.filter((item) => previewFiles.has(item.path)).length, signedFileFetchesBefore, `${failure.name} must reject before any signed-file fetch`);
+      await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
+      await waitFor(() => evaluate(client, `document.querySelector('#buildRecordAlert').textContent.includes('Verified preview reopened') && document.querySelector('#previewStatus').textContent === 'Verified staging ready'`), `${failure.name} exact signed-file recovery`);
     }
+
+    const declaredHeadingBeforeDelayedRuntime = await evaluate(client, `document.querySelector('[data-component-id="announcements"] .component-fields .field input').value`);
+    const signedRuntimeRequestsBeforeDraftRace = requests.filter((item) => item.path === signedRuntimePath).length;
+    delaySignedRuntimeResponse = true;
+    await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
+    await waitFor(() => requests.filter((item) => item.path === signedRuntimePath).length > signedRuntimeRequestsBeforeDraftRace, 'delayed signed runtime draft-race request');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .component-fields .field input'); input.value = 'Newer local draft during signed runtime read'; input.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await wait(240);
+    assert.deepEqual(await evaluate(client, `({ raw: document.querySelector('#rawManifest').textContent, srcdoc: document.querySelector('#previewFrame').srcdoc, stale: document.querySelector('#previewFrame').dataset.stale, publishDisabled: document.querySelector('#deployButton').disabled })`), { raw: trustedRawBeforeNegatives, srcdoc: trustedSourceBeforeNegatives, stale: 'true', publishDisabled: true }, 'a delayed signed runtime cannot replace trusted evidence after the same-workspace draft changes');
+    await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .component-fields .field input'); input.value = ${JSON.stringify(declaredHeadingBeforeDelayedRuntime)}; input.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#reopenBuildPreviewButton').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildRecordAlert').textContent.includes('Verified preview reopened') && document.querySelector('#previewStatus').textContent === 'Verified staging ready'`), 'exact signed files recover after delayed draft race');
 
     for (let index = 1; index < receiptVariants.length; index += 1) {
       const variant = receiptVariants[index];
@@ -1469,10 +1571,10 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.equal(delayedBuildBoundary.publishDisabled, true);
     assert.equal(delayedBuildBoundary.selected, 2, 'the explicitly reconciled next-template draft remains selected');
 
-    const delayedFileRequests = requests.filter((item) => previewFiles.has(item.path)).length;
-    delayPreviewFiles = true;
+    const delayedFileRequests = requests.filter((item) => item.path === signedRuntimePath).length;
+    delaySignedRuntimeResponse = true;
     await evaluate(client, `document.querySelector('#builderForm').requestSubmit()`);
-    await waitFor(() => requests.filter((item) => previewFiles.has(item.path)).length > delayedFileRequests, 'delayed signed preview file request');
+    await waitFor(() => requests.filter((item) => item.path === signedRuntimePath).length > delayedFileRequests, 'delayed signed runtime workspace request');
     await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '42'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '42' && document.querySelector('#workspaceRole').textContent === 'Architect'`), 'workspace switch during preview file load');
     await wait(240);
@@ -1488,14 +1590,14 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.deepEqual(secondTemplateRequest.body.modules, ['announcements', 'donation-campaign']);
     assert.equal(await evaluate(client, `[...document.querySelectorAll('#manifestList .manifest-row')].find((row) => row.querySelector('dt').textContent === 'Template').querySelector('dd').textContent`), 'bazaar-cooperative · v1.0.0', 'the receipt must bind the second real template');
 
-    const runtimeRequestsBeforeScopeSwitch = requests.filter((item) => item.path === '/assets/datastar-v1.0.2.js').length;
-    delayRuntimeResponse = true;
+    const runtimeRequestsBeforeScopeSwitch = requests.filter((item) => item.path === signedRuntimePath).length;
+    delaySignedRuntimeResponse = true;
     delaySecondPrincipalHistory = true;
     const secondPrincipalRequestStart = requests.length;
     await evaluate(client, `(() => { document.querySelector('#trackLookup').value = 'track_browser'; document.querySelector('#loadTrackButton').click(); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTrackID').value === 'track_browser'`), 'principal-switch build inspection');
     await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
-    await waitFor(() => requests.filter((item) => item.path === '/assets/datastar-v1.0.2.js').length > runtimeRequestsBeforeScopeSwitch, 'delayed runtime reload request');
+    await waitFor(() => requests.filter((item) => item.path === signedRuntimePath).length > runtimeRequestsBeforeScopeSwitch, 'delayed signed runtime reload request');
     await evaluate(client, `document.querySelector('#logoutButton').click()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#authView').hidden`), 'principal switch sign-out');
     await evaluate(client, `(() => {

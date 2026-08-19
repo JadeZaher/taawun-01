@@ -39,3 +39,26 @@ keep their own honest retry states. Viewer invitations remain session-only;
 Architect may invite a Viewer, Maintainer coordinates with an Architect or an
 existing member, and Viewer remains inspect-only. None of this guidance adds a
 backend record, durable milestone, or analytics event.
+
+## Signed preview file execution
+
+The cockpit treats the manifest file list as the delivery boundary, not merely
+display metadata. Before replacing either receipt or iframe it binds
+`index.html`, `theme.css`, `app.css`, and the bundled runtime to the exact
+authorized track file route, fetches each with the current Bearer token, and
+forces a no-store read before checking raw byte length plus SHA-256 and strict
+UTF-8 decoding. Descriptor paths must be unique and traversal-free; preview
+URLs may not switch tracks or
+add query/fragment data.
+
+The document may name the public pinned runtime for portable bundle semantics,
+but the cockpit never fetches or executes that public path. It requires that tag
+to match the signed runtime requirement, then executes only the separately
+verified runtime bytes from the track-scoped bundle. A missing, altered, delayed,
+or stale file leaves the prior trusted iframe and receipt untouched and keeps
+publication disabled.
+
+Removing the cockpit's public runtime import also removes its incidental
+`data-bind` behavior. Small builder-only presentation links, such as reflecting
+the plain App name in `.sample-title`, stay explicit vanilla DOM updates; they do
+not justify fetching or executing unsigned runtime bytes in the parent cockpit.
