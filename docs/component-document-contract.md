@@ -276,6 +276,29 @@ durable `PUBLICATION_REQUESTED` version, reloads safe status/events, and retries
 activation without repeating the publication request. DNS control, reviewer,
 and Bazaar gates remain unchanged.
 
+## Signed Starter Path boundary
+
+The Signed Starter Path is approved for implementation as a first-use aid; it
+is not yet live acceptance evidence and does not add a persistence or authority
+primitive.
+
+- It appears only after a selected, authorized workspace history request has
+  completed successfully with zero rows. An absent workspace, a loading
+  request, or a failed history request is not an empty-workspace signal.
+- Progress is derived ephemeral UI state. There is no completion flag,
+  analytics state, or backend record. After reload or fresh login, the signed
+  step is derived only by reopening one applicable authorized track through the
+  complete verified-preview path; a summary presence flag is insufficient.
+- Invitation tokens and invitation progress remain session-only. The path may
+  create and copy an invitation for delivery over a trusted channel, but it
+  must not restore or describe that handoff as durable after reload.
+- The five-person comprehension check is pending manual, post-deployment
+  private-beta validation with real participants. Results must not be
+  fabricated, and the study does not block the technical deployment gate.
+
+Existing non-empty workspace composition, history, domain recovery, and role
+controls remain unchanged.
+
 ## Rollback and operational boundary
 
 Use the last-known-good application `09cd897` / Railway deployment
