@@ -630,12 +630,12 @@ created no membership; workspace and both users still cleaned successfully.
 
 ### Ranked remaining market-viability backlog
 
-1. **P1 — Build discovery and continuity:** durable signed work is commercially
-   unreachable once its opaque ID is lost. Implement and independently retest the
-   bounded authorized history and safe exact-draft recovery described above.
-2. **P1 — Domain readiness after reload:** real claim/publication evidence exists
-   in supported APIs but is not surfaced; show its authoritative state and next
-   action without bypassing external DNS or review.
+1. **Closed P1 — Build discovery and continuity:** deployment `d446f826` adds and
+   independently passes the bounded authorized history and safe exact-draft
+   recovery described above.
+2. **Closed P1 — Domain readiness after reload:** deployment `d446f826`
+   rediscovers real claim/publication evidence and passes the independent pending
+   claim recovery seam without bypassing external DNS or review.
 3. **P2 — Honest activity navigation:** `dashboard/recent` reports only workspace
    creation. After history exists, link to real build/domain activity or retain an
    explicit empty state; never synthesize activity.
@@ -650,6 +650,76 @@ created no membership; workspace and both users still cleaned successfully.
 5. **External only:** controlled DNS, authorized Bazaar review/purchase fixture,
    federation, TURN and E2EE remain explicit dependencies, not product defects to
    bypass.
+
+### Independent post-deploy acceptance — application `cedacb0`
+
+Railway deployment `d446f826-bb48-4005-afc4-98e7fac8e046` is terminal
+`SUCCESS`; image
+`sha256:a33cce1d52df957432841f4c071083c943a45f9cc06307be85d49c74b79f7343`.
+The docs-only PR head is `cea8fb9` and was not redeployed. The integrated gate
+passed every Go package/command test, both production builds, 13/13 Node tests
+including two promoted real-Chromium journeys, diff check and independent review.
+This lane claims no fresh Codex Browser evidence.
+
+At `2026-08-19T06:44:18Z–06:44:34Z`, an independent synthetic Architect
+(`47`), Viewer (`48`) and Maintainer (`49`) exercised workspace `33`. Three exact
+two-component previews created verified tracks, in order:
+
+- `track_02T2_UMxCgpYe_UOFufN8xA0`, request `qNxGNtzTRGiRpZdWCYBc-A`,
+  Railway `201` / 40 ms;
+- `track_36_FZjrgERWYpAx7Dl7QNd30`, request `36AwsIRmSEKEzOmw6WHkDg`,
+  Railway `201` / 86 ms;
+- `track_qFFA-IV4XJmU9n5im6LDeiLK`, request `9th82coJSDeqY63A6WHkDg`,
+  Railway `201` / 56 ms.
+
+After discarding the original bearer and signing in afresh, a two-item history
+page returned the third and second tracks, its opaque cursor returned only the
+first track, and the combined result had no duplicate or skip. The exact summary
+schema contained only `id`, `templateId`, `status`, `version`, `updatedAt`,
+`previewPresent`, `artifactPresent`, `publicationPresent`, and
+`authorizationExpiresAt`; it contained no actor, documents, signature, raw
+failure or other workspace evidence. `limit=500` was safely capped and returned
+the three available records. Unknown, duplicate, zero-limit and malformed-cursor
+queries each returned deterministic `400`. History responses were `no-store` and
+`nosniff`.
+
+The newest history record reopened `200` with active verified evidence; its six
+append-only events returned `200`, signed index returned bearer `200`, and
+anonymous access returned `401`. Viewer history/track access was `403/403` before
+invitation and `200/200` after invitation acceptance; Viewer build and domain
+claim listing remained `403/403`. The Maintainer listed and reopened the exact
+track `200/200`, received identical generic `403` envelopes for correct and
+guessed resume versions of the Architect-owned track, then edited the recovered
+documents into new actor-bound track `track_OkGqv3z3oqMvOn7kZaWmdigk`. Preview
+request `1326VEDxQwi8ZVQ1WUN5dQ` was Railway `201` / 44 ms, the new track was
+distinct from all Architect tracks, and it appeared in the authorized workspace
+history.
+
+Pending domain claim `Xc1ssxQfnqlI5rNKT7lchy8r` was created `201`, rediscovered
+after another fresh login through the real claim list `200`, and had an honest
+empty publication history `200`. Verification without external DNS remained
+`422`; QA did not create, alter or bypass DNS. Live activation and Bazaar purchase
+remain external-fixture gaps. Promoted Chromium/source coverage supplies the
+non-live UI evidence for honest loading/empty/error/retry, exact draft recovery,
+stale workspace/principal/track suppression, activation-only retry, 320/400 and
+effective 200% reflow, keyboard semantics, and the complete pre-commit binding of
+track workspace/artifact/preview/origins/expiry/subject to the attested manifest.
+
+Railway correlation after both implementation and independent smokes sampled 93
+requests: 71 `2xx`, 22 intentional `4xx`, zero `5xx`, p95 66 ms and p99 88 ms.
+CPU peaked at 0.011 vCPU and memory at 0.0516 GB; bounded runtime output showed
+one clean start and accepted auth events, with no panic, exit or application error.
+Supported cleanup completed: claim delete `200`, member deletes `48/49` `204/204`,
+workspace `33` `204`, users `48/49/47` `204/204/204`, and all three old tokens
+returned `401`. The earlier implementation smoke independently cleaned users
+`45/46` and workspace `32` with `204/204/204` and both old tokens `401`.
+
+**Verdict:** ACCEPT for application correctness and private-beta activation /
+continuity on `cedacb0` / `d446f826`. No P0/P1 application finding remains from
+this batch. P2 operator-authority cleanup visibility and the explicit external
+DNS/Bazaar/federation/TURN/E2EE dependencies remain documented; users `8`, `19`
+and inference-only `30` must still be handled only through supported authorized
+operator lifecycle paths.
 
 ## Acceptance rule
 
