@@ -809,6 +809,107 @@ derivation, Viewer inspection/build denial, Maintainer actor-bound clone,
 independent loader recovery, stale response suppression and non-empty-workspace
 regression before acceptance.
 
+## Signed runtime repair — deployment `431bc9b3`
+
+Application commit `c1e4aa5` was deployed as Railway
+`431bc9b3-21b2-4e12-a4e1-c2a4a1fbfc39`, image
+`sha256:d79c8682c0ca46a3a834901f4fce4083ccf67a63854b689adaac6333c96797a1`.
+The final docs-only PR head was `8755f19f6c5f988077cf18a5ec9cbcd213906984`
+and was not redeployed. Rollback remained `cedacb0` /
+`d446f826-bb48-4005-afc4-98e7fac8e046`. The implementation gate passed all Go
+packages/commands, both production builds, 13/13 Node tests including two
+promoted real-Chromium journeys, diff integrity and independent security/source
+review. Promotion then passed 8/8 health and 8/8 root probes, with the cockpit
+title present and the redundant public runtime import absent.
+
+The repaired cockpit binds `index.html`, `theme.css`, `app.css` and the bundled
+runtime to the exact selected track file route, fetches all four with the current
+Bearer token and `cache: no-store`, then checks raw byte count, SHA-256 and fatal
+UTF-8 decoding before committing either receipt or iframe. Manifest descriptors
+must be unique, traversal-free and internally bind the runtime/theme; supplied
+preview URLs must match the current track exactly and may not add query or
+fragment data. The signed document must still name the portable public runtime
+requirement, but the cockpit replaces that tag using only separately verified
+track-scoped bytes. The parent cockpit's former incidental App-name behavior is
+now explicit vanilla DOM synchronization, so it no longer needs the unsigned
+public runtime.
+
+Promoted real-Chromium coverage mirrors the live failure with a canonical LF
+signed runtime and byte-different CRLF public asset, and proves the public asset
+is never requested. It rejects missing runtime, duplicate/traversal descriptors,
+runtime/manifest mismatch, wrong-track and query substitution, signed-runtime
+`404`, same-length SHA mutations of document/theme/styles/runtime, length drift
+and delayed draft/workspace/principal responses. Every failure retains the prior
+trusted iframe, receipt and raw manifest, marks it stale, disables publication and
+recovers only through a fresh exact reopen. The same promoted gate preserves one
+intact inline runtime, `allow-scripts allow-forms`, control interaction, seven
+counted starter activations, explicit three-template choice, history-confirmation
+retry, fresh-login one-track derivation, independent People/history/domain
+failure recovery, Viewer read-only behavior, Maintainer actor-bound clone,
+44-pixel targets and 320/400/effective-200% reflow. This lane claims no fresh
+Browser, keyboard, mobile or screen-reader evidence.
+
+The final independent live pass ran at
+`2026-08-19T09:42:46Z–09:42:51Z`. Architect `70` and collaborator `71` created
+workspace `44`. The initial workspace collection was empty; authorized history
+returned a distinct zero-row `200` with `no-store` and `nosniff`; and the real
+catalog returned all three templates and eleven modules. A meaningfully changed
+two-component `community-iftar` request included custom Unicode scalar, array and
+object data. Railway request `5t2zoqv0SoGdI7gzwUFZXw` returned `201` in 68 ms,
+creating track `track_RtmPnvC7WfQO8M5L8wee6P3J` and artifact
+`art_1de810d14ad154cc7ea45a7126b0c178`.
+
+The exact `manifestJson` digest, full manifest equality, workspace/actor,
+component documents, signature/key, origins, preview lifecycle and future expiry
+all matched. Raw bytes and descriptors matched for all four executed files. The
+authenticated signed runtime was exactly 34,083 bytes with SHA-256
+`2837d87acf6ee0ba8e4e63765926c25a98d63883b02f88be194a86b81d3fd24a`
+(`bNbVbX4iRTmxRfGWwUFZXw`, `200`), while anonymous access was `401`. The legacy
+public runtime remained 34,092 CRLF bytes with SHA-256
+`ad76a361fa0ba5dcda7478dc20925ee4cf397dca0619fae0ac848613f31ce662`,
+but live root source contained no public runtime import and did contain the exact
+track-scoped signed-file/digest/no-store path.
+
+History then confirmed exactly one preview track. A fresh login listed history
+once and reopened that one track with `includeVerifiedPreview=true`; the manifest
+digest and exact documents were unchanged. Collaborator history and known-track
+reads were generic `403/403` before invitation. After an Architect-created,
+session-delivered Viewer invitation was accepted, Viewer history, exact track and
+signed runtime reads returned `200`, while build remained `403`. The Viewer was
+removed through the supported membership route, reinvited as Maintainer and
+accepted. Maintainer inspected the source track, copied only curated draft fields
+without track/creator/signer/lifecycle/idempotency authority, changed a component
+document and created distinct actor-bound track
+`track_kMLrOUYy1AyOfGO1R5AO9pk1`; Railway request
+`p2ujKQv4QVCgMQwbjq4OvQ` returned `201` in 61 ms. Workspace history then contained
+both real tracks.
+
+One earlier independent pass on users `68/69` and workspace `43` replayed the
+source request's persisted idempotency key and correctly received deterministic
+`409 composition_conflict`. Source confirmed the cockpit's curated draft clone
+does not copy that field, so this is harness-only evidence, not an application
+finding. That pass still completed every runtime/Viewer assertion, then cleaned
+membership, workspace and both users with `204`; both tokens returned `401`.
+The corrected pass likewise deleted membership `71`, workspace `44`, users
+`71/70` with `204`, and both final tokens returned `401`. No independent fixture
+from either pass remains.
+
+Railway correlation found both exact preview requests above on deployment
+`431bc9b3`; the final 143-request bounded sample contained 124 `2xx`, nineteen
+intentional `4xx`, zero `5xx`, p95 61 ms, p99 82 ms and max 92 ms. CPU averaged
+0.0004 vCPU (max 0.0072) and memory averaged 0.0241 GB (max 0.0410). Bounded
+runtime searches contained one clean start and no panic, fatal or error record.
+
+**Verdict:** ACCEPT for the Signed Starter Path technical checkpoint on `c1e4aa5`
+/ `431bc9b3`. The runtime trust P1 is closed; no P0/P1 application finding remains
+from the completed API/source/promoted-Chromium matrix. Five-person comprehension
+testing remains pending genuine private-beta participants and is not fabricated
+or treated as a deployment gate. Fresh Browser/accessibility credit remains
+explicitly unclaimed. External DNS/Bazaar/reviewer fixtures,
+federation/TURN/E2EE, and supported application-admin cleanup for users `8`, `19`
+and inference-only `30` remain the previously documented dependencies; no raw
+database or fabricated authority was used.
+
 ## Acceptance rule
 
 Under the current control-room charter, sign-off requires zero open P0/P1 findings,
