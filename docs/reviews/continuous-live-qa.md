@@ -919,3 +919,419 @@ cleanup evidence, and explicit limitation of remaining gaps to authorized operat
 provisioning, external DNS/Bazaar fixtures or the documented federation/TURN/E2EE
 deferrals. Fresh independent browser evidence remains valuable but is not claimed
 and is not a release blocker while the Codex trust-path defect persists.
+
+## Fresh in-app Browser acceptance and cockpit gap audit — in progress
+
+On `2026-08-21`, the independent lane resumed with the healthy bundled in-app
+Browser `26.818.21641` against accepted app `c1e4aa5` / Railway deployment
+`431bc9b3-21b2-4e12-a4e1-c2a4a1fbfc39`. This is fresh live visual and
+interaction evidence rather than promoted-test credit. The public root showed the
+concrete workspace-signed/local-first value statement and the accurate central
+identity/artifact/control-record, encrypted-relay, zero-custody and no-settlement
+boundaries. A synthetic first principal received an honest no-workspace state,
+then a successful authorized zero-history state with all three real templates and
+eleven catalog modules.
+
+That pass found one live P1. After workspace A `45` explicitly selected
+`community-iftar`, creating workspace B `46` through the cockpit selected B but
+left A's template milestone visible: B had honest zero history while the Signed
+Starter Path falsely reported `1 of 5` and “Community iftar selected explicitly.”
+Railway recorded B's workspace creation as `201` at
+`2026-08-21T04:32:57.165129725Z` in 28 ms. No component document or server
+authorization leak was observed. The coherent state-isolation batch was sent to
+implementation and the cross-workspace starter area remains paused pending a new
+deployment; unrelated evidence below does not accept that gate.
+
+Unrelated live paths remained green. Viewer `73` had no pre-invite workspace,
+accepted an Architect-issued session-only invitation, saw only authorized real
+People data with no emails, and remained read-only across build, Shura and Finance.
+Maintainer `74` likewise had no pre-invite workspace, then received build/propose/
+vote capability without invite/decide/publish authority. Maintainer created and
+approved a synthetic proposal; Architect `72` recorded final decision
+`decision_RPUXPNfm5GNyp05YKta9E4pV`, which safely prefilled Finance. Synthetic
+quest `quest_vr4LDIfc4pLRkrXPCNjl7Veo` advanced only through valid sandbox states
+and ended `CANCELLED`; every visible state said no funds, custody, balance or
+settlement. Bazaar showed a truthful published-only empty state and named the
+controlled-DNS/reviewer fixture dependencies without fabricating a listing.
+
+A pending synthetic domain claim was rediscovered after sign-out/fresh login,
+did not reconstruct its TXT proof, kept publication disabled, and returned the
+actionable missing-TXT recovery message. Exact production-origin CORS preflight
+returned `200` with the exact allow-origin header
+(`_XIicTjaQU6qrUB_9fVATg`); a disallowed-origin preflight returned `200` without
+an allow-origin header (`_kGg_Xo7Sii6dPVqnpoFkQ`). OAuth authorization/resource
+metadata returned `200`; unauthenticated `/mcp` returned a pinned `401` Bearer
+challenge with protected-resource metadata and `nosniff`; unauthenticated ethics
+audit returned `401`. The bounded Railway `>=500` query remained empty.
+
+The baseline fixture was then removed through supported routes only. Viewer and
+Maintainer membership removal returned `204/204`; pending claim
+`E96p6TYJP0bGEMk7KawVJch5` revoke returned `200`; workspace deletes for `45/46`
+returned `204/204`; self-deletes for users `73/74/72` returned `204/204/204`; and
+all three retained JWTs read back `401`. The cancelled quest remains immutable
+audit evidence only. No DNS, Bazaar, reviewer, infrastructure, database or admin
+authority was changed.
+
+A later isolated gap-audit fixture exposed a separate P1 during cleanup. User
+`75` created sole workspace `47`, then self-delete returned `204` before any
+workspace delete reached the service; the old token returned `401`. Railway's
+bounded DELETE log contains the user deletion at
+`2026-08-21T05:09:34.454576854Z` and no `DELETE /api/workspaces/47`. A separate
+self-cleaning outsider `76` received `403`, not `404`, from
+`GET /api/workspaces/47`, proving that the workspace still exists while remaining
+isolated. User `76` then self-deleted `204` and its old token returned `401`.
+Because user `75` was tombstoned and no application admin is configured,
+workspace `47` is now explicit operator-authority-blocked residue; no raw DB or
+fabricated JWT cleanup will be attempted.
+
+The expanded cockpit audit records the following current gaps separately from the
+active P1:
+
+| Rank | Planned/current/evidence | Impact | Existing-primitive fit |
+| --- | --- | --- | --- |
+| **P1 confirmed** | `DELETE /api/users/75` returned `204` while the account still owned workspace `47`; the only owner token became `401`, no workspace DELETE occurred, and an outsider read proved the workspace remains (`403`, not `404`). | Self-service account deletion can strand an owned workspace with no active supported cleanup authority. | Fail closed with a deterministic `409 owned_workspaces_remaining` until supported workspace cleanup, or implement one documented atomic workspace disposition that preserves required audit records; prove no partial tombstone. |
+| P1 candidate | Approved-domain revocation is promised and the authenticated `DELETE /api/workspaces/{id}/domains/{claim_id}` route exists, but the live panel exposes claim/rotate/verify/reload only. | An Architect cannot visibly terminate a compromised or obsolete delivery origin. | Add confirmed Architect-only revoke, conflict-safe readback, retained history and fail-closed workspace/principal guards. |
+| P1 candidate | Live People exposes real members plus create/accept invitation, while mounted membership-remove and invitation-revoke routes are unreachable. Pending invitation records intentionally disappear after reload. | An Architect cannot offboard a member or revoke even a current-session grant from the cockpit. | Add Architect-only member removal and current-session invitation revoke; keep the after-reload limitation honest unless a bounded existing-record list is approved. |
+| P1 market-continuity candidate | Shura says “Paste a real proposal ID” and Finance requires an “Existing quest ID”; neither durable subsystem has a bounded workspace list route or UI. | Fresh-login/device loss makes governance and sandbox work commercially undiscoverable and weakens Shura-to-Finance continuity. | Add bounded redacted workspace summaries and role-safe inspect/recovery, mirroring accepted Build History without exposing capability tokens or actor identity. |
+| P1 support/privacy candidate | The authenticated cockpit exposes Sign out only although supported self password-rotation/tombstoning and workspace deletion routes are mounted. | Customers cannot rotate all sessions or perform supported account/workspace cleanup without API/operator help. | Add a deliberately separated account/workspace lifecycle surface with confirmation, immediate invalidation and old-token `401` readback. |
+| P2 | The core hosted MCP/OAuth control plane is invisible in the live cockpit: no MCP/OAuth text or link exists although metadata and `/mcp` are mounted. | A private-beta operator cannot discover how the LLM-facing differentiator is used. | Add honest read-only connection guidance using existing metadata; keep external-client proof explicitly pending. |
+| P2 accessibility | Live target measurements found logout 27 px, auth tabs 38 px, tertiary/domain buttons 28.8 px, details summaries 33.2 px and the color control 42 px despite the explicit 44 px acceptance criterion. | Keyboard/touch usability and the stated accessibility gate are inconsistent with production CSS. | Raise the existing target tokens/hit areas without changing the Swiss visual hierarchy; retest desktop and reflow. |
+| P2 accessibility | Applying a valid advanced component document rebuilt the editor and left `*:focus` empty; Add/Remove custom field use the same rerender path. Invalid trailing JSON and reserved `workspaceId` correctly failed closed and retained the last valid document. | A keyboard user loses their place after a successful edit even though data safety is correct. | Restore focus to the equivalent surviving control, or an announced component heading when the control is removed; cover Apply/Add/Remove and template-switch Apply/Cancel. |
+
+Publication-lifetime acceptance remains fixture-free until the dedicated
+deployment handoff. The approved contract deliberately separates an ordinary
+source-linked publication-history row from the one currently selected active
+artifact. Only that active, exact row may trigger full artifact verification and
+the computed `manifestDigest`; ordinary source-linked rows remain lightweight,
+while an inactive row is exact-selected only when an operator explicitly asks to
+verify its artifact. This prevents list-time N+1 artifact reads and avoids
+presenting historical linkage as fresh cryptographic verification.
+
+Duplicate source links are valid publication history, not corruption. Reverse
+publication-to-track binding is therefore populated only when exactly one
+candidate survives authorization and exact validation; zero or multiple
+candidates return `null` without disclosing whether an inaccessible candidate
+exists. The ambiguous cockpit state must offer no one-click replacement and must
+direct an authorized operator to exact verified Build History or a new signed
+preview. Acceptance includes duplicate candidates, authorized ambiguity,
+cross-workspace/no-oracle reads and the crash window between immutable replacement
+creation and active-selection reconciliation.
+
+The expiry boundary also separates recorded activation from current serving
+truth. At and after the signed authorization expiry, the API retains the audit
+fact `active=true` but must return `servingState=expired`; Host must not serve the
+old artifact, and the cockpit must never describe that row or receipt as Active
+or Verified. Controlled-clock acceptance will test expiry minus one millisecond,
+the exact boundary and plus one millisecond, along with successor activation,
+revoked-domain denial, concurrency/idempotency, cache/CSP headers and fail-closed
+browser reconciliation. No TTL, DNS, Bazaar or reviewer fixture is authorized
+before the dedicated deployment and control-room retest handoff.
+
+The authoritative completeness audit preserving both the self-delete lifecycle
+serialization and publication-lifetime charters, including duplicate-publication
+ambiguity and null/no-oracle handling, is SHA-256
+`C3C60EAF4DA7CD92A1D73BE748C36CFB719F990449F57ADB193E4F93FBBBF95A`.
+All subsequent deployment and ledger handoffs must cite that value; earlier
+completeness-audit hashes are superseded.
+
+### Workspace-scoped cockpit state deployment retest — ACCEPT
+
+The bounded workspace-state repair is live at application commit
+`6c7a973d0619243784488bee0d9ee388a39c3c05`, Railway deployment
+`bb2b3f31-7ebe-43f2-9b21-db553bc4e581` (`SUCCESS`), image
+`sha256:c9961684da740845e1d0202fdc083c54eb81956fe1f0b727e621b67d453c9fd5`
+and docs-only PR head `de3f96dd4e07f1b3e19b5a83364f24d3b43fc9b3`.
+The integrated handoff reports all Go packages and production builds green,
+13/13 promoted real-Chromium journeys, independent UI/security approval, a
+16/16 health/root soak and zero bounded `5xx`.
+
+Fresh in-app Browser `26.818.21641` evidence used a new synthetic organizer and
+workspaces A `48` and B `49`. A explicitly selected `community-iftar`, selected
+two allowed components and changed the Iftar summary to exact Arabic/emoji/plain
+Unicode. Creating B through the cockpit selected B with no inherited template,
+component, document, track, receipt, invitation or publication state; the guide
+correctly showed `0 of 5`. Returning to A restored only A's scoped document but
+still showed `0 of 5` and required three intentional confirmations for the
+restored template, components and customization. A rapid A→B→A→B sequence ended
+on a still-blank B with no stale A document or trusted receipt.
+
+After explicit reconfirmation, A created track
+`track_06we_ONN7uhO0pfdcbIyYNx9` and artifact
+`art_9c7b1f10ce0766800efabf0b6191ab64`. Railway recorded the preview `201`
+at `2026-08-21T05:47:55.342980015Z` in 48 ms. The live iframe began with the
+styled signed card and exact Unicode content, not runtime source; its sandbox was
+exactly `allow-scripts allow-forms`. The visible receipt said the Taawun build
+service verified an active signature, bound workspace `48`, exact origin,
+component-document digests and future preview expiry, and separate Build History
+confirmed exactly one real track while stating it was not published.
+
+With B selected, supported API deletion returned `204` under Railway request
+`CNBS3v-nQ6WcCOten6XIxQ` at `2026-08-21T05:49:52.719727921Z` in 5 ms. A reload
+correctly cleared the tab session; fresh login listed only A, automatically
+reopened the one applicable verified track, retained the exact document and
+receipt, and did not restore B. A separately registered principal received the
+honest no-workspace state with no A/B name, document, track, receipt or milestone.
+Promoted Chromium remains the evidence for artificially delayed create and
+People/history/domain/track/invite/accept/publication response interleavings;
+the live rapid-switch, deletion fallback and principal reset all failed closed.
+
+A bounded diagnostic series then reached the documented login limiter and
+returned `429` with safe copy. Further authentication requests were stopped; no
+limiter bypass was attempted. After the full window, a single supported cleanup
+pass reopened the exact track at `200` under Railway request
+`loqiShjRSHORpR8InpoFkQ`, recomputed the exact `manifestJson` SHA-256 and matched
+`manifestDigest`. The signed runtime descriptor resolved to
+`assets/datastar-v1.0.2.js`; authenticated read returned `200`, 34,083 bytes,
+`private, no-store` and `nosniff`, while anonymous read returned `401`.
+
+Workspace A `48` deletion returned `204` under request
+`O_z_XMaHQtKItOj-nPRhug` at `2026-08-21T06:04:50.597995278Z` in 3 ms and an
+independent authorized principal then read it as `404`. Self-delete for organizer
+`77` returned `204` under `2VQGEiLUR7W7IKhaLPU1MQ` in 76 ms; zero-workspace
+principal `78` returned `204` under `zJPhRtudTV-jIbymLPU1MQ` in 48 ms; both old
+tokens returned `401`. Workspace B `49` had already been deleted `204`. No fixture
+from this retest remains. Railway correlation shows one clean start and no HTTP
+`>=500` throughout the deployment window.
+
+**Verdict:** ACCEPT the workspace-scoped cockpit-state P1 on `6c7a973d` /
+`bb2b3f31`. The exact live A→B blank boundary, intentional A recovery, rapid
+switch, deletion fallback, fresh-login signed-history recovery, new-principal
+isolation, signed runtime/file boundary and supported cleanup are green. Promoted
+Chromium supplies deterministic delayed-response coverage. No P0/P1 application
+finding remains in this gate; the separately sequenced self-delete orphan P1 was
+left open on that release and is evaluated immediately below. Workspace `47`
+remains explicit operator-authority-blocked historical residue.
+
+### Next gate: Decision-A self-delete serialization — fixture-free charter
+
+The control room released the database-backed lifecycle-serialization lane only
+after the workspace-state acceptance above. No production load race is
+authorized. Repository acceptance must deterministically force both interleavings
+using independent handles to the same SQLite file and an independent-process
+`BEGIN IMMEDIATE` exercise: create-wins commits the owned workspace and makes
+self-delete return `409 owned_workspaces_remaining` with the user and token still
+valid; delete-wins commits the tombstone first and makes workspace creation fail
+with no workspace or membership row while the old token reads `401`. Cancellation
+and storage failure must roll back without partial lifecycle state.
+
+After a verified deployment handoff, the live lane will run low-rate sequential
+checks only. Fresh identity A will create one workspace, receive the nested safe
+`409 owned_workspaces_remaining` envelope on self-delete, retain an unchanged
+`200` profile, valid token and owned-workspace listing, then delete the workspace
+`204`, self-delete `204`, and prove old profile and workspace-creation authority
+both return `401`. Fresh zero-workspace identity B will self-delete `204` and
+prove the same old-authority `401` boundaries. A distinct principal attempting to
+delete either user must receive a generic `403` without an existence or ownership
+oracle. A bounded domain/OAuth/reference case will confirm the precondition does
+not corrupt audit/control references and that final supported cleanup revokes old
+JWT/OAuth authority without raw database errors.
+
+Every live mutation will retain only synthetic IDs, statuses, timestamps and
+Railway request IDs, then correlate exact app/edge records and a bounded zero-5xx
+readback. Workspace `47` remains a historical operator-authority-blocked residue;
+no raw database, fabricated JWT, bootstrap-admin or production concurrency action
+will be attempted. Publication-lifetime and UI-safety fixtures remain paused until
+this gate closes.
+
+### Decision-A self-delete deployment retest — ACCEPT
+
+The exact application and PR commit
+`b044365357664c3bb3d1654600f409ff74b8ef69` is live on the operationally current
+Railway deployment `d60347f7-5dd6-4778-b3e2-bb3d088ff8e3` (`SUCCESS`), image
+`sha256:6472195b6b2fe296473fd0129126b6b94c92dccb303eb0d208219b3eab2befd1`.
+Control-room attribution confirmed that this was an app-identical second release
+of `b044365`; it removed the earlier identical deployment `96e7fa37`. Direct
+`/api/health` and root probes returned `200` before fixture creation, with health
+request `O7FJsBI7Q62MidP0xtoGcA`. The integrated gate supplied the required
+same-file independent-handle, independent-process `BEGIN IMMEDIATE`, forced
+create-wins/delete-wins and rollback/cancellation/COMMIT-failure tests; no live
+production race or load was attempted.
+
+Fresh owner `79` created workspace `50` and a pending synthetic
+`.example.invalid` domain claim without DNS verification or publication. The
+claim returned `201` under `aVjeyKa1TUOIvyowWUN5dQ`, exercising the domain/audit
+reference that had previously caused raw FK deletion failures. Distinct
+zero-workspace principal `80` received generic `403` for both the owner-account
+delete (`dNI-7eQTSpKV9-yMYqVb7A`, 3 ms) and workspace delete
+(`L6nUtsPdSaOETcNZYqVb7A`, 3 ms), with no owned-workspace code, name, count or
+lock oracle.
+
+Owner self-delete returned `409` under `mX5n1NTSSkC85V-Ilt7tkg` in 49 ms. Its
+129-byte response was exactly one nested `error` object with only `code` and
+`message`; the code was `owned_workspaces_remaining`, the message was the bounded
+deletion prerequisite, and the body contained no workspace name/ID/count, domain,
+database cause or raw constraint text. Headers were
+`application/json; charset=utf-8`, `Cache-Control: no-store`,
+`X-Content-Type-Options: nosniff`, plus the Railway request ID. The unchanged JWT
+then read the exact same profile `200` (`vW4tSM0BQB-R1-erYqVb7A`, 2 ms) and the
+exact one-workspace collection `200` (`weUIa8-qRLSQqUbsYqVb7A`, 3 ms), proving
+the conflict neither tombstoned nor rotated authority.
+
+Supported workspace cleanup returned `204` under
+`8daGPi5zRzykt0uBnPRhug` in 25 ms and the distinct principal then read workspace
+`50` as `404` under `2OqM5SXDQaO6EitpYqVb7A`. Owner self-delete subsequently
+returned bodyless `204`, `no-store` and `nosniff` under
+`lt2CkUvlSEukwJ6Llt7tkg` in 50 ms. Its old JWT returned `401` for profile
+(`zaXxCcQ5SpOSrZCMYqVb7A`) and workspace creation
+(`Z5lS__HETrCchV_NwUFZXw`). Zero-owned principal `80` independently self-deleted
+with the same bodyless/header contract under `6RPeEeq9TiaoS7CnYqVb7A` in 49 ms;
+its old profile and workspace-create requests returned `401` under
+`Tv83aGExSZ2l9qBWnPRhug` and `URYpEWQ1TFKwHxOsnPRhug`. OAuth metadata remained
+`200`; the integrated lifecycle suite supplies OAuth-session/consent retention
+coverage without creating a broader live OAuth authority fixture.
+
+One harness summary flag initially printed `false` despite every named assertion
+above being green. A local no-network reproduction proved PowerShell parsed the
+comma-separated `@(expr, expr, ...)` aggregate as one chained comparison; this
+was test arithmetic, not a second application run or defect. No repeat fixture
+was created. Exact Railway readback confirmed every status/timing above and found
+zero deployment-scoped HTTP `>=500` records.
+
+**Verdict:** ACCEPT Decision-A lifecycle-safe self-delete on `b044365` /
+`d60347f7`. Both fresh identities and workspace `50` were removed exclusively
+through supported routes, both old authorities are `401`, the pending domain
+reference caused no FK/raw-error regression, and no QA residue remains.
+Workspace `47` remains the explicitly preserved pre-fix operator-authority
+cleanup blocker. Publication-lifetime and UI-safety fixtures were not started.
+
+### Publication-lifetime deployment retest — ACCEPT
+
+The exact application and PR commit
+`928c8f274460f00b4ac2059a0e7c43fb221d5791` is live on Railway deployment
+`43f11880-806a-4719-84b3-d6587403ec2c` (`SUCCESS`). Railway returned one clean
+application start at `2026-08-21T15:16:14Z`, and the final deployment list still
+showed this release as the sole current `SUCCESS`. The connector did not expose
+the runtime image digest, so build digest
+`sha256:2719c97dc903ceafe5c568a55a8125f71f4fd8875e74d42bdf1b462b109c5c9a`
+is recorded only as a build digest and is not represented as the running image.
+The accepted rollback source remains `b044365357664c3bb3d1654600f409ff74b8ef69`;
+its operational deployment `d60347f7-5dd6-4778-b3e2-bb3d088ff8e3` was removed
+by promotion. The authoritative completeness audit is unchanged at SHA-256
+`C3C60EAF4DA7CD92A1D73BE748C36CFB719F990449F57ADB193E4F93FBBBF95A`.
+
+The integrated release handoff reported every Go package and command, both
+production binaries, diff check, independent backend/security/UI reviews and
+14/14 Node tests green, including the two promoted real-Chromium journeys.
+Source readback on the exact commit confirmed controlled-clock tests for the
+injected server clock, exact stored manifest bytes, expiry minus one millisecond,
+the exact expiry boundary and plus one millisecond; Host `GET`/`HEAD`; revoked
+claim and artifact failure; atomic successor activation; idempotency/concurrency;
+crash-window recovery; non-unique exact publication binding; immutable
+replacement/rollback lineage; and one-set-query bounded publication context.
+The promoted browser test additionally proves the monotonic expiry deadline
+removes all Active/Verified/healthy/live wording and interactivity before an
+authoritative exact re-read, source-linked replacement and rollback, null or
+ambiguous binding guidance, stale claim/principal responses, trusted keyboard
+activation, at-least-44-pixel publication action targets and 160/200/320/400-pixel
+reflow. These controlled tests are the temporal and activated-publication proof;
+no live DNS, reviewer, Bazaar or shortened-TTL fixture was fabricated.
+
+Fresh live in-app Browser evidence used synthetic Architect `82` and workspace
+`51`. The honest zero-workspace path preceded supported workspace creation. The
+Architect explicitly selected `community-iftar`, chose two allowed components,
+changed the Iftar title, and created signed track
+`track_ae3I_veiZ1kNT52Vq6K5jzVu` / artifact
+`art_f1c167a686c1d81e054f68ad5f1477f3`. Railway recorded the preview `201` at
+`2026-08-21T15:28:42.404381798Z` in 91 ms. The cockpit independently confirmed
+the track in Build History, rendered the styled card rather than runtime source,
+showed the exact workspace/component/origin/lifecycle/signature receipt, and
+kept publication disabled. The iframe sandbox was exactly
+`allow-scripts allow-forms`. The one executed inline module was 34,083 bytes and
+its SHA-256 was exactly
+`2837d87acf6ee0ba8e4e63765926c25a98d63883b02f88be194a86b81d3fd24a`,
+matching the signed manifest runtime descriptor and the authenticated immutable
+file bytes. Authenticated runtime and `index.html` reads returned `200`,
+`private, no-store`, `nosniff` and exact manifest file digests; anonymous reads
+returned `401`.
+
+Claim `jP3HKAWG6_P0iqyBzHpRvNDJ` used one exact synthetic
+`.example.invalid` origin. Its DNS proof value was displayed only in-session and
+was never copied into this ledger or a report. The claim remained honestly
+`pending`; the cockpit said external DNS verification was required, synthesized
+no proof, loaded zero immutable activation records, hid exact-record,
+replacement and rollback controls, and kept Publish disabled. A direct domain
+publication attempt returned `409 origin_not_verified`. Conductor publication
+request returned nested `409 publication_claim_unavailable`, `no-store` and
+`nosniff`; before and after reads stayed exactly `PREVIEW_READY`, version `6`,
+so denial persisted no stale transition. Railway correlated the request at
+`2026-08-21T15:31:04.200996760Z` in 5 ms.
+
+The live publication-context API returned `200` with `no-store`, `nosniff`, an
+empty `publications` collection and server time for both default limit `20` and
+explicit limit `50`. Exact selection of a missing authorized publication
+returned the same bounded empty collection. Limit `51`, duplicate `limit`, and
+mixed exact-selection/paging returned deterministic `400
+invalid_publication_query`. Distinct outsider `83` received the same generic
+`403 workspace_forbidden` for actual and missing exact-publication selectors and
+for the claim list, preventing a claim/publication/version oracle; it then
+self-deleted through the supported route and its old profile returned `401`.
+Railway recorded the complete history series as `200`/`400`/`403` in 2–26 ms and
+no `5xx`.
+
+Invited Viewer `84` proved pre-invite `403`, accepted Viewer membership, listed
+and reopened the exact signed history and preview, but had disabled composer and
+domain controls, hidden replacement/rollback actions, no publication-context
+authority and a disabled Publish action. Invited Maintainer `85` had build but
+not publish authority, restored the exact documents into a new local draft,
+changed one title and created actor-bound successor track
+`track_cB_X7DUbiHWdzFsDRBgQGStg` / artifact
+`art_3f271b34d2316f8b21f644d9bc8fe045`. Railway recorded its preview `201` at
+`2026-08-21T15:37:50.500017677Z` in 105 ms. Both roles received `403` from the
+publication-context API, and neither cockpit exposed replacement, rollback or
+publication mutation.
+
+A candidate principal-isolation concern was tested to completion and was not a
+defect. The Architect entered distinctive unbuilt text `OWNER PRIVATE UNSAVED
+LEAK SENTINEL`. An initial sign-out click occurred while automatic signed-track
+recovery was still settling and did not cross the authentication boundary. Once
+recovery settled, a clean sign-out cleared the sentinel, workspace and selected
+components before another principal authenticated. Viewer login then showed no
+sentinel, no checked components and only the server-derived authorized signed
+preview. A later reload after supported account deletion showed the logged-out
+state, empty workspace, waiting preview and no retained publication record or
+action. The deterministic switch therefore failed closed; no P1 was sent.
+
+The live browser had no console warning/error, keyboard roving moved account and
+workspace tabs with Arrow/Home/End while retaining focus, and no horizontal
+overflow appeared at the stabilized 385-pixel and 305-pixel live CSS viewports.
+The promoted Chromium journey, rather than this in-app viewport adapter, remains
+the exact 160/200/320/400-pixel reflow evidence. Rapid
+authentication probes correctly reached one bounded `429` at
+`2026-08-21T15:41:12.785030687Z` in 5 ms; further login attempts stopped until
+the limiter window recovered. One non-blocking P2 accessibility/hygiene item
+remains for a later coherent UI batch: pending-claim utility controls measured
+29 px, Sign out 27 px and logged-out auth tabs 38 px, below the product's 44 px
+target. The promoted active/expired publication action controls themselves are
+covered at at least 44 px. Anonymous signed-file `401` responses also remain
+without `Cache-Control`, while successful signed-file responses are
+`private, no-store`; no sensitive bytes were returned.
+
+Supported cleanup deleted workspace `51` at
+`2026-08-21T15:48:55.234525080Z` (`204`, 4 ms), which removed both tracks,
+artifacts, memberships and the pending claim. Viewer `84`, Maintainer `85` and
+Architect `82` then self-deleted at `15:48:56Z`, each with `204`; all old profile
+tokens returned `401`, and old track/runtime reads returned `401`. Outsider `83`
+had already self-deleted `204`. No fixture from this gate remains. Workspace
+`47` remains the explicitly preserved historical operator-authority blocker and
+was not touched.
+
+Final Railway readback found zero HTTP `500..599` records for deployment
+`43f11880`, continuous low resource use (one-hour CPU maximum approximately
+`0.0051` vCPU and memory maximum `0.0348` GB), exact `201` preview, `409`
+pending-publication, `429` limiter and `204` cleanup correlations, and no restart
+or deployment anomaly.
+
+**Verdict:** ACCEPT the publication-lifetime P0 on application commit
+`928c8f274460f00b4ac2059a0e7c43fb221d5791` / Railway deployment
+`43f11880-806a-4719-84b3-d6587403ec2c`. Live Browser, API, signed-byte, role,
+stale-principal, accessibility and cleanup boundaries are green. Exact temporal
+expiry/Host serving, direct/null/ambiguous publication binding and immutable
+replacement/rollback are accepted from the promoted controlled-clock, Host and
+real-Chromium suites because producing those live states requires the forbidden
+external DNS/reviewer fixture. No P0/P1 application finding remains. The later
+UI-safety batch may now begin only after control-room handoff.
+
+The five-person study remains `not-started`; no participant, consent, demand or
+willingness-to-pay evidence is claimed. Continuous acceptance remains in progress
+through the separately authorized UI-safety sequence and final one-time Fable
+adversarial review; neither is claimed by this publication-lifetime gate.

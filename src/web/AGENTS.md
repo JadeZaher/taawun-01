@@ -80,3 +80,69 @@ Removing the cockpit's public runtime import also removes its incidental
 `data-bind` behavior. Small builder-only presentation links, such as reflecting
 the plain App name in `.sample-title`, stay explicit vanilla DOM updates; they do
 not justify fetching or executing unsigned runtime bytes in the parent cockpit.
+
+## Destructive workspace controls
+
+People offboarding is an Architect-only presentation of the existing membership
+DELETE. Owner and current-principal rows never receive a control, confirmation
+binds the exact member and workspace epoch, and success is not announced until
+an authoritative People readback omits that member. Viewer and Maintainer views
+remain inspect-only.
+
+Invitation revocation applies only to pending grants created in the current
+browser session. It sends the displayed record's positive `expected_version`,
+accepts only the exact next-version `REVOKED` response, and clears the matching
+secret. A conflict has no readback path, so the UI clears the secret and reports
+status as unknown instead of inventing a durable invitation index.
+
+Domain revocation binds the exact selected claim and issues one DELETE followed
+by exact claim and publication-history reads. A revoked claim hides DNS proof
+and cannot verify, publish, replace, or roll back. Its immutable history and the
+last trusted staging iframe may remain visible, but that iframe is not public
+serving authority.
+
+Member and invitation confirmations expose stable target IDs plus exact
+workspace identity. Once a request starts, Cancel is disabled and cannot claim
+that no request was sent. Invitation create/revoke and domain claim/verify/revoke
+use one in-flight mutation lane per primitive; domain confirmation has a separate
+epoch so merely opening or cancelling it cannot invalidate another operation.
+Domain claim mutations and publication replacement or rollback are mutually
+exclusive in both directions, and long-running publication work remains bound
+to the unchanged exact workspace and claim fingerprint. Alternate domain
+renderers and evidence reloads preserve that exclusion; native claim controls
+remain disabled until authoritative publication completion clears its own busy
+state. The inverse also holds: a domain-claims read owns its exact loader epoch,
+synchronously rerenders every native claim and publication control as disabled,
+keeps replacement and rollback unavailable through claim/publication readback,
+and cannot commit stale results across a publication epoch.
+An ambiguous member or domain response fails closed until authoritative People
+or exact claim-and-history reload resolves the outcome.
+
+## Account and editing continuity
+
+The Account tab exposes self-only password rotation and account deletion; it has
+no administrator primitive. Password rotation uses the server's 12-character
+minimum and deliberately returns to sign-in because every session is invalidated.
+Account deletion treats `owned_workspaces_remaining` as a non-mutating recovery
+state, and a successful zero-owned deletion signs out while explaining retained
+audit and control records. Message-bearing account sign-outs select the login
+tab before rendering their final live outcome so tab setup cannot erase it.
+
+Password rotation, selected-owner workspace cleanup, and account deletion share
+one explicit Account mutation guard. Network or 5xx outcomes never assert that
+credentials, sessions, workspaces, or accounts are unchanged: password and
+account ambiguity signs out for re-authentication, while workspace ambiguity
+requires a workspace reload. Owned workspace cleanup uses the existing
+owner-authorized workspace DELETE before retrying self-deletion. Its exact
+workspace stays scope-locked while the request is in flight; ambiguous cleanup
+releases the busy guard but keeps account deletion disabled until an
+authoritative workspace-list reload resolves ownership. Its recovery opens the
+Build surface so the exact outcome and workspace retry control are visible and
+focusable. Cleanup never treats deleting one workspace as evidence that every
+owned workspace is gone.
+
+Component editor rerenders explicitly restore focus for JSON Apply, custom-field
+Add/Remove, selection changes, and template-switch Apply/Cancel. Invalid or
+reserved JSON never replaces the last valid document. The logged-out landing
+keeps account access immediate while describing outcomes before the later trust,
+custody, and retention caveats; its claims remain bounded to existing primitives.

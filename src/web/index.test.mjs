@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -31,6 +31,52 @@ async function installedChromium() {
 }
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+function requestWithLiteralHost(url, host, timeout = 2_000) {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    let response;
+    let timeoutID;
+    let settled = false;
+    const onResponseEnd = () => finish(null, { status: Number(response?.statusCode || 0) });
+    const onResponseError = (error) => finish(error);
+    const onRequestError = (error) => finish(error);
+    const onRequestClose = () => request.removeListener('error', onRequestError);
+    const finish = (error, result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutID);
+      response?.removeListener('end', onResponseEnd);
+      response?.removeListener('error', onResponseError);
+      if (error) {
+        response?.destroy();
+        if (!request.destroyed) request.destroy();
+        reject(error);
+        return;
+      }
+      resolve(result);
+    };
+    const request = httpRequest({
+      protocol: target.protocol,
+      hostname: target.hostname,
+      port: target.port || undefined,
+      path: `${target.pathname}${target.search}`,
+      method: 'GET',
+      headers: { Host: host, Connection: 'close' },
+    }, (incoming) => {
+      response = incoming;
+      response.once('end', onResponseEnd);
+      response.once('error', onResponseError);
+      response.resume();
+    });
+    request.on('error', onRequestError);
+    request.once('close', onRequestClose);
+    timeoutID = setTimeout(() => {
+      finish(new Error(`literal Host request timed out after ${timeout} ms`));
+    }, timeout);
+    request.end();
+  });
+}
 
 async function within(promise, label, timeout = 5_000) {
   let timeoutID;
@@ -254,6 +300,34 @@ test('registration enforces the server password minimum', async () => {
   assert.doesNotMatch(html, /Use at least 8 characters\.|id="registerPassword"[^>]*minlength="8"/u);
 });
 
+test('bounded UI safety mutations stay self/workspace scoped and version guarded', async () => {
+  const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const memberRemoval = html.match(/async function removeSelectedMember[\s\S]*?(?=\n\s*const RESUMABLE_TRACK_STATUSES)/u)?.[0] || '';
+  const invitationRevoke = html.match(/async function revokeSelectedInvitation[\s\S]*?(?=\n\s*async function createInvitation)/u)?.[0] || '';
+  const domainRevoke = html.match(/async function revokeSelectedDomain[\s\S]*?(?=\n\s*function selectedModules)/u)?.[0] || '';
+  const accountLifecycle = html.match(/function accountMarker[\s\S]*?(?=\n\s*const authTabs)/u)?.[0] || '';
+
+  assert.doesNotMatch(html, /Enter the builder/u);
+  assert.match(html, /Create a community app/u);
+  assert.match(html, /Organize people and decisions/u);
+  assert.match(html, /Preview before sharing/u);
+  assert.match(html, /Reuse trusted templates/u);
+  assert.match(html, /id="revokeDomainButton"[^>]*>Revoke domain</u);
+  assert.match(memberRemoval, /\/workspaces\/\$\{action\.marker\.workspaceID\}\/users\/\$\{action\.userID\}/u);
+  assert.match(html, /Number\(member\.user_id\) !== principalID\(\)/u);
+  assert.match(html, /String\(member\.role \|\| ''\)\.toLowerCase\(\) !== 'owner'/u);
+  assert.match(invitationRevoke, /body: \{ expected_version: action\.version \}/u);
+  assert.match(invitationRevoke, /String\(revoked\.status \|\| ''\)\.toUpperCase\(\) !== 'REVOKED'/u);
+  assert.ok(domainRevoke.indexOf("{ method: 'DELETE' }") < domainRevoke.indexOf('const readback = await api(path)'), 'domain revoke must issue DELETE before exact claim readback');
+  assert.equal((domainRevoke.match(/await api\(path, \{ method: 'DELETE' \}\)/gu) || []).length, 1, 'domain revoke issues one DELETE');
+  assert.doesNotMatch(accountLifecycle, /\/admin\//u);
+  assert.match(accountLifecycle, /api\(`\/users\/\$\{marker\.userID\}`.*method: 'PUT'/u);
+  assert.match(accountLifecycle, /api\(`\/users\/\$\{marker\.userID\}`.*method: 'DELETE'/u);
+  assert.match(accountLifecycle, /error\.code === 'owned_workspaces_remaining'/u);
+  assert.match(html, /\.button\.tertiary \{ min-height: 44px; min-width: 44px;/u);
+  assert.match(html, /details summary \{ min-height: 44px; min-width: 44px;/u);
+});
+
 test('successful registration signs in with ephemeral local credentials', async () => {
   const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const handler = html.match(/element\('registerForm'\)\.addEventListener\('submit',[\s\S]*?(?=\n\s*element\('logoutButton'\))/u)?.[0];
@@ -373,7 +447,7 @@ test('mobile auth shell preserves its value and custody explanation with accessi
         const authLayout = await evaluate(client, `(() => {
           document.querySelector('#authView').hidden = false;
           document.querySelector('#appView').hidden = true;
-          const copy = document.querySelector('.auth-story p');
+          const copy = document.querySelector('.auth-caveat');
           const style = getComputedStyle(copy);
           const rect = copy.getBoundingClientRect();
           return {
@@ -385,16 +459,21 @@ test('mobile auth shell preserves its value and custody explanation with accessi
               return candidateRect.right > document.documentElement.clientWidth + 0.5 || candidateRect.left < -0.5;
             }).slice(0, 8).map((candidate) => candidate.tagName.toLowerCase() + '#' + candidate.id + '.' + candidate.className),
             layoutWidth: window.innerWidth,
+            visibleH1s: [...document.querySelectorAll('h1')].filter((heading) => !heading.closest('[hidden]') && getComputedStyle(heading).display !== 'none').length,
+            outcomes: document.querySelectorAll('.auth-outcome').length,
+            controlHeights: ['landingRegisterButton', 'landingLoginButton', 'loginTab', 'registerTab', 'loginEmail', 'loginPassword'].map((id) => Math.round(document.getElementById(id).getBoundingClientRect().height)),
           };
         })()`);
-        assert.match(authLayout.copy, /Workspace-signed artifacts/u);
-        assert.match(authLayout.copy, /local-first records/u);
-        assert.match(authLayout.copy, /sandbox actions/u);
-        assert.match(authLayout.copy, /explicit transactional control records/u);
-        assert.match(authLayout.copy, /Relay transit stays encrypted: an Amanah boundary with zero custody and no settlement/u);
+        assert.match(authLayout.copy, /account identity, signed artifacts/u);
+        assert.match(authLayout.copy, /Community app records remain local-first/u);
+        assert.match(authLayout.copy, /does not hold funds or promise settlement/u);
+        assert.match(authLayout.copy, /required audit history after account deletion/u);
         assert.equal(authLayout.visible, true, `${width}px at ${scale * 100}% must show the concrete product and custody explanation`);
         assert.equal(authLayout.overflow, false, `${width}px at ${scale * 100}% must reflow without horizontal document overflow: ${authLayout.overflowElements.join(', ')}`);
         assert.equal(authLayout.layoutWidth, layoutWidth, `${width}px at ${scale * 100}% must use the expected reflow width`);
+        assert.equal(authLayout.visibleH1s, 1, `${width}px at ${scale * 100}% must expose one visible landing H1`);
+        assert.equal(authLayout.outcomes, 4, 'the landing must retain four plain-language outcome cards');
+        assert.ok(authLayout.controlHeights.every((height) => height >= 44), `${width}px at ${scale * 100}% account controls must be at least 44 CSS px: ${authLayout.controlHeights}`);
 
         const railLayout = await evaluate(client, `(() => {
           document.querySelector('#authView').hidden = true;
@@ -438,6 +517,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
 
   const token = 'browser-signed-preview-token';
   const secondToken = 'browser-second-principal-token';
+  const removedMemberToken = 'browser-removed-member-token';
   const documentFields = [
     { key: 'title', label: 'Card heading', valueType: 'string', description: 'Curated heading.', required: true, maxLength: 120 },
     { key: 'summary', label: 'Summary', valueType: 'string', description: 'Curated plain-text summary.', required: true, maxLength: 600 },
@@ -524,11 +604,17 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
   let historyFailNext = false;
   let domainFailNext = false;
   let delayDomainResponse = false;
+  let delayPublicationExclusionDomainResponse = false;
   let delayWorkspaceCreateResponse = false;
   let delayScopeClaimResponse = false;
   let delayInvitationResponse = false;
+  let delayMemberDeleteResponse = false;
+  let memberDeleteAmbiguousNext = false;
+  let delayInvitationRevokeResponse = false;
+  let invitationRevokeFailNext = false;
   let delayAcceptanceResponse = false;
   let delayScopePublicationResponse = false;
+  let releaseScopePublicationResponse = null;
   let includeInapplicableNewest = false;
   let delayHistoryResponse = false;
   let delaySecondPrincipalHistory = false;
@@ -537,13 +623,49 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
   let delayClaimResponse = false;
   let delayVerifyResponse = false;
   let delayPublicationRequest = false;
+  let delayRollbackActivationResponse = false;
+  let delayWorkspaceDeleteResponse = false;
+  let workspaceDeleteAmbiguousNext = false;
   const trackEvents = new Map();
   const extraTracks = new Map();
-  let workspaces = [{ id: 41, name: 'QA Community' }, { id: 42, name: 'QA Other Workspace' }];
+  let workspaces = [{ id: 41, name: 'QA Community' }, { id: 42, name: 'QA Other Workspace' }, { id: 81, name: 'Second Principal Workspace' }, { id: 91, name: 'Retained Unrelated Workspace' }];
+  const workspaceOwners = new Map([[41, new Set([7, 8])], [42, new Set([7, 8])], [81, new Set([8])], [91, new Set([99])]]);
+  const workspaceMembers = new Map([
+    [41, [
+      { user_id: 7, username: 'QA Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
+      { user_id: 8, username: 'Removable Viewer', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
+      { user_id: 9, username: 'Removable Viewer', role: 'viewer', joined_at: '2026-08-18T00:00:00Z' },
+      { user_id: 10, username: 'Ambiguous Viewer', role: 'viewer', joined_at: '2026-08-18T00:00:00Z' },
+    ]],
+    [42, [
+      { user_id: 7, username: 'QA Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
+      { user_id: 8, username: 'Second Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
+    ]],
+    [81, [
+      { user_id: 8, username: 'Second Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
+    ]],
+  ]);
+  let removedMemberActive = true;
+  let invitationSequence = 0;
+  const currentInvitations = new Map();
+  let invitationAcceptRaceNext = false;
+  let accountTokenInvalid = false;
+  let accountDeleted = false;
+  let secondAccountDeleted = false;
+  let currentAccountPassword = 'correct horse battery staple';
+  let delayPasswordUpdateResponse = false;
+  let passwordUpdateAmbiguousNext = false;
+  let delayAccountDeleteResponse = false;
+  let accountDeleteCommitAmbiguousNext = false;
+  const principalForAuthorization = (authorization) => authorization === `Bearer ${token}` ? 7 : authorization === `Bearer ${secondToken}` ? 8 : 0;
+  const accountHasOwnedWorkspaces = (userID) => workspaces.some((workspace) => workspaceOwners.get(workspace.id)?.has(userID));
+  let domainRevokeFailNext = false;
+  let delayDomainRevokeResponse = false;
   let nextWorkspaceID = 43;
   let domainClaims = [
     { id: 'claim_browser', workspaceId: 41, origin: 'https://app.community.example', host: 'app.community.example', status: 'verified', challengeExpiresAt: '2099-08-17T00:00:00Z', verifiedAt: '2026-08-18T00:00:00Z', verificationExpiresAt: '2099-08-18T00:00:00Z', createdAt: '2026-08-18T00:00:00Z', updatedAt: '2026-08-18T00:00:00Z' },
     { id: 'claim_pending', workspaceId: 41, origin: 'https://pending.community.example', host: 'pending.community.example', status: 'pending', challengeExpiresAt: '2099-08-18T12:00:00Z', createdAt: '2026-08-18T00:10:00Z', updatedAt: '2026-08-18T00:10:00Z' },
+    { id: 'claim_pending_revoke', workspaceId: 41, origin: 'https://pending-revoke.community.example', host: 'pending-revoke.community.example', status: 'pending', challengeExpiresAt: '2099-08-18T12:00:00Z', createdAt: '2026-08-18T00:11:00Z', updatedAt: '2026-08-18T00:11:00Z' },
     { id: 'claim_revoked', workspaceId: 41, origin: 'https://revoked.community.example', host: 'revoked.community.example', status: 'revoked', revocationReason: 'user', challengeExpiresAt: '2026-08-18T00:00:00Z', createdAt: '2026-08-18T00:20:00Z', updatedAt: '2026-08-18T00:20:00Z' },
     { id: 'claim_expired', workspaceId: 41, origin: 'https://expired.community.example', host: 'expired.community.example', status: 'revoked', revocationReason: 'expired', challengeExpiresAt: '2026-08-18T00:00:00Z', createdAt: '2026-08-18T00:30:00Z', updatedAt: '2026-08-18T00:30:00Z' },
   ];
@@ -552,6 +674,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
   let delayPublicationContextResponse = false;
   let publicationContextFailNext = false;
   let replacementPreviewFailAfterCommit = false;
+  let delayReplacementSuccessResponse = false;
   let replacementSuccessorVariant = '';
   let publicationServerTime = '2026-08-18T06:02:00Z';
   let automaticPublicationExpiry = false;
@@ -602,12 +725,36 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     const json = (status, body) => send(status, 'application/json; charset=utf-8', JSON.stringify(body));
 
     if (record.method === 'GET' && record.path === '/') return send(200, 'text/html; charset=utf-8', cockpitHTML);
+    if (record.method === 'GET' && record.path === '/public-host') {
+      const serving = request.headers.host === 'app.community.example'
+        && domainPublications.some((publication) => publication.claimId === 'claim_browser' && publication.active && publication.servingState === 'serving');
+      return serving ? send(200, 'text/html; charset=utf-8', '<h1>Public community app</h1>') : json(404, { error: { code: 'public_host_not_found' } });
+    }
     if (record.method === 'GET' && record.path === '/assets/datastar-v1.0.2.js') {
       return send(200, 'text/javascript; charset=utf-8', publicRuntime);
     }
     if (record.method === 'POST' && record.path === '/api/login') {
       const second = record.body?.email === 'second@example.test';
+      const valid = second
+        ? record.body?.password === 'correct horse battery staple' && !secondAccountDeleted
+        : record.body?.email === 'qa@example.test' && record.body?.password === currentAccountPassword && !accountDeleted;
+      if (!valid) return json(401, { error: { code: 'unauthorized', message: 'Authentication failed.' } });
+      if (!second) accountTokenInvalid = false;
       return json(200, { token: second ? secondToken : token, user: { id: second ? 8 : 7, username: second ? 'Second Architect' : 'QA Architect', email: record.body?.email } });
+    }
+    if (accountTokenInvalid && record.authorization === `Bearer ${token}` && record.path.startsWith('/api/')) {
+      return json(401, { error: { code: 'unauthorized', message: 'Authentication required.' } });
+    }
+    if (secondAccountDeleted && record.authorization === `Bearer ${secondToken}` && record.path.startsWith('/api/')) {
+      return json(401, { error: { code: 'unauthorized', message: 'Authentication required.' } });
+    }
+    if (!removedMemberActive && record.authorization === `Bearer ${removedMemberToken}` && record.path.startsWith('/api/conductor/tracks')) {
+      return json(403, { error: { code: 'workspace_forbidden', message: 'Workspace access forbidden.' } });
+    }
+    if (record.method === 'GET' && record.path === '/api/workspaces/41/people' && record.authorization === `Bearer ${removedMemberToken}`) {
+      return removedMemberActive
+        ? json(200, { members: workspaceMembers.get(41) })
+        : json(403, { error: { code: 'workspace_forbidden', message: 'Workspace access forbidden.' } });
     }
     if (previewFiles.has(record.path)) {
       if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(401, { error: { code: 'unauthorized', message: 'Authentication required.' } });
@@ -641,11 +788,13 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       return json(200, { id: second ? 8 : 7, username: second ? 'Second Architect' : 'QA Architect', email: second ? 'second@example.test' : 'qa@example.test' });
     }
     if (record.method === 'GET' && record.path === '/api/workspaces') {
-      return json(200, { workspaces });
+      const userID = principalForAuthorization(record.authorization);
+      return json(200, { workspaces: workspaces.filter((workspace) => workspaceOwners.get(workspace.id)?.has(userID)) });
     }
     if (record.method === 'POST' && record.path === '/api/workspaces') {
       const workspace = { id: nextWorkspaceID++, name: String(record.body?.name || 'Created workspace') };
       workspaces = [...workspaces, workspace];
+      workspaceOwners.set(workspace.id, new Set([principalForAuthorization(record.authorization)]));
       if (delayWorkspaceCreateResponse) {
         delayWorkspaceCreateResponse = false;
         await wait(300);
@@ -662,20 +811,47 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       }
     }
     if (record.method === 'GET' && record.path === '/api/workspaces/41/people') {
+      if (record.authorization === `Bearer ${removedMemberToken}` && !removedMemberActive) return json(403, { error: { code: 'workspace_forbidden', message: 'Workspace access forbidden.' } });
       if (failPeopleNext) {
         failPeopleNext = false;
         return json(503, { error: { code: 'people_unavailable', message: 'Synthetic People interruption.' } });
       }
-      return json(200, { members: [
-        { user_id: 7, username: 'QA Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
-        { user_id: 8, username: 'Second Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
-      ] });
+      return json(200, { members: workspaceMembers.get(41) });
     }
     if (record.method === 'GET' && record.path === '/api/workspaces/42/people') {
-      return json(200, { members: [
-        { user_id: 7, username: 'QA Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
-        { user_id: 8, username: 'Second Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
-      ] });
+      return json(200, { members: workspaceMembers.get(42) });
+    }
+    if (record.method === 'DELETE' && /^\/api\/workspaces\/41\/users\/(9|10)$/u.test(record.path)) {
+      if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(403, { error: { code: 'workspace_forbidden', message: 'Workspace access forbidden.' } });
+      if (delayMemberDeleteResponse) {
+        delayMemberDeleteResponse = false;
+        await wait(180);
+      }
+      const userID = Number(record.path.split('/').at(-1));
+      workspaceMembers.set(41, workspaceMembers.get(41).filter((member) => member.user_id !== userID));
+      if (userID === 9) removedMemberActive = false;
+      if (memberDeleteAmbiguousNext) {
+        memberDeleteAmbiguousNext = false;
+        return json(503, { error: { code: 'membership_write_unavailable', message: 'Synthetic ambiguous member response.' } });
+      }
+      return send(204, 'application/json; charset=utf-8', '');
+    }
+    if (record.method === 'DELETE' && /^\/api\/workspaces\/\d+$/u.test(record.path)) {
+      const workspaceID = Number(record.path.split('/').at(-1));
+      const userID = principalForAuthorization(record.authorization);
+      if (!userID || !workspaceOwners.get(workspaceID)?.has(userID)) return json(403, { error: { code: 'workspace_forbidden' } });
+      workspaces = workspaces.filter((workspace) => workspace.id !== workspaceID);
+      workspaceOwners.delete(workspaceID);
+      workspaceMembers.delete(workspaceID);
+      if (delayWorkspaceDeleteResponse) {
+        delayWorkspaceDeleteResponse = false;
+        await wait(180);
+      }
+      if (workspaceDeleteAmbiguousNext) {
+        workspaceDeleteAmbiguousNext = false;
+        return json(503, { error: { code: 'workspace_write_unavailable', message: 'Synthetic ambiguous workspace response.' } });
+      }
+      return send(204, 'application/json; charset=utf-8', '');
     }
     if (record.method === 'GET' && /^\/api\/workspaces\/\d+\/people$/u.test(record.path)) {
       if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(401, { error: { code: 'unauthorized', message: 'Authentication required.' } });
@@ -728,6 +904,11 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       await wait(300);
     }
     if (record.method === 'GET' && record.path === '/api/workspaces/41/domains') {
+      if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(403, { error: { code: 'workspace_forbidden' } });
+      if (delayPublicationExclusionDomainResponse) {
+        delayPublicationExclusionDomainResponse = false;
+        await wait(180);
+      }
       if (domainFailNext) {
         domainFailNext = false;
         return json(503, { error: { code: 'domain_dependency_unavailable', message: 'Synthetic domain interruption.' } });
@@ -740,6 +921,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       return json(200, { claims: [] });
     }
     if (record.method === 'GET' && /^\/api\/workspaces\/41\/domains\/[^/]+\/publications$/u.test(record.path)) {
+      if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(403, { error: { code: 'workspace_forbidden' } });
       if (publicationContextFailNext) {
         publicationContextFailNext = false;
         return json(503, { error: { code: 'publication_context_unavailable', message: 'Synthetic publication context interruption.' } });
@@ -748,9 +930,11 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
         delayPublicationContextResponse = false;
         await wait(300);
       }
+      const claimID = record.path.split('/').at(-2);
+      const claimPublications = domainPublications.filter((publication) => publication.claimId === claimID);
       const publicationID = requestURL.searchParams.get('publicationId');
       if (publicationID) {
-        const selected = domainPublications.find((publication) => publication.id === publicationID);
+        const selected = claimPublications.find((publication) => publication.id === publicationID);
         if (selected && automaticPublicationExpiry && publicationID === 'publication_browser') {
           automaticPublicationExactReads += 1;
           if (automaticPublicationExactReads > 1) {
@@ -761,8 +945,8 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
         return json(200, { publications: selected ? [publicationContextRow(selected, true)] : [], serverTime: publicationServerTime });
       }
       const cursor = requestURL.searchParams.get('cursor');
-      const page = cursor ? domainPublications.slice(1) : domainPublications.slice(0, domainPublications.length > 1 ? 1 : 20);
-      return json(200, { publications: page.map((publication) => publicationContextRow(publication)), serverTime: publicationServerTime, ...(domainPublications.length > 1 && !cursor ? { nextCursor: 'publication-page-2' } : {}) });
+      const page = cursor ? claimPublications.slice(1) : claimPublications.slice(0, claimPublications.length > 1 ? 1 : 20);
+      return json(200, { publications: page.map((publication) => publicationContextRow(publication)), serverTime: publicationServerTime, ...(claimPublications.length > 1 && !cursor ? { nextCursor: 'publication-page-2' } : {}) });
     }
     if (record.method === 'POST' && record.path === '/api/workspaces/41/domains') {
       const claim = { id: 'claim_rotated', workspaceId: 41, origin: record.body.origin, host: new URL(record.body.origin).host, status: 'pending', challengeExpiresAt: '2099-08-18T12:00:00Z', createdAt: '2026-08-18T01:00:00Z', updatedAt: '2026-08-18T01:00:00Z' };
@@ -778,12 +962,34 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     }
     if (record.method === 'POST' && record.path === '/api/shura/v1/invitations') {
       if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(401, { error: { code: 'unauthorized', message: 'Authentication required.' } });
-      const invitation = { id: 'invitation_scope_race', workspace_id: Number(record.body?.workspace_id), invitee: String(record.body?.invitee || ''), role: String(record.body?.role || 'Viewer'), status: 'PENDING' };
+      const invitation = { id: `invitation_scope_race_${++invitationSequence}`, workspace_id: Number(record.body?.workspace_id), invitee: String(record.body?.invitee || ''), role: String(record.body?.role || 'Viewer'), status: 'PENDING', version: 1 };
+      currentInvitations.set(invitation.id, invitation);
       if (delayInvitationResponse) {
         delayInvitationResponse = false;
         await wait(800);
       }
       return json(201, { invitation, token: 'session-only-scope-race-token' });
+    }
+    if (record.method === 'POST' && /^\/api\/shura\/v1\/invitations\/[^/]+\/revoke$/u.test(record.path)) {
+      if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(403, { error: { code: 'workspace_forbidden' } });
+      const invitationID = record.path.split('/').at(-2);
+      const invitation = currentInvitations.get(invitationID);
+      if (!invitation || invitation.status !== 'PENDING' || Number(record.body?.expected_version) !== invitation.version) return json(409, { error: 'Conflict', message: 'governance state conflict' });
+      if (delayInvitationRevokeResponse) {
+        delayInvitationRevokeResponse = false;
+        await wait(180);
+      }
+      if (invitationRevokeFailNext) {
+        invitationRevokeFailNext = false;
+        return json(503, { error: { code: 'invitation_dependency_unavailable', message: 'Synthetic invitation interruption.' } });
+      }
+      if (invitationAcceptRaceNext) {
+        invitationAcceptRaceNext = false;
+        Object.assign(invitation, { status: 'ACCEPTED', version: invitation.version + 1 });
+        return json(409, { error: 'Conflict', message: 'governance state conflict' });
+      }
+      Object.assign(invitation, { status: 'REVOKED', version: invitation.version + 1 });
+      return json(200, invitation);
     }
     if (record.method === 'POST' && record.path === '/api/shura/v1/invitations/accept') {
       if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(401, { error: { code: 'unauthorized', message: 'Authentication required.' } });
@@ -794,9 +1000,71 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       return json(200, { id: 'invitation_accept_scope_race', workspace_id: 42, role: 'Viewer', status: 'ACCEPTED' });
     }
     if (record.method === 'GET' && /^\/api\/workspaces\/41\/domains\/[^/]+$/u.test(record.path)) {
+      if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(403, { error: { code: 'workspace_forbidden' } });
       const claimID = record.path.split('/').at(-1);
       const claim = domainClaims.find((entry) => entry.id === claimID);
       return claim ? json(200, claim) : json(404, { error: { code: 'domain_claim_not_found', message: 'Domain claim not found.' } });
+    }
+    if (record.method === 'DELETE' && /^\/api\/workspaces\/41\/domains\/[^/]+$/u.test(record.path)) {
+      if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(403, { error: { code: 'workspace_forbidden' } });
+      if (delayDomainRevokeResponse) {
+        delayDomainRevokeResponse = false;
+        await wait(180);
+      }
+      if (domainRevokeFailNext) {
+        domainRevokeFailNext = false;
+        return json(503, { error: { code: 'domain_dependency_unavailable', message: 'Synthetic ambiguous domain response.' } });
+      }
+      const claimID = record.path.split('/').at(-1);
+      const claim = domainClaims.find((entry) => entry.id === claimID);
+      if (!claim || !['pending', 'verified'].includes(claim.status)) return json(404, { error: { code: 'domain_claim_not_found', message: 'Domain claim not found.' } });
+      Object.assign(claim, { status: 'revoked', revocationReason: 'user', revokedAt: '2026-08-18T08:00:00Z', updatedAt: '2026-08-18T08:00:00Z' });
+      domainPublications = domainPublications.map((publication) => publication.claimId === claimID && publication.active
+        ? { ...publication, servingState: 'claim_unavailable', authorizationExpiresAt: null, manifestDigest: null }
+        : publication);
+      return json(200, claim);
+    }
+    if (record.method === 'PUT' && record.path === '/api/users/7') {
+      if (record.authorization !== `Bearer ${token}`) return json(record.authorization ? 403 : 401, { error: { code: 'user_forbidden' } });
+      if (typeof record.body?.password !== 'string' || record.body.password.length < 12) return json(400, { error: 'password too short' });
+      if (delayPasswordUpdateResponse) {
+        delayPasswordUpdateResponse = false;
+        await wait(180);
+      }
+      currentAccountPassword = record.body.password;
+      accountTokenInvalid = true;
+      if (passwordUpdateAmbiguousNext) {
+        passwordUpdateAmbiguousNext = false;
+        return json(503, { error: { code: 'user_write_unavailable', message: 'Synthetic ambiguous password response.' } });
+      }
+      return json(200, { id: 7, username: 'QA Architect', email: 'qa@example.test' });
+    }
+    if (record.method === 'DELETE' && /^\/api\/users\/(7|8)$/u.test(record.path)) {
+      const userID = Number(record.path.split('/').at(-1));
+      const callerID = principalForAuthorization(record.authorization);
+      if (!callerID || callerID !== userID) return json(record.authorization ? 403 : 401, { error: { code: 'user_forbidden' } });
+      if (delayAccountDeleteResponse) {
+        delayAccountDeleteResponse = false;
+        await wait(180);
+      }
+      if (accountHasOwnedWorkspaces(userID)) return json(409, { error: { code: 'owned_workspaces_remaining', message: 'Owned workspaces must be deleted before this account can be deleted.' } });
+      if (accountDeleteCommitAmbiguousNext) {
+        accountDeleteCommitAmbiguousNext = false;
+        if (userID === 7) {
+          accountDeleted = true;
+          accountTokenInvalid = true;
+        } else {
+          secondAccountDeleted = true;
+        }
+        return json(503, { error: { code: 'user_write_unavailable', message: 'Synthetic ambiguous account response after commit.' } });
+      }
+      if (userID === 7) {
+        accountDeleted = true;
+        accountTokenInvalid = true;
+      } else {
+        secondAccountDeleted = true;
+      }
+      return send(204, 'application/json; charset=utf-8', '');
     }
     if (record.method === 'POST' && /^\/api\/workspaces\/41\/domains\/[^/]+\/verify$/u.test(record.path)) {
       const claimID = record.path.split('/').at(-2);
@@ -858,7 +1126,8 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       trackEvents.set('track_browser', [...(trackEvents.get('track_browser') || []), { type: 'PUBLICATION_REQUESTED', toStatus: 'PUBLICATION_REQUESTED', trackVersion: activeTrackResponse.track.version, createdAt: '2026-08-18T06:00:00Z', detail: { secret: 'never-render-this-detail' } }]);
       if (delayScopePublicationResponse) {
         delayScopePublicationResponse = false;
-        await wait(800);
+        await new Promise((resolve) => { releaseScopePublicationResponse = resolve; });
+        releaseScopePublicationResponse = null;
       } else if (delayPublicationRequest) {
         delayPublicationRequest = false;
         await wait(180);
@@ -901,6 +1170,10 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       return json(201, replacementTrackResponse.track);
     }
     if (record.method === 'POST' && /^\/api\/workspaces\/41\/domains\/claim_browser\/publications\/[^/]+\/activate$/u.test(record.path)) {
+      if (delayRollbackActivationResponse) {
+        delayRollbackActivationResponse = false;
+        await wait(180);
+      }
       const sourceID = record.path.split('/').at(-2);
       const source = domainPublications.find((publication) => publication.id === sourceID);
       if (!source || source.servingState !== 'inactive') return json(422, { error: { code: 'artifact_not_publishable', message: 'Historical artifact is not currently eligible.' } });
@@ -1074,6 +1347,10 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
             { type: 'PREVIEW_READY', toStatus: 'PREVIEW_READY', trackVersion: 6, createdAt: '2026-08-18T04:23:28Z', detail: { raw: 'never-render-this-detail' } },
           ]);
         }
+      }
+      if (replacement && delayReplacementSuccessResponse) {
+        delayReplacementSuccessResponse = false;
+        await wait(180);
       }
       if (replacement && replacementPreviewFailAfterCommit) {
         replacementPreviewFailAfterCommit = false;
@@ -1335,6 +1612,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
 
     await evaluate(client, `document.querySelector('[data-component-id="announcements"] .component-tools button').click()`);
     await waitFor(() => evaluate(client, `Boolean(document.querySelector('[data-component-id="announcements"] .custom-field'))`), 'custom field add');
+    assert.equal(await evaluate(client, `document.activeElement?.value`), 'custom_1', 'Add custom field restores focus to the announced new field name');
     await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .custom-field input[aria-label$="field name"]'); input.value = 'audience'; input.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('[data-component-id="announcements"] .custom-field input[aria-label$="field name"]')?.value === 'audience'`), 'custom field rename');
     await evaluate(client, `(() => { const select = document.querySelector('[data-component-id="announcements"] .custom-field select'); select.value = 'array'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
@@ -1402,11 +1680,14 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       input.parentElement.querySelector('button').click();
     })()`);
     await waitFor(() => evaluate(client, `document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value.includes('Evening 🌙')`), 'valid surrogate pair and emoji draft');
+    assert.deepEqual(await evaluate(client, `({ active: document.activeElement?.textContent, open: document.querySelector('[data-component-id="announcements"] .advanced-document').open })`), { active: 'Apply valid JSON', open: true }, 'valid Advanced Apply reopens the surviving details and restores focus to Apply');
 
     await evaluate(client, `document.querySelector('[data-component-id="donation-campaign"] .component-tools button').click()`);
     await waitFor(() => evaluate(client, `Boolean(document.querySelector('[data-component-id="donation-campaign"] .custom-field'))`), 'removable custom field add');
     await evaluate(client, `document.querySelector('[data-component-id="donation-campaign"] .custom-field button').click()`);
     await waitFor(() => evaluate(client, `!document.querySelector('[data-component-id="donation-campaign"] .custom-field')`), 'custom field remove');
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceAnnouncer').textContent === 'Removed custom field custom_1. Focus returned to the surviving donation-campaign component heading.'`), 'custom field removal live-region announcement');
+    assert.deepEqual(await evaluate(client, `({ heading: document.activeElement?.dataset.componentHeading, announcement: document.querySelector('#workspaceAnnouncer').textContent })`), { heading: 'true', announcement: 'Removed custom field custom_1. Focus returned to the surviving donation-campaign component heading.' }, 'Remove focuses and announces the surviving component heading');
 
     const lastValidAnnouncement = await evaluate(client, `document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value`);
     await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .advanced-document textarea'); input.value = JSON.stringify({title:'Unicode',summary:String.fromCharCode(0xD800)}); input.parentElement.querySelector('button').click(); })()`);
@@ -1439,9 +1720,11 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     await waitFor(() => evaluate(client, `!document.querySelector('#templateReconcile').hidden && document.querySelector('#templateReconcileMessage').textContent.includes('iftar-registration')`), 'incompatible template reconciliation');
     await evaluate(client, `document.querySelector('#cancelTemplateSwitch').click()`);
     assert.equal(await evaluate(client, `document.querySelector('#templateSelect').value`), 'community-iftar', 'cancel keeps the current template');
+    assert.equal(await evaluate(client, `document.activeElement?.id`), 'templateSelect', 'template switch Cancel returns focus to the template selector');
     assert.match(await evaluate(client, `document.querySelector('#component-error-announcements').textContent`), /last valid document is retained/iu, 'invalid input explains last-valid recovery');
     await evaluate(client, `(() => { const select = document.querySelector('#templateSelect'); select.value = 'bazaar-cooperative'; select.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('#applyTemplateSwitch').click(); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#templateSelect').value === 'bazaar-cooperative' && document.querySelectorAll('#moduleList input:checked').length === 2`), 'template reconciliation apply');
+    assert.equal(await evaluate(client, `document.activeElement?.id`), 'templateSelect', 'template switch Apply returns focus to the template selector');
     await evaluate(client, `(() => { const select = document.querySelector('#templateSelect'); select.value = 'community-iftar'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#templateSelect').value === 'community-iftar' && document.querySelectorAll('#moduleList input:checked').length === 3 && document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value.includes('students')`), 'template draft restoration');
     assert.equal(await evaluate(client, `document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value`), lastValidAnnouncement, 'template return restores the exact last-valid document, not invalid input');
@@ -1686,13 +1969,40 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.equal(requests.filter((item) => item.path === '/api/conductor/tracks/track_browser' && item.search === '?includeVerifiedPreview=true').length, automaticRecoveryPreviewReads, 'plain build inspection must not issue a redundant verified-preview read after automatic recovery');
     await waitFor(() => evaluate(client, `document.querySelector('#domainClaimSelect').value === 'claim_browser' && !document.querySelector('#deployButton').disabled`), 'reloaded domain claim is ready for the exact signed origin');
 
+    activationFailNext = false;
     delayPublicationRequest = true;
-    await evaluate(client, `(() => { document.querySelector('#deployButton').click(); const select = document.querySelector('#domainClaimSelect'); select.value = 'claim_pending'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-    await wait(240);
-    assert.deepEqual(await evaluate(client, `({ claim: document.querySelector('#domainClaimSelect').value, track: document.querySelector('#buildRecordTitle').textContent, published: document.querySelector('#deployStateText').textContent })`), { claim: 'claim_pending', track: 'community-iftar · PREVIEW_READY', published: 'Domain verification required' }, 'delayed publication request cannot overwrite a newer same-workspace claim selection');
+    const delayedExactPublicationStart = requests.length;
+    await evaluate(client, `document.querySelector('#deployButton').click()`);
+    await waitFor(() => requests.slice(delayedExactPublicationStart).some((request) => request.method === 'POST' && request.path === '/api/conductor/tracks/track_browser/publication'), 'delayed exact-claim publication request in flight');
+    assert.deepEqual(await evaluate(client, `({ claim: document.querySelector('#domainClaimSelect').value, selectDisabled: document.querySelector('#domainClaimSelect').disabled, publishBusy: document.querySelector('#deployButton').getAttribute('aria-busy') })`), { claim: 'claim_browser', selectDisabled: true, publishBusy: 'true' }, 'publication natively locks exact claim selection while its request is in flight');
+    const exactClaimStateBeforeBlockedSelection = await evaluate(client, `document.querySelector('#domainClaimsState').textContent`);
+    const domainRequestsBeforeBlockedSelection = requests.filter((request) => request.path.startsWith('/api/workspaces/41/domains')).length;
+    await evaluate(client, `(() => { const select = document.querySelector('#domainClaimSelect'); select.value = 'claim_pending'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    assert.deepEqual(await evaluate(client, `({ claim: document.querySelector('#domainClaimSelect').value, selectedState: document.querySelector('#domainClaimsState').textContent, selectDisabled: document.querySelector('#domainClaimSelect').disabled, publishBusy: document.querySelector('#deployButton').getAttribute('aria-busy') })`), {
+      claim: 'claim_browser', selectedState: exactClaimStateBeforeBlockedSelection, selectDisabled: true, publishBusy: 'true',
+    }, 'synthetic change on the disabled select is rejected without changing exact claim state');
+    assert.equal(requests.filter((request) => request.path.startsWith('/api/workspaces/41/domains')).length, domainRequestsBeforeBlockedSelection, 'blocked same-workspace claim change emits no domain load or mutation');
+    await waitFor(() => evaluate(client, `document.querySelector('#deployStateText').textContent === 'Serving'
+      && document.querySelector('#domainPublicationRecordTitle').textContent.includes('publication_browser')
+      && document.querySelector('#deployButton').getAttribute('aria-busy') === 'false'
+      && !document.querySelector('#domainClaimSelect').disabled
+      && !document.querySelector('#retryDomainClaims').disabled`), 'delayed publication completes against the original exact claim and releases controls');
+    const delayedExactPublicationRequests = requests.slice(delayedExactPublicationStart);
+    assert.ok(delayedExactPublicationRequests.some((request) => request.method === 'POST' && request.path === '/api/conductor/tracks/track_browser/publication' && request.body?.claimId === 'claim_browser'), 'publication mutation stays bound to the original exact claim');
+    assert.ok(delayedExactPublicationRequests.some((request) => request.method === 'GET' && request.path.endsWith('/domains/claim_browser/publications') && request.search === '?limit=20'), 'publication completion reloads authoritative history for the original exact claim');
+    assert.ok(delayedExactPublicationRequests.some((request) => request.method === 'GET' && request.path.endsWith('/domains/claim_browser/publications') && request.search === '?publicationId=publication_browser'), 'publication completion exact-selects its authoritative activation record');
+    assert.equal(delayedExactPublicationRequests.some((request) => request.path.includes('claim_pending') || request.path === '/api/workspaces/41/domains'), false, 'blocked selection cannot redirect publication or issue a domain-claims reload');
+    assert.equal(delayedExactPublicationRequests.some((request) => request.path.startsWith('/api/workspaces/41/domains') && request.method !== 'GET'), false, 'blocked selection emits no domain mutation while authoritative publication reads complete');
+    assert.deepEqual(await evaluate(client, `({ claim: document.querySelector('#domainClaimSelect').value, revokeDisabled: document.querySelector('#revokeDomainButton').disabled, track: document.querySelector('#buildRecordTitle').textContent, published: document.querySelector('#deployStateText').textContent, exact: document.querySelector('#domainPublicationRecordTitle').textContent.includes('publication_browser'), publishBusy: document.querySelector('#deployButton').getAttribute('aria-busy') })`), { claim: 'claim_browser', revokeDisabled: false, track: 'community-iftar · PUBLISHED', published: 'Serving', exact: true, publishBusy: 'false' }, 'authoritative completion retains original claim truth without stranded controls or busy state');
+    activationFailNext = true;
+    domainPublications = [];
     Object.assign(activeTrackResponse.track, { status: 'PREVIEW_READY', version: 6, claimId: '', publication: undefined, updatedAt: '2026-08-18T04:23:28Z' });
     await evaluate(client, `(() => { const select = document.querySelector('#domainClaimSelect'); select.value = 'claim_browser'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-    await waitFor(() => evaluate(client, `!document.querySelector('#deployButton').disabled`), 'publication claim reset');
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationRecord').hidden && document.querySelector('#domainPublicationState').textContent.includes('No publication activation records')`), 'publication context reset after isolated exact-claim journey');
+    await evaluate(client, `(() => { document.querySelector('#trackLookup').value = 'track_browser'; document.querySelector('#loadTrackButton').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTitle').textContent === 'community-iftar · PREVIEW_READY'`), 'exact-claim publication fixture reset');
+    await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#previewFrame').dataset.stale === 'false' && !document.querySelector('#deployButton').disabled`), 'publication claim and verified preview reset');
 
     delayPublicationRequest = true;
     const trustedPairBeforePublicationRace = await evaluate(client, `({
@@ -2125,10 +2435,39 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     })()`), 'uncertain replacement response retains bounded retry key, completes cleanup, and restores record focus');
     const firstReplacementAttempt = requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview' && request.body?.ttlHours === 2160).at(-1);
     assert.ok(firstReplacementAttempt?.body?.idempotencyKey, 'replacement attempt carries an idempotency key');
+    const replacementAttemptsBeforeRevokeOverlap = requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview' && request.body?.ttlHours === 2160).length;
+    await evaluate(client, `document.querySelector('#revokeDomainButton').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#domainRevokeConfirm').hidden && document.querySelector('#replaceDomainPublication').hidden && document.querySelector('#replaceDomainPublication').disabled`), 'open domain revoke excludes replacement controls');
+    await evaluate(client, `(() => { document.querySelector('#replaceDomainPublication').click(); document.querySelector('#confirmDomainPublicationAction').click(); })()`);
+    assert.equal(requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview' && request.body?.ttlHours === 2160).length, replacementAttemptsBeforeRevokeOverlap, 'open domain revoke prevents replacement preview requests');
+    await evaluate(client, `document.querySelector('#cancelDomainRevoke').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainRevokeConfirm').hidden && document.activeElement?.id === 'revokeDomainButton' && !document.querySelector('#replaceDomainPublication').hidden && !document.querySelector('#replaceDomainPublication').disabled`), 'domain revoke cancellation restores focus and exact replacement eligibility');
+    delayReplacementSuccessResponse = true;
+    const domainDeletesBeforeReplacement = requests.filter((request) => request.method === 'DELETE' && request.path === '/api/workspaces/41/domains/claim_browser').length;
     await evaluate(client, `document.querySelector('#replaceDomainPublication').click(); document.querySelector('#confirmDomainPublicationAction').click()`);
+    await waitFor(() => requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview' && request.body?.ttlHours === 2160).length > replacementAttemptsBeforeRevokeOverlap, 'replacement preview success request in flight');
+    assert.deepEqual(await evaluate(client, `({ publishing: document.querySelector('#confirmDomainPublicationAction').getAttribute('aria-busy'), reload: document.querySelector('#retryDomainClaims').disabled, select: document.querySelector('#domainClaimSelect').disabled, revoke: document.querySelector('#revokeDomainButton').disabled })`), { publishing: 'true', reload: true, select: true, revoke: true }, 'replacement keeps exact domain controls disabled while the success response is delayed');
+    await evaluate(client, `(() => { document.querySelector('#revokeDomainButton').click(); document.querySelector('#confirmDomainRevoke').click(); })()`);
+    assert.equal(requests.filter((request) => request.method === 'DELETE' && request.path === '/api/workspaces/41/domains/claim_browser').length, domainDeletesBeforeReplacement, 'replacement publication in flight prevents domain revoke DELETE');
     await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationRecordTitle').textContent.includes('publication_replacement')
       && document.querySelector('#deployStateText').textContent === 'Serving'
       && !document.querySelector('#loadMoreDomainPublications').hidden`), 'immutable replacement activation and bounded history');
+    assert.deepEqual(await evaluate(client, `({ busy: document.querySelector('#confirmDomainPublicationAction').getAttribute('aria-busy'), claim: document.querySelector('#domainClaimSelect').value, reloadDisabled: document.querySelector('#retryDomainClaims').disabled, revokeDisabled: document.querySelector('#revokeDomainButton').disabled, exactDigest: document.querySelector('#domainPublicationRecordDigest').textContent.includes('Exact stored manifest SHA-256') })`), { busy: 'false', claim: 'claim_browser', reloadDisabled: false, revokeDisabled: false, exactDigest: true }, 'delayed replacement success retains authoritative exact context without stranded busy state');
+    assert.deepEqual(await evaluate(client, `({ hidden: document.querySelector('#replaceDomainPublication').hidden, disabled: document.querySelector('#replaceDomainPublication').disabled })`), { hidden: false, disabled: false }, 'replacement is genuinely eligible before claims reload begins');
+    const replacementRequestsBeforeDomainReload = requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview' && request.body?.ttlHours === 2160).length;
+    const rollbackRequestsBeforeDomainReload = requests.filter((request) => request.method === 'POST' && request.path.includes('/domains/claim_browser/publications/') && request.path.endsWith('/activate')).length;
+    const delayedDomainReloadStart = requests.length;
+    delayPublicationExclusionDomainResponse = true;
+    await evaluate(client, `document.querySelector('#retryDomainClaims').click()`);
+    await waitFor(() => requests.slice(delayedDomainReloadStart).some((request) => request.method === 'GET' && request.path === '/api/workspaces/41/domains'), 'distinct delayed domain-claims reload in flight');
+    assert.deepEqual(await evaluate(client, `({ reload: document.querySelector('#retryDomainClaims').disabled, select: document.querySelector('#domainClaimSelect').disabled, origin: document.querySelector('#domainOrigin').disabled, claim: document.querySelector('#claimDomainButton').disabled, verify: document.querySelector('#verifyDomainButton').disabled, revoke: document.querySelector('#revokeDomainButton').disabled, publish: document.querySelector('#deployButton').disabled, inspect: [...document.querySelectorAll('[data-publication-id]')].length > 0 && [...document.querySelectorAll('[data-publication-id]')].every((control) => control.disabled), replaceHidden: document.querySelector('#replaceDomainPublication').hidden, replaceDisabled: document.querySelector('#replaceDomainPublication').disabled, rollbackHidden: document.querySelector('#rollbackDomainPublication').hidden, rollbackDisabled: document.querySelector('#rollbackDomainPublication').disabled })`), { reload: true, select: true, origin: true, claim: true, verify: true, revoke: true, publish: true, inspect: true, replaceHidden: true, replaceDisabled: true, rollbackHidden: true, rollbackDisabled: true }, 'domain-claims loading synchronously disables every exact-domain and publication control');
+    await evaluate(client, `(() => { document.querySelector('#replaceDomainPublication').click(); document.querySelector('#rollbackDomainPublication').click(); document.querySelector('#confirmDomainPublicationAction').click(); })()`);
+    assert.equal(requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview' && request.body?.ttlHours === 2160).length, replacementRequestsBeforeDomainReload, 'domain-claims loading prevents replacement requests');
+    assert.equal(requests.filter((request) => request.method === 'POST' && request.path.includes('/domains/claim_browser/publications/') && request.path.endsWith('/activate')).length, rollbackRequestsBeforeDomainReload, 'domain-claims loading prevents rollback requests');
+    await waitFor(() => evaluate(client, `document.querySelector('#domainClaimSelect').value === 'claim_browser' && !document.querySelector('#retryDomainClaims').disabled && document.querySelector('#domainPublicationList').textContent.includes('publication_replacement')`), 'delayed domain-claims readback restores the exact claim and publication list');
+    await evaluate(client, `document.querySelector('[data-publication-id="publication_replacement"]').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationRecordTitle').textContent.includes('publication_replacement') && !document.querySelector('#replaceDomainPublication').hidden && !document.querySelector('#replaceDomainPublication').disabled`), 'exact publication readback restores replacement eligibility after domain reload');
+    assert.deepEqual(await evaluate(client, `({ confirmBusy: document.querySelector('#confirmDomainPublicationAction').getAttribute('aria-busy'), claimBusy: document.querySelector('#claimDomainButton').getAttribute('aria-busy'), verifyBusy: document.querySelector('#verifyDomainButton').getAttribute('aria-busy') })`), { confirmBusy: 'false', claimBusy: 'false', verifyBusy: 'false' }, 'domain reload completion leaves no publication or claim busy state stranded');
     const replacementAttempts = requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview' && request.body?.ttlHours === 2160);
     assert.equal(replacementAttempts.length, replacementPreviewCountBeforeCancel + successorNegativeVariants.length + 2, 'invalid successors are rejected before mutation and one uncertain valid response is retried once');
     assert.equal(replacementAttempts.at(-1).body.idempotencyKey, firstReplacementAttempt.body.idempotencyKey, 'uncertain replacement retry retains the exact idempotency key');
@@ -2148,6 +2487,21 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.match(requests.find((request) => request.method === 'GET' && request.path.endsWith('/domains/claim_browser/publications') && request.search.includes('cursor=publication-page-2'))?.search || '', /^\?limit=20&cursor=publication-page-2$/u, 'opaque cursor is used only with the bounded page size');
     await evaluate(client, `document.querySelector('[data-publication-id="publication_browser"]').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationRecordTitle').textContent.includes('publication_browser') && !document.querySelector('#rollbackDomainPublication').hidden && document.querySelector('#domainPublicationRecordDigest').textContent.includes('Exact stored manifest SHA-256')`), 'exact historical proof enables rollback');
+    assert.deepEqual(await evaluate(client, `({ hidden: document.querySelector('#rollbackDomainPublication').hidden, disabled: document.querySelector('#rollbackDomainPublication').disabled, exact: document.querySelector('#domainPublicationRecordDigest').textContent.includes('Exact stored manifest SHA-256'), activeCurrent: document.querySelector('#domainPublicationList').textContent.includes('Serving — activation record retained · publication_replacement') })`), { hidden: false, disabled: false, exact: true, activeCurrent: true }, 'inactive prior publication is genuinely rollback-eligible beside the active replacement before claims reload begins');
+    const rollbackRequestsBeforeClaimsReload = requests.filter((request) => request.method === 'POST' && request.path.endsWith('/domains/claim_browser/publications/publication_browser/activate')).length;
+    const delayedRollbackClaimsReloadStart = requests.length;
+    delayPublicationExclusionDomainResponse = true;
+    await evaluate(client, `document.querySelector('#retryDomainClaims').click()`);
+    await waitFor(() => requests.slice(delayedRollbackClaimsReloadStart).some((request) => request.method === 'GET' && request.path === '/api/workspaces/41/domains'), 'distinct delayed claims reload begins from an eligible rollback');
+    assert.deepEqual(await evaluate(client, `({ reload: document.querySelector('#retryDomainClaims').disabled, select: document.querySelector('#domainClaimSelect').disabled, origin: document.querySelector('#domainOrigin').disabled, revoke: document.querySelector('#revokeDomainButton').disabled, inspect: [...document.querySelectorAll('[data-publication-id]')].length > 0 && [...document.querySelectorAll('[data-publication-id]')].every((control) => control.disabled), rollbackHidden: document.querySelector('#rollbackDomainPublication').hidden, rollbackDisabled: document.querySelector('#rollbackDomainPublication').disabled })`), { reload: true, select: true, origin: true, revoke: true, inspect: true, rollbackHidden: true, rollbackDisabled: true }, 'claims reload natively removes a previously eligible rollback and disables the remaining exact-domain controls');
+    await evaluate(client, `(() => { document.querySelector('#rollbackDomainPublication').click(); document.querySelector('#confirmDomainPublicationAction').click(); })()`);
+    assert.equal(requests.filter((request) => request.method === 'POST' && request.path.endsWith('/domains/claim_browser/publications/publication_browser/activate')).length, rollbackRequestsBeforeClaimsReload, 'claims reload blocks rollback activation from a previously eligible exact context');
+    await waitFor(() => evaluate(client, `document.querySelector('#domainClaimSelect').value === 'claim_browser' && !document.querySelector('#retryDomainClaims').disabled && document.querySelector('#domainPublicationList').textContent.includes('publication_replacement')`), 'rollback claims reload restores authoritative claim and current publication history');
+    await evaluate(client, `document.querySelector('#loadMoreDomainPublications').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('[data-publication-id="publication_browser"]') !== null`), 'rollback source returns through authoritative bounded history after claims reload');
+    await evaluate(client, `document.querySelector('[data-publication-id="publication_browser"]').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#rollbackDomainPublication').hidden && !document.querySelector('#rollbackDomainPublication').disabled`), 'authoritative exact readback restores rollback after claims reload');
+    assert.deepEqual(await evaluate(client, `({ reload: document.querySelector('#retryDomainClaims').disabled, select: document.querySelector('#domainClaimSelect').disabled, revoke: document.querySelector('#revokeDomainButton').disabled, rollback: document.querySelector('#rollbackDomainPublication').disabled, confirmBusy: document.querySelector('#confirmDomainPublicationAction').getAttribute('aria-busy'), claimBusy: document.querySelector('#claimDomainButton').getAttribute('aria-busy'), verifyBusy: document.querySelector('#verifyDomainButton').getAttribute('aria-busy') })`), { reload: false, select: false, revoke: false, rollback: false, confirmBusy: 'false', claimBusy: 'false', verifyBusy: 'false' }, 'rollback claims reload completes with exact controls restored and no busy state stranded');
     const rollbackMutationsBeforeStaleConfirm = requests.filter((request) => request.method === 'POST' && request.path.endsWith('/domains/claim_browser/publications/publication_browser/activate')).length;
     await evaluate(client, `document.querySelector('#rollbackDomainPublication').click()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#domainPublicationConfirm').hidden && document.activeElement?.id === 'confirmDomainPublicationAction'`), 'rollback inline confirmation focus');
@@ -2162,10 +2516,26 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     await waitFor(() => evaluate(client, `document.querySelector('[data-publication-id="publication_browser"]') !== null`), 'rollback source history recovery');
     await evaluate(client, `document.querySelector('[data-publication-id="publication_browser"]').click()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#rollbackDomainPublication').hidden`), 'rollback source exact proof recovery');
+    const rollbackMutationsBeforeRevokeOverlap = requests.filter((request) => request.method === 'POST' && request.path.endsWith('/domains/claim_browser/publications/publication_browser/activate')).length;
+    await evaluate(client, `document.querySelector('#revokeDomainButton').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#domainRevokeConfirm').hidden && document.querySelector('#rollbackDomainPublication').hidden && document.querySelector('#rollbackDomainPublication').disabled`), 'open domain revoke excludes publication controls');
+    await evaluate(client, `(() => { document.querySelector('#rollbackDomainPublication').click(); document.querySelector('#confirmDomainPublicationAction').click(); })()`);
+    assert.equal(requests.filter((request) => request.method === 'POST' && request.path.endsWith('/domains/claim_browser/publications/publication_browser/activate')).length, rollbackMutationsBeforeRevokeOverlap, 'open domain revoke prevents publication mutation requests');
+    await evaluate(client, `document.querySelector('#cancelDomainRevoke').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainRevokeConfirm').hidden && document.activeElement?.id === 'revokeDomainButton' && !document.querySelector('#rollbackDomainPublication').hidden && !document.querySelector('#rollbackDomainPublication').disabled`), 'domain revoke cancellation restores focus and exact rollback eligibility');
+    delayRollbackActivationResponse = true;
+    const domainDeletesBeforeRollback = requests.filter((request) => request.method === 'DELETE' && request.path === '/api/workspaces/41/domains/claim_browser').length;
+    const domainClaimReadsBeforeRollback = requests.filter((request) => request.method === 'GET' && request.path === '/api/workspaces/41/domains').length;
     await evaluate(client, `document.querySelector('#rollbackDomainPublication').click()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#domainPublicationConfirm').hidden && document.activeElement?.id === 'confirmDomainPublicationAction'`), 'rollback reconfirmation after exact recovery');
     await evaluate(client, `document.querySelector('#confirmDomainPublicationAction').click()`);
+    await waitFor(() => requests.filter((request) => request.method === 'POST' && request.path.endsWith('/domains/claim_browser/publications/publication_browser/activate')).length > rollbackMutationsBeforeRevokeOverlap, 'rollback publication request in flight');
+    assert.deepEqual(await evaluate(client, `({ reload: document.querySelector('#retryDomainClaims').disabled, select: document.querySelector('#domainClaimSelect').disabled, claim: document.querySelector('#claimDomainButton').disabled, verify: document.querySelector('#verifyDomainButton').disabled, revoke: document.querySelector('#revokeDomainButton').disabled })`), { reload: true, select: true, claim: true, verify: true, revoke: true }, 'domain reload, selection, and mutation controls remain natively disabled during rollback publication');
+    await evaluate(client, `(() => { document.querySelector('#retryDomainClaims').click(); document.querySelector('#verifyDomainButton').click(); document.querySelector('#revokeDomainButton').click(); document.querySelector('#confirmDomainRevoke').click(); })()`);
+    assert.equal(requests.filter((request) => request.method === 'GET' && request.path === '/api/workspaces/41/domains').length, domainClaimReadsBeforeRollback, 'rollback publication in flight prevents domain claim reload requests');
+    assert.equal(requests.filter((request) => request.method === 'DELETE' && request.path === '/api/workspaces/41/domains/claim_browser').length, domainDeletesBeforeRollback, 'rollback publication in flight prevents domain revoke DELETE');
     await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationRecordTitle').textContent.includes('publication_rollback') && document.querySelector('#deployStateText').textContent === 'Serving'`), 'rollback creates and confirms a source-linked immutable activation');
+    await waitFor(() => evaluate(client, `document.querySelector('#domainClaimSelect').value === 'claim_browser' && !document.querySelector('#retryDomainClaims').disabled && !document.querySelector('#domainClaimSelect').disabled && !document.querySelector('#revokeDomainButton').disabled && document.querySelector('#verifyDomainButton').disabled`), 'authoritative rollback completion restores exact verified-claim controls without enabling verify');
     assert.equal(domainPublications[0].sourcePublicationId, 'publication_browser');
     assert.ok(requests.some((request) => request.method === 'POST' && request.path.endsWith('/domains/claim_browser/publications/publication_browser/activate')), 'rollback uses the exact prior-publication activation route');
     assert.ok(requests.some((request) => request.method === 'GET' && request.path.endsWith('/domains/claim_browser/publications') && request.search === '?publicationId=publication_rollback'), 'rollback success requires exact bounded publication readback');
@@ -2310,15 +2680,13 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
 
     Object.assign(activeTrackResponse.track, { status: 'PREVIEW_READY', version: 6, claimId: '', publication: undefined, updatedAt: '2026-08-18T07:00:00Z' });
     await evaluate(client, `document.querySelector('#openNewestBuildButton').click()`);
-    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Verified staging ready' && !document.querySelector('#deployButton').disabled`), 'scope-race publication precondition');
+    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Verified staging ready' && !document.querySelector('#deployButton').disabled`), 'scope-race verified preview precondition');
     delayTrackResponse = true;
     delayScopeClaimResponse = true;
     delayInvitationResponse = true;
     delayAcceptanceResponse = true;
-    delayScopePublicationResponse = true;
     const delayedCreateBoundaryStart = requests.length;
     await evaluate(client, `(() => {
-      document.querySelector('#deployButton').click();
       document.querySelector('#openNewestBuildButton').click();
       const origin = document.querySelector('#domainOrigin');
       origin.value = 'https://scope-race.community.example';
@@ -2332,8 +2700,8 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     await waitFor(() => requests.slice(delayedCreateBoundaryStart).some((item) => item.path === '/api/conductor/tracks/track_browser')
       && requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'POST' && item.path === '/api/workspaces/41/domains')
       && requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'POST' && item.path === '/api/shura/v1/invitations')
-      && requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'POST' && item.path === '/api/shura/v1/invitations/accept')
-      && requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'POST' && item.path === '/api/conductor/tracks/track_browser/publication'), 'delayed track, domain, invitation, acceptance, and publication operations before workspace creation');
+      && requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'POST' && item.path === '/api/shura/v1/invitations/accept'), 'delayed track, domain, invitation, and acceptance operations before workspace creation');
+    assert.equal(requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'POST' && item.path === '/api/conductor/tracks/track_browser/publication'), false, 'workspace-create boundary does not overlap mutually exclusive publication and domain mutation lanes');
     delayPeopleResponse = true;
     delayHistoryResponse = true;
     delayDomainResponse = true;
@@ -2419,23 +2787,52 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.ok(requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'GET' && item.path === '/api/conductor/tracks' && item.search.includes('workspaceId=41')), 'the prior workspace history request was in flight');
     assert.ok(requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'GET' && item.path === '/api/workspaces/41/domains'), 'the prior workspace domain request was in flight');
     await evaluate(client, `(() => {
+      const track = document.querySelector('#openNewestBuildButton'); track.textContent = 'Workspace B track operation'; track.setAttribute('aria-busy', 'true'); track.disabled = true;
       const claim = document.querySelector('#claimDomainButton'); claim.textContent = 'Workspace B claim operation'; claim.setAttribute('aria-busy', 'true'); claim.disabled = true;
       const invite = document.querySelector('#createInviteButton'); invite.textContent = 'Workspace B invite operation'; invite.setAttribute('aria-busy', 'true'); invite.disabled = true;
       const accept = document.querySelector('#acceptInviteButton'); accept.textContent = 'Workspace B acceptance operation'; accept.setAttribute('aria-busy', 'true'); accept.disabled = true;
-      const deploy = document.querySelector('#deployButton'); deploy.textContent = 'Workspace B publication operation'; deploy.setAttribute('aria-busy', 'true'); deploy.disabled = true;
     })()`);
     await wait(500);
-    assert.deepEqual(await evaluate(client, `({ workspace: document.querySelector('#workspaceSelect').value, claim: document.querySelector('#claimDomainButton').textContent, claimBusy: document.querySelector('#claimDomainButton').getAttribute('aria-busy'), invite: document.querySelector('#createInviteButton').textContent, inviteBusy: document.querySelector('#createInviteButton').getAttribute('aria-busy'), accept: document.querySelector('#acceptInviteButton').textContent, acceptBusy: document.querySelector('#acceptInviteButton').getAttribute('aria-busy'), acceptToken: document.querySelector('#acceptInviteToken').value, acceptResult: document.querySelector('#acceptInviteResult').textContent, inviteRecords: document.querySelectorAll('#invitationList li').length, deploy: document.querySelector('#deployButton').textContent, deployBusy: document.querySelector('#deployButton').getAttribute('aria-busy') })`), { workspace: '43', claim: 'Workspace B claim operation', claimBusy: 'true', invite: 'Workspace B invite operation', inviteBusy: 'true', accept: 'Workspace B acceptance operation', acceptBusy: 'true', acceptToken: '', acceptResult: '', inviteRecords: 0, deploy: 'Workspace B publication operation', deployBusy: 'true' }, 'late workspace A mutation finalizers cannot select another workspace, append invitations, or relabel/reset workspace B controls');
+    assert.deepEqual(await evaluate(client, `({ workspace: document.querySelector('#workspaceSelect').value, track: document.querySelector('#openNewestBuildButton').textContent, trackBusy: document.querySelector('#openNewestBuildButton').getAttribute('aria-busy'), claim: document.querySelector('#claimDomainButton').textContent, claimBusy: document.querySelector('#claimDomainButton').getAttribute('aria-busy'), invite: document.querySelector('#createInviteButton').textContent, inviteBusy: document.querySelector('#createInviteButton').getAttribute('aria-busy'), accept: document.querySelector('#acceptInviteButton').textContent, acceptBusy: document.querySelector('#acceptInviteButton').getAttribute('aria-busy'), acceptToken: document.querySelector('#acceptInviteToken').value, acceptResult: document.querySelector('#acceptInviteResult').textContent, inviteRecords: document.querySelectorAll('#invitationList li').length })`), { workspace: '43', track: 'Workspace B track operation', trackBusy: 'true', claim: 'Workspace B claim operation', claimBusy: 'true', invite: 'Workspace B invite operation', inviteBusy: 'true', accept: 'Workspace B acceptance operation', acceptBusy: 'true', acceptToken: '', acceptResult: '', inviteRecords: 0 }, 'late workspace A track, claim, invitation, and acceptance finalizers cannot select another workspace, append invitations, or relabel/reset workspace B controls');
 
     await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '41'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '41'
       && document.querySelector('#previewStatus').textContent === 'Verified staging ready'
-      && document.querySelector('#starterRecoveryState').textContent.includes('durable history confirmed')`), 'return to signed workspace derives progress only from authorized verified history');
+      && document.querySelector('#starterRecoveryState').textContent.includes('durable history confirmed')
+      && document.querySelector('#domainClaimSelect').value === 'claim_browser'
+      && !document.querySelector('#deployButton').disabled`), 'return to signed workspace restores one genuinely eligible exact-claim publication context');
+
+    const exactPublicationFixtureTrack = structuredClone(activeTrackResponse.track);
+    const exactPublicationFixtureEvents = structuredClone(trackEvents.get('track_browser') || []);
+    delayScopePublicationResponse = true;
+    const delayedPublicationScopeBoundaryStart = requests.length;
+    await evaluate(client, `document.querySelector('#deployButton').click()`);
+    await waitFor(() => requests.slice(delayedPublicationScopeBoundaryStart).some((item) => item.method === 'POST'
+      && item.path === '/api/conductor/tracks/track_browser/publication' && item.body?.claimId === 'claim_browser'), 'delayed exact workspace-41 publication request in flight');
+    await waitFor(() => typeof releaseScopePublicationResponse === 'function', 'workspace-41 publication response held before release');
+    assert.deepEqual(await evaluate(client, `({ claim: document.querySelector('#domainClaimSelect').value, selectDisabled: document.querySelector('#domainClaimSelect').disabled, reloadDisabled: document.querySelector('#retryDomainClaims').disabled, publishBusy: document.querySelector('#deployButton').getAttribute('aria-busy') })`), { claim: 'claim_browser', selectDisabled: true, reloadDisabled: true, publishBusy: 'true' }, 'scope-race publication begins from the exact verified claim with native domain exclusion');
 
     await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '42'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '42'
       && document.querySelector('#workspaceRole').textContent === 'Architect'
-      && document.querySelector('#buildHistoryState').textContent.includes('No workspace build records yet')`), 'local-draft source workspace');
+      && document.querySelector('#buildHistoryState').textContent.includes('No workspace build records yet')
+      && document.querySelector('#domainClaimsState').textContent.includes('No domain claims yet')
+      && !document.querySelector('#retryDomainClaims').disabled`), 'workspace 42 resolves while workspace-41 publication remains delayed');
+    await evaluate(client, `(() => {
+      const deploy = document.querySelector('#deployButton'); deploy.textContent = 'Workspace 42 publication operation'; deploy.setAttribute('aria-busy', 'true'); deploy.disabled = true;
+      document.querySelector('#deployStateText').textContent = 'Workspace 42 publication state';
+      const status = document.querySelector('#domainStatus'); status.textContent = 'Workspace 42 publication identity'; status.hidden = false;
+    })()`);
+    releaseScopePublicationResponse();
+    await waitFor(() => releaseScopePublicationResponse === null, 'held workspace-41 publication response released after workspace-42 marker');
+    await wait(240);
+    const delayedPublicationScopeRequests = requests.slice(delayedPublicationScopeBoundaryStart);
+    assert.equal(delayedPublicationScopeRequests.some((item) => item.method === 'POST' && item.path === '/api/conductor/tracks/track_browser/activate'), false, 'stale workspace-41 publication response cannot advance activation in workspace 42');
+    assert.equal(delayedPublicationScopeRequests.some((item) => item.method === 'GET' && item.path.includes('/domains/claim_browser/publications')), false, 'stale workspace-41 publication response cannot launch authoritative readback into workspace 42');
+    assert.deepEqual(await evaluate(client, `({ workspace: document.querySelector('#workspaceSelect').value, role: document.querySelector('#workspaceRole').textContent, domainSelection: document.querySelector('#domainClaimSelect').value, deploy: document.querySelector('#deployButton').textContent, deployBusy: document.querySelector('#deployButton').getAttribute('aria-busy'), deployDisabled: document.querySelector('#deployButton').disabled, deployState: document.querySelector('#deployStateText').textContent, domainStatus: document.querySelector('#domainStatus').textContent })`), { workspace: '42', role: 'Architect', domainSelection: '', deploy: 'Workspace 42 publication operation', deployBusy: 'true', deployDisabled: true, deployState: 'Workspace 42 publication state', domainStatus: 'Workspace 42 publication identity' }, 'late workspace-41 publication finalizer cannot overwrite scope or clear workspace-42 publication control identity');
+    Object.assign(activeTrackResponse.track, exactPublicationFixtureTrack);
+    trackEvents.set('track_browser', exactPublicationFixtureEvents);
+
     await evaluate(client, `(() => {
       const template = document.querySelector('#templateSelect');
       template.value = 'community-iftar';
@@ -2503,6 +2900,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '41'
       && document.querySelector('#workspaceRole').textContent === 'Architect'
       && document.querySelector('#previewStatus').textContent === 'Verified staging ready'`), 'deleted selection falls back through the same fail-closed scope boundary');
+    await waitFor(() => evaluate(client, `document.querySelector('#starterPathStatus').textContent === ''`), 'authorized nonempty history recovery settles the fallback starter summary');
     assert.deepEqual(await evaluate(client, `({ builderAlert: document.querySelector('#builderAlert').textContent, announcement: document.querySelector('#workspaceAnnouncer').textContent, starterSummary: document.querySelector('#starterPathStatus').textContent, inviteToken: document.querySelector('#inviteTokenOutput').value })`), { builderAlert: '', announcement: '', starterSummary: '', inviteToken: '' }, 'fallback selection clears deleted-workspace retry, announcement, starter, and invitation state before authorized history recovery');
 
     delayWorkspaceCreateResponse = true;
@@ -2535,6 +2933,320 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     await wait(380);
     assert.deepEqual(await evaluate(client, `({ workspace: document.querySelector('#workspaceSelect').value, profile: document.querySelector('#profileName').textContent, workspaceName: document.querySelector('#workspaceName').value, createAlert: document.querySelector('#createWorkspaceAlert').textContent, announcement: document.querySelector('#workspaceAnnouncer').textContent })`), { workspace: '41', profile: 'QA Architect', workspaceName: '', createAlert: '', announcement: '' }, 'a delayed create response cannot select a workspace or write UI state into a new principal session');
     assert.equal(requests.slice(postLogoutRequestStart).filter((item) => item.method === 'GET' && item.path === '/api/workspaces').length, 1, 'the stale create response cannot trigger a second preferred-workspace reload in the new session');
+
+    await evaluate(client, `document.querySelector('#peopleTab').click()`);
+    await waitFor(() => evaluate(client, `document.querySelectorAll('#peopleList li').length === 4 && document.querySelectorAll('[data-remove-member]').length === 2`), 'Architect-only removable member controls');
+    assert.deepEqual(await evaluate(client, `[...document.querySelectorAll('[data-remove-member]')].map((button) => button.dataset.removeMember)`), ['9', '10'], 'owner and self rows never expose removal controls');
+    assert.deepEqual(await evaluate(client, `[...document.querySelectorAll('#peopleList li')].filter((row) => row.querySelector('strong').textContent === 'Removable Viewer').map((row) => row.querySelector('span').textContent)`), [
+      'User ID 8 · Architect · workspace role owner · QA Community (workspace ID 41)',
+      'User ID 9 · Viewer · workspace role viewer · QA Community (workspace ID 41)',
+    ], 'duplicate usernames remain distinguishable by visible stable user and workspace identity');
+    assert.equal(await evaluate(client, `fetch('/api/workspaces/41/people', { headers: { Authorization: 'Bearer ${removedMemberToken}' } }).then((response) => response.status)`), 200, 'member token is authorized for People before removal');
+    assert.equal(await evaluate(client, `fetch('/api/conductor/tracks?workspaceId=41', { headers: { Authorization: 'Bearer ${removedMemberToken}' } }).then((response) => response.status)`), 200, 'member token is authorized for workspace track scope before removal');
+    const memberDeleteStart = requests.length;
+    await evaluate(client, `document.querySelector('[data-remove-member="9"]').click()`);
+    assert.equal(await evaluate(client, `document.activeElement?.id`), 'confirmMemberRemoval', 'member confirmation receives focus');
+    assert.deepEqual(await evaluate(client, `(() => { const dialog = document.querySelector('#confirmMemberRemoval').closest('[role="alertdialog"]'); const title = document.getElementById(dialog.getAttribute('aria-labelledby')); const copy = document.getElementById(dialog.getAttribute('aria-describedby')); return { title: title?.textContent, copy: copy?.textContent }; })()`), {
+      title: 'Remove Removable Viewer (user ID 9)?',
+      copy: 'Remove this exact member from QA Community (workspace ID 41)? Their existing sign-in token will no longer authorize that workspace. This does not delete their account or retained audit history.',
+    }, 'member alertdialog binds unique visible target and consequence copy');
+    await evaluate(client, `document.querySelector('#cancelMemberRemoval').click()`);
+    assert.equal(requests.slice(memberDeleteStart).filter((item) => item.method === 'DELETE' && item.path === '/api/workspaces/41/users/9').length, 0, 'member Cancel sends no request');
+    assert.equal(await evaluate(client, `document.activeElement?.dataset.removeMember`), '9', 'member Cancel returns focus to the exact trigger');
+    await evaluate(client, `new Promise((resolve) => requestAnimationFrame(() => { document.querySelector('#workspaceAnnouncer').textContent = ''; requestAnimationFrame(resolve); }))`);
+    delayMemberDeleteResponse = true;
+    await evaluate(client, `(() => { document.querySelector('[data-remove-member="9"]').click(); const confirm = document.querySelector('#confirmMemberRemoval'); confirm.click(); confirm.click(); })()`);
+    await waitFor(() => requests.slice(memberDeleteStart).some((item) => item.method === 'DELETE' && item.path === '/api/workspaces/41/users/9'), 'member DELETE in flight');
+    assert.equal(await evaluate(client, `document.querySelector('#cancelMemberRemoval').disabled`), true, 'member Cancel disables after request starts');
+    await evaluate(client, `document.querySelector('#cancelMemberRemoval').click()`);
+    assert.equal(await evaluate(client, `document.querySelector('#workspaceAnnouncer').textContent`), '', 'in-flight member Cancel cannot announce that no request was sent');
+    await waitFor(() => evaluate(client, `document.querySelector('#peopleState').textContent.includes('authoritative People readback') && !document.querySelector('[data-remove-member="9"]') && document.querySelector('#peopleList').textContent.includes('User ID 8')`), 'member removal authoritative People readback');
+    assert.equal(requests.slice(memberDeleteStart).filter((item) => item.method === 'DELETE' && item.path === '/api/workspaces/41/users/9').length, 1, 'member confirmation accepts one mutation despite double activation');
+    assert.equal(await evaluate(client, `document.activeElement?.id`), 'membersTitle', 'confirmed member removal focuses the surviving People heading');
+    assert.equal(await evaluate(client, `fetch('/api/workspaces/41/people', { headers: { Authorization: 'Bearer ${removedMemberToken}' } }).then((response) => response.status)`), 403, 'the removed member token immediately loses workspace scope');
+    assert.equal(await evaluate(client, `fetch('/api/conductor/tracks?workspaceId=41', { headers: { Authorization: 'Bearer ${removedMemberToken}' } }).then((response) => response.status)`), 403, 'the removed member token also loses workspace-scoped track authority');
+
+    memberDeleteAmbiguousNext = true;
+    const ambiguousMemberStart = requests.length;
+    await evaluate(client, `(() => { document.querySelector('[data-remove-member="10"]').click(); document.querySelector('#confirmMemberRemoval').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#peopleState').textContent.includes('outcome is unknown') && document.activeElement?.id === 'retryPeople'`), 'ambiguous member response fails closed on authoritative recovery');
+    assert.equal(requests.slice(ambiguousMemberStart).filter((item) => item.method === 'DELETE' && item.path === '/api/workspaces/41/users/10').length, 1, 'ambiguous member response still records one issued mutation');
+    await evaluate(client, `document.querySelector('#retryPeople').click()`);
+    await waitFor(() => evaluate(client, `document.querySelectorAll('#peopleList li').length === 2 && document.querySelector('#peopleState').textContent.includes('2 real workspace members')`), 'People reload resolves the ambiguous committed removal authoritatively');
+
+    await evaluate(client, `(() => { document.querySelector('#invitee').value = 'revoke@example.test'; document.querySelector('#inviteRole').value = 'Viewer'; document.querySelector('#createInviteButton').click(); })()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#inviteGrant').hidden && Boolean(document.querySelector('[data-revoke-invitation]'))`), 'current-session pending invitation revoke control');
+    const invitationRevokeStart = requests.length;
+    await evaluate(client, `document.querySelector('[data-revoke-invitation]').click()`);
+    assert.equal(await evaluate(client, `document.activeElement?.id`), 'confirmInvitationRevoke', 'invitation confirmation receives focus');
+    const invitationDialog = await evaluate(client, `(() => { const dialog = document.querySelector('#confirmInvitationRevoke').closest('[role="alertdialog"]'); const labelledby = dialog.getAttribute('aria-labelledby'); const describedby = dialog.getAttribute('aria-describedby'); return { labelledby, describedby, title: document.getElementById(labelledby)?.textContent, copy: document.getElementById(describedby)?.textContent }; })()`);
+    assert.match(invitationDialog.labelledby, /^invitation-revoke-title-/u);
+    assert.match(invitationDialog.describedby, /^invitation-revoke-copy-/u);
+    assert.match(`${invitationDialog.title} ${invitationDialog.copy}`, /invitation_scope_race_.*workspace ID 41.*version 1.*secret will be cleared/isu, 'invitation alertdialog binds unique visible target and consequence copy');
+    await evaluate(client, `document.querySelector('#cancelInvitationRevoke').click()`);
+    assert.equal(requests.slice(invitationRevokeStart).filter((item) => /\/revoke$/u.test(item.path)).length, 0, 'invitation Cancel sends no request');
+    assert.equal(await evaluate(client, `document.activeElement?.dataset.revokeInvitation?.startsWith('invitation_scope_race_')`), true, 'invitation Cancel returns focus to its exact current-session trigger');
+    await evaluate(client, `new Promise((resolve) => requestAnimationFrame(() => { document.querySelector('#workspaceAnnouncer').textContent = ''; requestAnimationFrame(resolve); }))`);
+    delayInvitationRevokeResponse = true;
+    await evaluate(client, `(() => { document.querySelector('[data-revoke-invitation]').click(); const confirm = document.querySelector('#confirmInvitationRevoke'); confirm.click(); confirm.click(); })()`);
+    await waitFor(() => requests.slice(invitationRevokeStart).some((item) => /\/revoke$/u.test(item.path)), 'invitation revoke in flight');
+    assert.equal(await evaluate(client, `document.querySelector('#cancelInvitationRevoke').disabled`), true, 'invitation Cancel disables after request starts');
+    await evaluate(client, `(() => { document.querySelector('#cancelInvitationRevoke').click(); document.querySelector('#invitee').value = 'blocked-create@example.test'; document.querySelector('#createInviteButton').click(); })()`);
+    assert.equal(await evaluate(client, `document.querySelector('#workspaceAnnouncer').textContent`), '', 'in-flight invitation Cancel cannot announce that no request was sent');
+    assert.equal(requests.slice(invitationRevokeStart).filter((item) => item.method === 'POST' && item.path === '/api/shura/v1/invitations').length, 0, 'invitation create is suppressed while revoke is in flight');
+    await waitFor(() => evaluate(client, `document.querySelector('#inviteResult').textContent.includes('expected version') && document.querySelector('#inviteGrant').hidden && document.querySelector('#inviteTokenOutput').value === ''`), 'invitation REVOKED validation and secret clearing');
+    assert.equal(requests.slice(invitationRevokeStart).filter((item) => /\/revoke$/u.test(item.path)).length, 1, 'invitation revoke double activation emits one versioned request');
+    assert.deepEqual(requests.slice(invitationRevokeStart).find((item) => /\/revoke$/u.test(item.path)).body, { expected_version: 1 }, 'invitation revoke sends the exact current-session expected_version');
+
+    await evaluate(client, `(() => { document.querySelector('#invitee').value = 'race@example.test'; document.querySelector('#createInviteButton').click(); })()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#inviteGrant').hidden && [...document.querySelectorAll('[data-revoke-invitation]')].length === 1`), 'second pending invitation for accept-revoke race');
+    invitationAcceptRaceNext = true;
+    await evaluate(client, `(() => { document.querySelector('[data-revoke-invitation]').click(); document.querySelector('#confirmInvitationRevoke').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#inviteResult').textContent.includes('cannot claim its current status') && document.querySelector('#inviteGrant').hidden && document.querySelector('#invitationList').textContent.includes('STATUS UNKNOWN')`), 'invite accept-revoke conflict remains honest without durable readback');
+    assert.equal(await evaluate(client, `document.activeElement?.id`), 'inviteTitle', 'invitation conflict restores focus to the surviving invitation heading');
+
+    await evaluate(client, `(() => { document.querySelector('#invitee').value = 'retry@example.test'; document.querySelector('#createInviteButton').click(); })()`);
+    await waitFor(() => evaluate(client, `[...document.querySelectorAll('[data-revoke-invitation]')].length === 1`), 'pending invitation for non-conflict failure');
+    const failedInvitationID = await evaluate(client, `document.querySelector('[data-revoke-invitation]').dataset.revokeInvitation`);
+    invitationRevokeFailNext = true;
+    await evaluate(client, `(() => { document.querySelector('[data-revoke-invitation]').click(); document.querySelector('#confirmInvitationRevoke').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#inviteResult').textContent.includes('not confirmed revoked')`), 'non-conflict invitation revoke failure');
+    assert.equal(await evaluate(client, `document.activeElement?.dataset.revokeInvitation`), failedInvitationID, 'non-conflict invitation failure restores focus to the surviving revoke control');
+
+    delayInvitationResponse = true;
+    const delayedInviteCreateStart = requests.length;
+    await evaluate(client, `(() => { document.querySelector('#invitee').value = 'delayed-create@example.test'; document.querySelector('#createInviteButton').click(); })()`);
+    await waitFor(() => requests.slice(delayedInviteCreateStart).some((item) => item.method === 'POST' && item.path === '/api/shura/v1/invitations'), 'invitation create in flight');
+    await evaluate(client, `document.querySelector('[data-revoke-invitation]').click()`);
+    assert.equal(requests.slice(delayedInviteCreateStart).filter((item) => /\/revoke$/u.test(item.path)).length, 0, 'invitation revoke is suppressed while create is in flight');
+    await waitFor(() => evaluate(client, `document.querySelector('#inviteResult').textContent.includes('Invitation created') && !document.querySelector('#createInviteButton').disabled`), 'delayed invitation create response remains authoritative');
+
+    const rejectedMutationStatuses = await evaluate(client, `Promise.all([
+      fetch('/api/shura/v1/invitations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workspace_id: 41, invitee: 'blocked@example.test', role: 'Viewer' }) }).then((response) => response.status),
+      fetch('/api/shura/v1/invitations/${failedInvitationID}/revoke', { method: 'POST', headers: { Authorization: 'Bearer viewer-token', 'Content-Type': 'application/json' }, body: JSON.stringify({ expected_version: 1 }) }).then((response) => response.status),
+      fetch('/api/workspaces/41/domains/claim_browser', { headers: { Authorization: 'Bearer maintainer-token' } }).then((response) => response.status),
+      fetch('/api/workspaces/41/domains/claim_browser', { method: 'DELETE', headers: { Authorization: 'Bearer wrong-principal-token' } }).then((response) => response.status),
+      fetch('/api/users/7', { method: 'PUT', headers: { Authorization: 'Bearer viewer-token', 'Content-Type': 'application/json' }, body: JSON.stringify({ password: 'blocked-password-2026' }) }).then((response) => response.status),
+      fetch('/api/users/7', { method: 'DELETE' }).then((response) => response.status),
+    ])`);
+    assert.ok(rejectedMutationStatuses.every((status) => status === 401 || status === 403), `absent, Viewer, Maintainer, and wrong-principal mutation bearers must be rejected: ${rejectedMutationStatuses}`);
+
+    await evaluate(client, `document.querySelector('#buildTab').click()`);
+    await evaluate(client, `(() => { const select = document.querySelector('#domainClaimSelect'); select.value = 'claim_pending'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainClaimSelect').value === 'claim_pending' && !document.querySelector('#verifyDomainButton').disabled`), 'pending claim selected for domain overlap guard');
+    delayVerifyResponse = true;
+    const verifyOverlapStart = requests.length;
+    await evaluate(client, `(() => { document.querySelector('#verifyDomainButton').click(); document.querySelector('#revokeDomainButton').click(); })()`);
+    await waitFor(() => requests.slice(verifyOverlapStart).some((item) => item.method === 'POST' && item.path.endsWith('/claim_pending/verify')), 'domain verify in flight');
+    assert.equal(requests.slice(verifyOverlapStart).filter((item) => item.method === 'DELETE' && item.path.includes('claim_pending')).length, 0, 'domain revoke cannot open or issue while verify is in flight');
+    await waitFor(() => evaluate(client, `document.querySelector('#domainClaimsState').textContent.includes('Verified until')`), 'delayed verify remains authoritative');
+
+    domainRevokeFailNext = true;
+    delayDomainRevokeResponse = true;
+    const ambiguousDomainStart = requests.length;
+    await evaluate(client, `(() => { document.querySelector('#revokeDomainButton').click(); document.querySelector('#confirmDomainRevoke').click(); })()`);
+    await waitFor(() => requests.slice(ambiguousDomainStart).some((item) => item.method === 'DELETE' && item.path.includes('claim_pending')), 'domain revoke in flight before ambiguous response');
+    await evaluate(client, `(() => { document.querySelector('#claimDomainButton').click(); document.querySelector('#verifyDomainButton').click(); document.querySelector('#cancelDomainRevoke').click(); })()`);
+    assert.equal(requests.slice(ambiguousDomainStart).filter((item) => item.method === 'POST' && (item.path === '/api/workspaces/41/domains' || item.path.endsWith('/verify'))).length, 0, 'claim and verify cannot overlap an in-flight revoke');
+    await waitFor(() => evaluate(client, `document.querySelector('#domainStatus').textContent.includes('outcome is unknown') && document.querySelector('#domainProof').hidden && document.querySelector('#domainClaimSelect').value === '' && document.querySelector('#domainClaimSelect').disabled && document.querySelector('#verifyDomainButton').disabled && document.querySelector('#deployButton').disabled && document.querySelector('#replaceDomainPublication').hidden && document.querySelector('#rollbackDomainPublication').hidden`), 'ambiguous domain DELETE fails closed across claim and publication truth');
+    await evaluate(client, `document.querySelector('#retryDomainClaims').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainClaimSelect').value === 'claim_browser' && document.querySelector('#domainClaimsState').textContent.includes('Verified until')`), 'exact domain and history reload recovers from ambiguous revoke');
+
+    await evaluate(client, `(() => { const select = document.querySelector('#domainClaimSelect'); select.value = 'claim_pending_revoke'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainClaimSelect').value === 'claim_pending_revoke' && !document.querySelector('#revokeDomainButton').disabled && document.querySelector('#domainPublicationState').textContent.includes('No publication activation records')`), 'pending domain selected for revocation');
+    assert.ok(await evaluate(client, `document.querySelector('#revokeDomainButton').getBoundingClientRect().height >= 44`), 'pending-domain Revoke domain target is at least 44 CSS px');
+    const pendingDomainDeleteStart = requests.length;
+    await evaluate(client, `document.querySelector('#revokeDomainButton').click()`);
+    assert.match(await evaluate(client, `document.querySelector('#domainRevokeConfirmCopy').textContent`), /pending claim.*not presented as currently serving/iu, 'pending confirmation does not imply public serving');
+    await evaluate(client, `document.querySelector('#cancelDomainRevoke').click()`);
+    assert.equal(requests.slice(pendingDomainDeleteStart).filter((item) => item.method === 'DELETE' && item.path.includes('claim_pending_revoke')).length, 0, 'pending-domain Cancel sends no request');
+    assert.equal(await evaluate(client, `document.activeElement?.id`), 'revokeDomainButton', 'domain Cancel returns focus to Revoke domain');
+    await evaluate(client, `(() => { document.querySelector('#revokeDomainButton').click(); const confirm = document.querySelector('#confirmDomainRevoke'); confirm.click(); confirm.click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainStatus').textContent.includes('exact claim and publication-history readback') && document.querySelector('#domainClaimSelect').value === 'claim_pending_revoke' && document.querySelector('#domainClaimsState').textContent.includes('not presented as publicly serving')`), 'pending domain exact revoke readback without serving overclaim');
+    assert.deepEqual(requests.slice(pendingDomainDeleteStart).filter((item) => item.path.includes('claim_pending_revoke')).map((item) => item.method), ['DELETE', 'GET', 'GET'], 'domain confirmation issues exactly DELETE then claim GET and history GET');
+
+    const retainedRollbackPublication = domainPublications.find((publication) => publication.id === 'publication_rollback');
+    assert.ok(retainedRollbackPublication, 'verified revoke journey starts from the retained rollback activation record');
+    publicationServerTime = '2026-08-18T10:00:00Z';
+    domainPublications = domainPublications.map((publication) => publication.id === retainedRollbackPublication.id
+      ? { ...publication, active: true, servingState: 'serving', deactivatedAt: null, authorizationExpiresAt: '2099-08-18T10:00:00Z', manifestDigest: publication.manifestDigest || 'd'.repeat(64) }
+      : (publication.active ? { ...publication, active: false, servingState: 'inactive', deactivatedAt: '2026-08-18T10:00:00Z' } : publication));
+    const verifiedClaimFixture = domainClaims.find((claim) => claim.id === 'claim_browser');
+    assert.ok(verifiedClaimFixture, 'verified revoke journey retains the exact claim_browser fixture');
+    Object.assign(verifiedClaimFixture, { status: 'verified', verifiedAt: '2026-08-18T00:00:00Z', verificationExpiresAt: '2099-08-18T10:00:00Z', updatedAt: '2026-08-18T10:00:00Z' });
+    delete verifiedClaimFixture.revocationReason;
+    delete verifiedClaimFixture.revokedAt;
+    assert.deepEqual(domainPublications.filter((publication) => publication.active).map((publication) => ({ id: publication.id, claimId: publication.claimId, servingState: publication.servingState })), [
+      { id: 'publication_rollback', claimId: 'claim_browser', servingState: 'serving' },
+    ], 'verified revoke boundary has one exact active serving claim_browser publication');
+
+    await evaluate(client, `(() => { const select = document.querySelector('#domainClaimSelect'); select.value = 'claim_browser'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainClaimSelect').value === 'claim_browser'
+      && !document.querySelector('#retryDomainClaims').disabled
+      && document.querySelector('#domainPublicationList').textContent.includes('Serving — activation record retained · publication_rollback')`), 'verified serving fixture selected before authoritative claims reload');
+    const verifiedRevokeReloadStart = requests.length;
+    await evaluate(client, `document.querySelector('#retryDomainClaims').click()`);
+    await waitFor(() => requests.slice(verifiedRevokeReloadStart).some((item) => item.method === 'GET' && item.path === '/api/workspaces/41/domains')
+      && requests.slice(verifiedRevokeReloadStart).some((item) => item.method === 'GET' && item.path.endsWith('/domains/claim_browser/publications') && item.search === '?limit=20'), 'verified revoke precondition performs authoritative claim and history readback');
+    await waitFor(() => evaluate(client, `document.querySelector('#domainClaimSelect').value === 'claim_browser'
+      && !document.querySelector('#retryDomainClaims').disabled
+      && !document.querySelector('#revokeDomainButton').disabled
+      && document.querySelector('#domainPublicationList').textContent.includes('Serving — activation record retained · publication_rollback')`), 'authoritative reload restores exact serving claim and history before revoke');
+    await evaluate(client, `document.querySelector('[data-publication-id="publication_rollback"]').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationRecordTitle').textContent.includes('Serving — activation record retained · publication_rollback')
+      && document.querySelector('#domainPublicationRecordDigest').textContent.includes('Exact stored manifest SHA-256')`), 'exact active serving publication is authoritatively inspected before Host probe');
+    const publicHostBeforeRevoke = await requestWithLiteralHost(`${origin}/public-host`, 'app.community.example');
+    assert.equal(publicHostBeforeRevoke.status, 200, 'mocked verified public Host serves before claim revocation');
+    const trustedPreviewBeforeDomainRevoke = await evaluate(client, `document.querySelector('#previewFrame').getAttribute('srcdoc')`);
+    const verifiedDomainDeleteStart = requests.length;
+    await evaluate(client, `document.querySelector('#revokeDomainButton').click()`);
+    assert.match(await evaluate(client, `document.querySelector('#domainRevokeConfirmCopy').textContent`), /verified claim.*Public serving and publication authority.*ends immediately/iu, 'verified confirmation explains public Host authority ends while history remains');
+    await evaluate(client, `(() => { const confirm = document.querySelector('#confirmDomainRevoke'); confirm.click(); confirm.click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainStatus').textContent.includes('exact claim and publication-history readback') && document.querySelector('#domainClaimsState').textContent.includes('Public serving and publication authority ended')`), 'verified domain authoritative revoke readback');
+    assert.deepEqual(requests.slice(verifiedDomainDeleteStart).filter((item) => item.path.includes('claim_browser')).map((item) => item.method), ['DELETE', 'GET', 'GET'], 'verified domain uses one DELETE followed by exact claim/history readback');
+    const revokedDomainState = await evaluate(client, `({ preview: document.querySelector('#previewFrame').getAttribute('srcdoc'), previewStatus: document.querySelector('#previewStatus').textContent, proofHidden: document.querySelector('#domainProof').hidden, verifyDisabled: document.querySelector('#verifyDomainButton').disabled, publishDisabled: document.querySelector('#deployButton').disabled, replaceHidden: document.querySelector('#replaceDomainPublication').hidden, rollbackHidden: document.querySelector('#rollbackDomainPublication').hidden, historyRows: document.querySelectorAll('#domainPublicationList li').length, historyState: document.querySelector('#domainPublicationState').textContent })`);
+    assert.deepEqual({ ...revokedDomainState, historyRows: undefined, historyState: undefined }, { preview: trustedPreviewBeforeDomainRevoke, previewStatus: 'Verified staging ready', proofHidden: true, verifyDisabled: true, publishDisabled: true, replaceHidden: true, rollbackHidden: true, historyRows: undefined, historyState: undefined }, 'domain revoke retains the trusted staging iframe while disabling proof, verify, publish, replacement, and rollback');
+    assert.ok(revokedDomainState.historyRows >= 1, 'immutable activation history remains visible after verified claim revoke');
+    assert.match(revokedDomainState.historyState, /immutable activation record.*Serving truth comes from the server/iu, 'retained history is re-read from authoritative publication context');
+    const publicHostAfterRevoke = await requestWithLiteralHost(`${origin}/public-host`, 'app.community.example');
+    assert.equal(publicHostAfterRevoke.status, 404, 'mocked public Host shuts off after verified claim revocation');
+
+    await evaluate(client, `document.querySelector('#accountTab').click()`);
+    const passwordChangeStart = requests.length;
+    passwordUpdateAmbiguousNext = true;
+    delayPasswordUpdateResponse = true;
+    await evaluate(client, `(() => { document.querySelector('#newPassword').value = 'replacement-password-2026'; document.querySelector('#confirmNewPassword').value = 'replacement-password-2026'; const form = document.querySelector('#passwordForm'); form.requestSubmit(); form.requestSubmit(); })()`);
+    await waitFor(() => requests.slice(passwordChangeStart).some((item) => item.method === 'PUT' && item.path === '/api/users/7'), 'password rotation in flight');
+    assert.equal(await evaluate(client, `document.querySelector('#openDeleteAccount').disabled`), true, 'account deletion trigger disables during password rotation');
+    await evaluate(client, `document.querySelector('#openDeleteAccount').click()`);
+    assert.equal(requests.slice(passwordChangeStart).filter((item) => item.method === 'DELETE' && item.path === '/api/users/7').length, 0, 'account deletion cannot overlap password rotation');
+    await waitFor(() => evaluate(client, `!document.querySelector('#authView').hidden && !document.querySelector('#authAlert').hidden && document.querySelector('#authAlert').textContent.includes('Password change outcome is unknown')`), 'ambiguous password rotation signs out without stale truth');
+    assert.deepEqual(await evaluate(client, `(() => { const alert = document.querySelector('#authAlert'); return { visible: !alert.hidden && alert.getClientRects().length > 0, role: alert.getAttribute('role'), live: alert.getAttribute('aria-live'), message: alert.textContent.includes('Password change outcome is unknown'), loginSelected: document.querySelector('#loginTab').getAttribute('aria-selected'), focus: document.activeElement?.id }; })()`), {
+      visible: true, role: 'alert', live: 'polite', message: true, loginSelected: 'true', focus: 'loginPassword',
+    }, 'password ambiguity remains visible in the live authentication alert after selecting sign-in');
+    assert.equal(requests.slice(passwordChangeStart).filter((item) => item.method === 'PUT' && item.path === '/api/users/7').length, 1, 'password rotation double activation emits one self-only PUT');
+    assert.deepEqual(Object.keys(requests.slice(passwordChangeStart).find((item) => item.method === 'PUT' && item.path === '/api/users/7').body), ['password'], 'Account exposes no admin or unrelated user mutation');
+    assert.equal(await evaluate(client, `fetch('/api/profile', { headers: { Authorization: 'Bearer ${token}' } }).then((response) => response.status)`), 401, 'old session loses authority after password rotation');
+    await evaluate(client, `(() => { document.querySelector('#loginEmail').value = 'qa@example.test'; document.querySelector('#loginPassword').value = 'replacement-password-2026'; document.querySelector('#loginForm').requestSubmit(); })()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#appView').hidden
+      && document.querySelector('#profileName').textContent === 'QA Architect'
+      && document.querySelector('#workspaceLoading').hidden
+      && document.querySelector('#workspaceSelect').value === '41'
+      && document.querySelector('#workspaceRole').textContent === 'Architect'
+      && !document.querySelector('#openDeleteAccount').disabled`), 'ambiguous committed password rotation re-authenticates only with the new password and restores authoritative Account readiness');
+
+    await evaluate(client, `document.querySelector('#accountTab').click()`);
+    const accountDeleteStart = requests.length;
+    await evaluate(client, `document.querySelector('#openDeleteAccount').click()`);
+    assert.equal(await evaluate(client, `document.activeElement?.id`), 'confirmDeleteAccount', 'account deletion confirmation receives focus');
+    await evaluate(client, `document.querySelector('#cancelDeleteAccount').click()`);
+    assert.equal(requests.slice(accountDeleteStart).filter((item) => item.method === 'DELETE' && item.path === '/api/users/7').length, 0, 'account Cancel sends no request');
+    assert.equal(await evaluate(client, `document.activeElement?.id`), 'openDeleteAccount', 'account Cancel returns focus to its trigger');
+    delayAccountDeleteResponse = true;
+    await evaluate(client, `(() => { document.querySelector('#openDeleteAccount').click(); const confirm = document.querySelector('#confirmDeleteAccount'); confirm.click(); confirm.click(); })()`);
+    await waitFor(() => requests.slice(accountDeleteStart).some((item) => item.method === 'DELETE' && item.path === '/api/users/7'), 'account delete in flight');
+    await evaluate(client, `(() => { document.querySelector('#newPassword').value = 'blocked-overlap-password'; document.querySelector('#confirmNewPassword').value = 'blocked-overlap-password'; document.querySelector('#passwordForm').requestSubmit(); document.querySelector('#cancelDeleteAccount').click(); })()`);
+    assert.equal(requests.slice(accountDeleteStart).filter((item) => item.method === 'PUT' && item.path === '/api/users/7').length, 0, 'password rotation cannot overlap account deletion');
+    await waitFor(() => evaluate(client, `document.querySelector('#deleteAccountResult').textContent.includes('Nothing was deleted') && !document.querySelector('#appView').hidden`), 'owned-workspace self-delete 409 is non-destructive');
+    assert.equal(requests.slice(accountDeleteStart).filter((item) => item.method === 'DELETE' && item.path === '/api/users/7').length, 1, 'owned-workspace conflict emits one guarded request despite double activation');
+    assert.equal(accountDeleted, false, 'owned-workspace conflict retains the account');
+
+    const user7OwnedTargets = workspaces.filter((workspace) => workspaceOwners.get(workspace.id)?.has(7)).map((workspace) => workspace.id);
+    assert.ok(user7OwnedTargets.length > 1 && user7OwnedTargets[0] === 41, 'fixture exposes multiple exact owned targets for supported cleanup');
+    const workspaceCleanupStart = requests.length;
+    delayWorkspaceDeleteResponse = true;
+    workspaceDeleteAmbiguousNext = true;
+    await evaluate(client, `(() => { document.querySelector('#openDeleteOwnedWorkspace').click(); document.querySelector('#confirmDeleteOwnedWorkspace').click(); })()`);
+    await waitFor(() => requests.slice(workspaceCleanupStart).some((item) => item.method === 'DELETE' && item.path === '/api/workspaces/41'), 'supported owned-workspace cleanup request');
+    await evaluate(client, `(() => {
+      const select = document.querySelector('#workspaceSelect');
+      select.value = ${JSON.stringify(String(user7OwnedTargets[1]))};
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      document.querySelector('#createWorkspaceButton').click();
+      document.querySelector('#retryWorkspaces').click();
+    })()`);
+    assert.deepEqual(await evaluate(client, `({ selected: document.querySelector('#workspaceSelect').value, selectDisabled: document.querySelector('#workspaceSelect').disabled, createDisabled: document.querySelector('#createWorkspaceButton').disabled, retryDisabled: document.querySelector('#retryWorkspaces').disabled, accountDisabled: document.querySelector('#openDeleteAccount').disabled, confirmBusy: document.querySelector('#confirmDeleteOwnedWorkspace').getAttribute('aria-busy'), cancelDisabled: document.querySelector('#cancelDeleteOwnedWorkspace').disabled })`), {
+      selected: '41', selectDisabled: true, createDisabled: true, retryDisabled: true, accountDisabled: true, confirmBusy: 'true', cancelDisabled: true,
+    }, 'workspace cleanup locks scope and related activators while the exact DELETE is in flight');
+    await waitFor(() => evaluate(client, `document.querySelector('#deleteOwnedWorkspaceResult').textContent.includes('outcome is unknown')
+      && !document.querySelector('#buildSurface').hidden
+      && !document.querySelector('#workspaceError').hidden
+      && document.querySelector('#workspaceError').textContent.includes('outcome is unknown')
+      && !document.querySelector('#retryWorkspaces').hidden
+      && !document.querySelector('#retryWorkspaces').disabled
+      && document.activeElement?.id === 'retryWorkspaces'`), 'ambiguous cleanup clears busy truth and focuses visible authoritative recovery');
+    assert.equal(await evaluate(client, `document.querySelector('#buildTab').getAttribute('aria-selected')`), 'true', 'ambiguous cleanup opens the Build surface containing its visible reload recovery');
+    assert.equal(requests.slice(workspaceCleanupStart).filter((item) => item.method === 'DELETE' && item.path === '/api/workspaces/41').length, 1, 'attempted scope switch and retry cannot duplicate the exact cleanup request');
+    assert.deepEqual(await evaluate(client, `({ accountDisabled: document.querySelector('#openDeleteAccount').disabled, cleanupDisabled: document.querySelector('#openDeleteOwnedWorkspace').disabled, selectDisabled: document.querySelector('#workspaceSelect').disabled, retryDisabled: document.querySelector('#retryWorkspaces').disabled, confirmBusy: document.querySelector('#confirmDeleteOwnedWorkspace').getAttribute('aria-busy'), cancelDisabled: document.querySelector('#cancelDeleteOwnedWorkspace').disabled })`), {
+      accountDisabled: true, cleanupDisabled: true, selectDisabled: false, retryDisabled: false, confirmBusy: 'false', cancelDisabled: false,
+    }, 'ambiguous cleanup releases the action guard but blocks cleanup and account deletion until authoritative reload');
+    await evaluate(client, `(() => { document.querySelector('#openDeleteOwnedWorkspace').click(); document.querySelector('#confirmDeleteOwnedWorkspace').click(); })()`);
+    assert.equal(requests.slice(workspaceCleanupStart).filter((item) => item.method === 'DELETE' && item.path.startsWith('/api/workspaces/')).length, 1, 'disabled cleanup cannot emit a second DELETE before authoritative reload');
+    await evaluate(client, `document.querySelector('#retryWorkspaces').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value !== '41' && document.querySelector('#workspaceLoading').hidden && document.querySelector('#workspaceRole').textContent === 'Architect' && !document.querySelector('#openDeleteOwnedWorkspace').disabled && !document.querySelector('#openDeleteAccount').disabled`), 'authoritative owner workspace reload re-enables cleanup and account actions');
+    await evaluate(client, `document.querySelector('#accountTab').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#accountSurface').hidden && document.querySelector('#accountTab').getAttribute('aria-selected') === 'true'`), 'Account surface is restored before continuing exact owned-workspace cleanup');
+
+    for (const workspaceID of user7OwnedTargets.slice(1)) {
+      await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = ${JSON.stringify(String(workspaceID))}; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === ${JSON.stringify(String(workspaceID))} && document.querySelector('#workspaceRole').textContent === 'Architect' && !document.querySelector('#openDeleteOwnedWorkspace').disabled`), `owned workspace ${workspaceID} selected for exact cleanup`);
+      const targetDeleteStart = requests.length;
+      await evaluate(client, `document.querySelector('#openDeleteOwnedWorkspace').click()`);
+      assert.deepEqual(await evaluate(client, `(() => { const dialog = document.querySelector('#deleteOwnedWorkspaceConfirm'); return { visible: !dialog.hidden && dialog.getClientRects().length > 0, role: dialog.getAttribute('role'), confirmDisabled: document.querySelector('#confirmDeleteOwnedWorkspace').disabled, focus: document.activeElement?.id, exactTarget: document.querySelector('#deleteOwnedWorkspaceCopy').textContent.includes(${JSON.stringify(`workspace ID ${workspaceID}`)}) }; })()`), {
+        visible: true, role: 'alertdialog', confirmDisabled: false, focus: 'confirmDeleteOwnedWorkspace', exactTarget: true,
+      }, `workspace ${workspaceID} cleanup renders an exact-target confirmation and focuses its enabled action`);
+      await evaluate(client, `document.querySelector('#confirmDeleteOwnedWorkspace').click()`);
+      await waitFor(() => requests.slice(targetDeleteStart).some((item) => item.method === 'DELETE' && item.path === `/api/workspaces/${workspaceID}`), `workspace ${workspaceID} exact DELETE`);
+      await waitFor(() => evaluate(client, `![...document.querySelector('#workspaceSelect').options].some((option) => option.value === ${JSON.stringify(String(workspaceID))}) && document.querySelector('#confirmDeleteOwnedWorkspace').getAttribute('aria-busy') === 'false'`), `workspace ${workspaceID} authoritative removal readback`);
+      assert.equal(requests.slice(targetDeleteStart).filter((item) => item.method === 'DELETE' && item.path === `/api/workspaces/${workspaceID}`).length, 1, `workspace ${workspaceID} emits one exact cleanup request`);
+    }
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').options.length === 0 && !document.querySelector('#workspaceEmpty').hidden`), 'every user7-owned workspace removed through exact UI-supported cleanup');
+    assert.equal(accountHasOwnedWorkspaces(7), false, 'workspace DELETE readbacks, not a fixture flip, clear user7 ownership honestly');
+    assert.ok(workspaces.some((workspace) => workspace.id === 81) && workspaces.some((workspace) => workspace.id === 91), 'exact user7 cleanup preserves other principals\' workspaces');
+
+    accountDeleteCommitAmbiguousNext = true;
+    delayAccountDeleteResponse = true;
+    await evaluate(client, `(() => { document.querySelector('#openDeleteAccount').click(); document.querySelector('#confirmDeleteAccount').click(); })()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#authView').hidden && !document.querySelector('#authAlert').hidden && document.querySelector('#authAlert').textContent.includes('Account deletion outcome is unknown')`), 'post-commit account response ambiguity signs out without false existence claims');
+    assert.deepEqual(await evaluate(client, `(() => { const alert = document.querySelector('#authAlert'); return { visible: !alert.hidden && alert.getClientRects().length > 0, role: alert.getAttribute('role'), live: alert.getAttribute('aria-live'), message: alert.textContent.includes('Account deletion outcome is unknown'), loginSelected: document.querySelector('#loginTab').getAttribute('aria-selected'), focus: document.activeElement?.id }; })()`), {
+      visible: true, role: 'alert', live: 'polite', message: true, loginSelected: 'true', focus: 'loginEmail',
+    }, 'ambiguous account deletion keeps its recovery message visible and live after local sign-out');
+    assert.equal(accountDeleted, true, 'mock commits account deletion and token invalidation before returning 503');
+    assert.equal(await evaluate(client, `fetch('/api/profile', { headers: { Authorization: 'Bearer ${token}' } }).then((response) => response.status)`), 401, 'committed ambiguous deletion invalidates the old bearer');
+    const failedReauthStart = requests.length;
+    await evaluate(client, `(() => { document.querySelector('#loginEmail').value = 'qa@example.test'; document.querySelector('#loginPassword').value = 'replacement-password-2026'; document.querySelector('#loginForm').requestSubmit(); })()`);
+    await waitFor(() => requests.slice(failedReauthStart).some((item) => item.method === 'POST' && item.path === '/api/login'), 'deleted principal re-authentication attempt');
+    await waitFor(() => evaluate(client, `document.querySelector('#appView').hidden && document.querySelector('#authAlert').textContent.includes('Authentication failed')`), 'committed deletion is resolved by failed re-authentication');
+
+    await evaluate(client, `(() => { document.querySelector('#loginEmail').value = 'second@example.test'; document.querySelector('#loginPassword').value = 'correct horse battery staple'; document.querySelector('#loginForm').requestSubmit(); })()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#appView').hidden && document.querySelector('#profileName').textContent === 'Second Architect' && document.querySelector('#workspaceSelect').value === '81' && document.querySelector('#workspaceRole').textContent === 'Architect' && !document.querySelector('#openDeleteOwnedWorkspace').disabled`), 'clearly new principal session begins the independent zero-owned lifecycle');
+    await evaluate(client, `document.querySelector('#accountTab').click()`);
+    const secondOwnedTargets = workspaces.filter((workspace) => workspaceOwners.get(workspace.id)?.has(8)).map((workspace) => workspace.id);
+    assert.ok(secondOwnedTargets.length >= 2 && [81, 43].every((workspaceID) => secondOwnedTargets.includes(workspaceID)), 'new principal fixture exposes initial and retained UI-created exact owned targets');
+    assert.ok(!secondOwnedTargets.includes(44) && !workspaces.some((workspace) => workspace.id === 44), 'workspace 44 remains absent after the earlier deleted-selection fallback');
+    assert.ok(workspaces.some((workspace) => workspace.id === 91) && !secondOwnedTargets.includes(91), 'unrelated workspace 91 is not included in the new principal cleanup targets');
+    for (const workspaceID of secondOwnedTargets) {
+      await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = ${JSON.stringify(String(workspaceID))}; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === ${JSON.stringify(String(workspaceID))} && document.querySelector('#workspaceRole').textContent === 'Architect' && !document.querySelector('#openDeleteOwnedWorkspace').disabled`), `new principal owned workspace ${workspaceID} selected for exact cleanup`);
+      const targetDeleteStart = requests.length;
+      await evaluate(client, `document.querySelector('#openDeleteOwnedWorkspace').click()`);
+      assert.deepEqual(await evaluate(client, `(() => { const dialog = document.querySelector('#deleteOwnedWorkspaceConfirm'); return { visible: !dialog.hidden && dialog.getClientRects().length > 0, role: dialog.getAttribute('role'), confirmDisabled: document.querySelector('#confirmDeleteOwnedWorkspace').disabled, focus: document.activeElement?.id, exactTarget: document.querySelector('#deleteOwnedWorkspaceCopy').textContent.includes(${JSON.stringify(`workspace ID ${workspaceID}`)}) }; })()`), {
+        visible: true, role: 'alertdialog', confirmDisabled: false, focus: 'confirmDeleteOwnedWorkspace', exactTarget: true,
+      }, `new principal workspace ${workspaceID} cleanup renders an exact-target confirmation and focuses its enabled action`);
+      await evaluate(client, `document.querySelector('#confirmDeleteOwnedWorkspace').click()`);
+      await waitFor(() => requests.slice(targetDeleteStart).some((item) => item.method === 'DELETE' && item.path === `/api/workspaces/${workspaceID}`), `new principal workspace ${workspaceID} exact DELETE`);
+      await waitFor(() => evaluate(client, `![...document.querySelector('#workspaceSelect').options].some((option) => option.value === ${JSON.stringify(String(workspaceID))}) && document.querySelector('#confirmDeleteOwnedWorkspace').getAttribute('aria-busy') === 'false'`), `new principal workspace ${workspaceID} authoritative removal readback`);
+      assert.equal(requests.slice(targetDeleteStart).filter((item) => item.method === 'DELETE' && item.path === `/api/workspaces/${workspaceID}`).length, 1, `new principal workspace ${workspaceID} emits one exact cleanup request`);
+    }
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').options.length === 0 && !document.querySelector('#workspaceEmpty').hidden && !document.querySelector('#openDeleteAccount').disabled`), 'new principal authoritative zero-owned readback enables account deletion');
+    assert.equal(accountHasOwnedWorkspaces(8), false, 'new principal ownership precondition derives from exact retained workspace state');
+    assert.ok(workspaces.some((workspace) => workspace.id === 91), 'unrelated non-owned workspace survives both exact cleanup sequences');
+    await evaluate(client, `(() => { document.querySelector('#openDeleteAccount').click(); document.querySelector('#confirmDeleteAccount').click(); })()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#authView').hidden && !document.querySelector('#authAlert').hidden && document.querySelector('#authAlert').textContent.includes('Required audit and control records remain retained')`), 'new zero-owned principal account delete 204 signs out explicitly');
+    assert.deepEqual(await evaluate(client, `(() => { const alert = document.querySelector('#authAlert'); return { visible: !alert.hidden && alert.getClientRects().length > 0, role: alert.getAttribute('role'), live: alert.getAttribute('aria-live'), message: alert.textContent.includes('Required audit and control records remain retained'), success: alert.classList.contains('success'), loginSelected: document.querySelector('#loginTab').getAttribute('aria-selected'), focus: document.activeElement?.id }; })()`), {
+      visible: true, role: 'alert', live: 'polite', message: true, success: true, loginSelected: 'true', focus: 'loginEmail',
+    }, 'successful account deletion keeps retained-record truth visible and live after selecting sign-in');
+    assert.equal(secondAccountDeleted, true, 'zero-owned self-delete reaches the supported 204 lifecycle for the new principal');
   } finally {
     await closeChromium(chromium, 'component-journey');
     server.closeAllConnections?.();
@@ -2977,6 +3689,10 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     await evaluate(client, `document.querySelector('#peopleTab').click()`);
     await evaluate(client, `(() => { document.querySelector('#acceptInviteToken').value = 'accept_browser_viewer'; document.querySelector('#acceptInviteButton').click(); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Viewer' && document.querySelector('#workspaceSelect').value === '41'`), 'Viewer invitation acceptance');
+    await evaluate(client, `document.querySelector('#peopleTab').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#peopleSurface').hidden && document.querySelectorAll('#peopleList li').length === 3`), 'Viewer People readback');
+    assert.deepEqual(await evaluate(client, `({ removals: document.querySelectorAll('[data-remove-member]').length, inviteDisabled: document.querySelector('#createInviteButton').disabled, domainDisabled: document.querySelector('#revokeDomainButton').disabled, cleanupDisabled: document.querySelector('#openDeleteOwnedWorkspace').disabled })`), { removals: 0, inviteDisabled: true, domainDisabled: true, cleanupDisabled: true }, 'Viewer receives no enabled offboarding, invitation, domain, or owner-cleanup authority');
+    await evaluate(client, `document.querySelector('#buildTab').click()`);
     assert.equal(await evaluate(client, `document.querySelector('#templateSelect').value`), '', 'component drafts never cross principal scope');
     await waitFor(() => evaluate(client, `!document.querySelector('#signedStarterPath').hidden && document.querySelector('#starterPrimaryButton').disabled && document.querySelector('#starterPrimaryButton').textContent === 'Viewer inspect-only' && document.querySelector('#starterInviteButton').disabled`), 'Viewer exact-empty starter is inspect-only');
     roleHistoryEmpty = false;
@@ -3005,6 +3721,10 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     roleHistoryEmpty = true;
     await login(client, 'maintainer@example.test');
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Maintainer'`), 'Maintainer role');
+    await evaluate(client, `document.querySelector('#peopleTab').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#peopleSurface').hidden && document.querySelectorAll('#peopleList li').length === 3`), 'Maintainer People readback');
+    assert.deepEqual(await evaluate(client, `({ removals: document.querySelectorAll('[data-remove-member]').length, inviteDisabled: document.querySelector('#createInviteButton').disabled, domainDisabled: document.querySelector('#revokeDomainButton').disabled, cleanupDisabled: document.querySelector('#openDeleteOwnedWorkspace').disabled })`), { removals: 0, inviteDisabled: true, domainDisabled: true, cleanupDisabled: true }, 'Maintainer receives no enabled offboarding, invitation, domain, or owner-cleanup authority');
+    await evaluate(client, `document.querySelector('#buildTab').click()`);
     assert.equal(await evaluate(client, `document.querySelector('#templateSelect').value`), '', 'Maintainer begins with an independent principal-scoped draft');
     await waitFor(() => evaluate(client, `!document.querySelector('#signedStarterPath').hidden && !document.querySelector('#starterPrimaryButton').disabled && document.querySelector('#starterInviteButton').disabled && document.querySelector('#starterInviteButton').textContent.includes('Ask an Architect')`), 'Maintainer starter can build but delegates Viewer invitation authority');
     assert.match(await evaluate(client, `document.querySelector('#starterInviteButton').title`), /existing member/iu);
@@ -3040,10 +3760,11 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     for (const layoutWidth of [160, 200, 320, 400]) {
       await client.send('Emulation.setDeviceMetricsOverride', { width: layoutWidth, height: 1_000, deviceScaleFactor: 1, mobile: false });
       await waitFor(() => evaluate(client, `window.innerWidth === ${layoutWidth}`), `${layoutWidth}px component editor`);
-      const editorLayout = await evaluate(client, `({ overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, visible: !document.querySelector('#buildSurface').hidden, cardWidth: document.querySelector('.component-editor')?.getBoundingClientRect().width || 0, viewport: document.documentElement.clientWidth })`);
+      const editorLayout = await evaluate(client, `({ overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, visible: !document.querySelector('#buildSurface').hidden, cardWidth: document.querySelector('.component-editor')?.getBoundingClientRect().width || 0, viewport: document.documentElement.clientWidth, targetHeights: [...document.querySelectorAll('.button.tertiary, details summary, .publication-action, [id^="retry"]')].filter((control) => control.getClientRects().length > 0 && getComputedStyle(control).visibility !== 'hidden').map((control) => Math.round(control.getBoundingClientRect().height)) })`);
       assert.equal(editorLayout.overflow, false, `${layoutWidth}px component editor must reflow without horizontal overflow`);
       assert.equal(editorLayout.visible, true);
       assert.ok(editorLayout.cardWidth <= editorLayout.viewport, `${layoutWidth}px component card stays inside the viewport`);
+      assert.ok(editorLayout.targetHeights.length > 0 && editorLayout.targetHeights.every((height) => height >= 44), `${layoutWidth}px tertiary, retry, details, and action targets must be at least 44 CSS px: ${editorLayout.targetHeights}`);
     }
     await client.send('Emulation.setDeviceMetricsOverride', { width: 1_280, height: 1_000, deviceScaleFactor: 1, mobile: false });
     await waitFor(() => evaluate(client, `window.innerWidth === 1280`), 'desktop component editor reset');

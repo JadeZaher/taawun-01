@@ -71,19 +71,20 @@
     .brand-mark::before, .brand-mark::after { content: ""; position: absolute; inset: 5px -6px; border: 1px solid rgba(87, 166, 142, 0.7); }
     .brand-mark::after { transform: rotate(90deg); }
 
-    .button { min-height: 42px; border: 1px solid transparent; border-radius: var(--radius); padding: 10px 16px; background: var(--emerald); color: #f8f3e8; font-weight: 600; cursor: pointer; transition: background 150ms ease, border-color 150ms ease, transform 150ms ease; }
+    .button { min-height: 44px; min-width: 44px; border: 1px solid transparent; border-radius: var(--radius); padding: 10px 16px; background: var(--emerald); color: #f8f3e8; font-weight: 600; cursor: pointer; transition: background 150ms ease, border-color 150ms ease, transform 150ms ease; }
     .button:hover:not(:disabled) { background: var(--emerald-bright); color: var(--ink); }
     .button:active:not(:disabled) { transform: translateY(1px); }
     .button:disabled { opacity: 0.46; cursor: not-allowed; }
     .button.secondary { background: transparent; border-color: var(--line-strong); color: var(--parchment); }
     .button.secondary:hover:not(:disabled) { background: rgba(238, 231, 216, 0.06); border-color: var(--parchment-dim); color: var(--parchment); }
-    .button.tertiary { min-height: auto; padding: 6px 0; background: transparent; border: 0; color: var(--emerald-bright); font: 500 12px/1.4 var(--mono); }
+    .button.tertiary { min-height: 44px; min-width: 44px; padding: 10px 0; background: transparent; border: 0; color: var(--emerald-bright); font: 500 12px/1.4 var(--mono); }
     .button.tertiary:hover:not(:disabled) { background: transparent; color: var(--parchment); }
 
     label, legend { color: var(--parchment); font-size: 13px; font-weight: 600; }
     input, select, textarea {
       width: 100%; border: 1px solid var(--line-strong); border-radius: var(--radius); background: rgba(17, 22, 26, 0.78); color: var(--parchment); padding: 10px 12px; transition: border-color 150ms ease, box-shadow 150ms ease;
     }
+    input, select { min-height: 44px; }
     input:hover, select:hover, textarea:hover { border-color: rgba(238, 231, 216, 0.42); }
     input:focus, select:focus, textarea:focus { outline: none; border-color: var(--emerald-bright); box-shadow: 0 0 0 3px rgba(87, 166, 142, 0.13); }
     input::placeholder, textarea::placeholder { color: rgba(201, 192, 172, 0.55); }
@@ -101,18 +102,27 @@
     .notice.success { background: var(--soft-emerald); border-color: rgba(87, 166, 142, 0.35); color: #8ccab7; }
 
     .auth-view { min-height: 100vh; display: grid; place-items: center; padding: 28px; }
-    .auth-shell { width: min(940px, 100%); display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr); border: 1px solid var(--line-strong); background: var(--ink-2); box-shadow: var(--shadow); }
-    .auth-story { min-height: 560px; padding: 52px; border-right: 1px solid var(--line-strong); display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(135deg, rgba(60, 114, 99, 0.2), transparent 58%); }
-    .auth-story h1 { max-width: 9ch; margin-top: 56px; font: 500 clamp(38px, 5vw, 58px)/1.03 var(--serif); letter-spacing: -0.025em; }
+    .auth-shell { width: min(1120px, 100%); display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(330px, 0.65fr); border: 1px solid var(--line-strong); background: var(--ink-2); box-shadow: var(--shadow); }
+    .auth-story { min-height: 620px; padding: 48px; border-right: 1px solid var(--line-strong); display: grid; align-content: start; gap: 24px; background: linear-gradient(135deg, rgba(60, 114, 99, 0.2), transparent 58%); }
+    .auth-story h1 { max-width: 13ch; margin-top: 34px; font: 500 clamp(38px, 5vw, 58px)/1.03 var(--serif); letter-spacing: -0.025em; }
     .auth-story h1 em { color: var(--emerald-bright); font-weight: 400; }
     .auth-story p { max-width: 48ch; color: var(--parchment-dim); font-size: 14px; line-height: 1.55; }
     .auth-story p strong { color: var(--parchment); font-weight: 500; }
-    .auth-verse { margin-top: 28px; padding-left: 15px; border-left: 2px solid var(--gold); color: var(--gold); font: italic 15px/1.5 var(--serif); }
+    .auth-outcomes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+    .auth-outcome { min-width: 0; padding: 12px; border-left: 2px solid var(--emerald); background: rgba(17, 22, 26, 0.48); }
+    .auth-outcome strong, .auth-outcome span { display: block; }
+    .auth-outcome strong { font-size: 12px; }
+    .auth-outcome span { margin-top: 4px; color: var(--parchment-dim); font-size: 11px; }
+    .auth-how { display: grid; gap: 7px; padding-top: 16px; border-top: 1px solid var(--line); }
+    .auth-how h2 { font: 500 19px/1.2 var(--serif); }
+    .auth-how ol { margin: 0; padding-left: 20px; color: var(--parchment-dim); font-size: 12px; }
+    .auth-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .auth-caveat { padding-left: 15px; border-left: 2px solid var(--gold); color: var(--parchment-dim); font-size: 11px; }
     .auth-panel { padding: 52px 42px; align-self: center; }
     .auth-panel h2 { margin: 12px 0 8px; font: 500 30px/1.15 var(--serif); }
     .auth-panel > p { color: var(--parchment-dim); margin-bottom: 24px; }
     .tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; margin-bottom: 22px; background: var(--ink); border: 1px solid var(--line); }
-    .tab { min-height: 38px; border: 0; background: transparent; color: var(--parchment-dim); cursor: pointer; font: 500 12px/1 var(--mono); letter-spacing: 0.04em; text-transform: uppercase; }
+    .tab { min-height: 44px; min-width: 44px; border: 0; background: transparent; color: var(--parchment-dim); cursor: pointer; font: 500 12px/1 var(--mono); letter-spacing: 0.04em; text-transform: uppercase; }
     .tab[aria-selected="true"] { background: var(--ink-3); color: var(--parchment); box-shadow: inset 0 -2px var(--emerald-bright); }
     .auth-form { display: grid; gap: 16px; }
     .auth-alert:empty { display: none; }
@@ -127,7 +137,7 @@
     .session-copy strong { font-size: 13px; }
     .session-copy span { color: var(--parchment-dim); font-size: 11px; }
     .avatar { width: 30px; height: 30px; display: grid; place-items: center; background: var(--soft-emerald); border: 1px solid rgba(87, 166, 142, 0.4); color: var(--emerald-bright); font: 600 11px/1 var(--mono); }
-    .logout { border: 0; border-left: 1px solid var(--line); padding: 8px 0 8px 18px; background: transparent; color: var(--parchment-dim); font: 500 11px/1 var(--mono); text-transform: uppercase; cursor: pointer; }
+    .logout { min-height: 44px; min-width: 44px; border: 0; border-left: 1px solid var(--line); padding: 8px 0 8px 18px; background: transparent; color: var(--parchment-dim); font: 500 11px/1 var(--mono); text-transform: uppercase; cursor: pointer; }
     .logout:hover { color: var(--parchment); }
 
     .cockpit { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: calc(100vh - 64px); }
@@ -170,6 +180,10 @@
     .surface-record strong, .surface-record span { display: block; overflow-wrap: anywhere; }
     .surface-record strong { font-size: 12px; }
     .surface-record span { margin-top: 3px; color: var(--parchment-dim); font-size: 10px; }
+    .inline-confirm { margin-top: 10px; padding: 11px; border: 1px solid rgba(199, 162, 74, 0.42); background: var(--soft-gold); }
+    .inline-confirm p { color: var(--parchment-dim); font-size: 11px; }
+    .danger-zone { border-color: rgba(220, 107, 93, 0.42); background: rgba(220, 107, 93, 0.055); }
+    .danger-zone .button.danger { background: var(--danger); color: var(--ink); }
     .publication-action, .publication-confirm .button, #loadMoreDomainPublications { min-height: 44px; min-width: 44px; }
     .publication-confirm { margin-top: 12px; padding: 12px; border: 1px solid rgba(199, 162, 74, 0.42); background: var(--soft-gold); }
     .publication-confirm p { color: var(--parchment-dim); font-size: 11px; }
@@ -212,7 +226,8 @@
     #recoveryInviteButton, #openNewestBuildButton { min-height: 44px; }
     .starter-action-copy { grid-column: 1 / -1; }
     details.create-workspace { border: 1px solid var(--line); }
-    details.create-workspace summary { padding: 10px 12px; color: var(--emerald-bright); cursor: pointer; font: 500 11px/1.2 var(--mono); }
+    details summary { min-height: 44px; min-width: 44px; display: flex; align-items: center; padding-block: 10px; cursor: pointer; }
+    details.create-workspace summary { padding: 10px 12px; color: var(--emerald-bright); font: 500 11px/1.2 var(--mono); }
     .create-fields { display: grid; gap: 10px; padding: 3px 12px 12px; }
 
     .template-card { position: relative; padding: 14px; border: 1px solid rgba(87, 166, 142, 0.4); background: linear-gradient(120deg, var(--soft-emerald), transparent 70%); }
@@ -354,6 +369,7 @@
       .auth-story h1 { margin-top: 30px; font-size: 37px; }
       .auth-story p { margin-top: 26px; font-size: 13px; line-height: 1.45; }
       .auth-panel { padding: 34px 28px; }
+      .auth-outcomes { grid-template-columns: 1fr; }
       .topbar { padding: 0 16px; }
       .beta-tag, .session-copy { display: none; }
       .workspace { padding: 24px 16px; }
@@ -384,6 +400,7 @@
       .auth-story { padding: 18px; }
       .auth-story h1 { font-size: 30px; overflow-wrap: anywhere; }
       .auth-story p, .auth-panel > p { overflow-wrap: anywhere; }
+      .auth-actions { display: grid; }
       .auth-panel { padding: 24px 14px; }
       .tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .tab { font-size: 10px; letter-spacing: 0; overflow-wrap: anywhere; }
@@ -429,15 +446,28 @@
       <section class="auth-story" aria-labelledby="authStoryTitle">
         <div>
           <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>Taawun</span></div>
-          <h1 id="authStoryTitle">Build for your <em>community.</em></h1>
-          <div class="auth-verse">“And cooperate in righteousness and piety.” — Qur’an 5:2</div>
+          <h1 id="authStoryTitle">Build a clear home for your <em>community.</em></h1>
         </div>
-        <p><strong>Workspace-signed artifacts, local-first records, and honest sandbox actions.</strong> Taawun centrally keeps identity, signed artifacts, and explicit transactional control records—not local community state or funds. Relay transit stays encrypted: an Amanah boundary with zero custody and no settlement.</p>
+        <div class="auth-outcomes" aria-label="What Taawun helps communities do">
+          <div class="auth-outcome"><strong>Create a community app</strong><span>Start from an approved template and shape it with plain-language content.</span></div>
+          <div class="auth-outcome"><strong>Organize people and decisions</strong><span>See workspace roles and use Shura tools with explicit authority.</span></div>
+          <div class="auth-outcome"><strong>Preview before sharing</strong><span>Review a signed, sandboxed preview before any public publication step.</span></div>
+          <div class="auth-outcome"><strong>Reuse trusted templates</strong><span>Choose bounded components without turning content into code or permissions.</span></div>
+        </div>
+        <section class="auth-how" aria-labelledby="authHowTitle">
+          <h2 id="authHowTitle">How it works</h2>
+          <ol><li>Create or sign in to an account.</li><li>Choose a workspace, template, and components.</li><li>Review a signed preview; an Architect separately controls sharing.</li></ol>
+        </section>
+        <div class="auth-actions" aria-label="Account access shortcuts">
+          <button id="landingRegisterButton" class="button" type="button">Create account</button>
+          <button id="landingLoginButton" class="button secondary" type="button">Sign in</button>
+        </div>
+        <p class="auth-caveat"><strong>Trust and custody:</strong> Taawun keeps account identity, signed artifacts, and required audit or control records. Community app records remain local-first. Relay transit is encrypted; Taawun does not hold funds or promise settlement. Retention follows the record’s purpose, including required audit history after account deletion.</p>
       </section>
 
       <section id="authPanel" class="auth-panel" aria-labelledby="authTitle" tabindex="-1">
-        <div class="eyebrow">Private beta · Architect access</div>
-        <h2 id="authTitle">Enter the builder</h2>
+        <div class="eyebrow">Private beta · Account access</div>
+        <h2 id="authTitle">Sign in or create an account</h2>
         <p>Your session stays in this browser tab and clears when you sign out or reload.</p>
 
         <div class="tabs" role="tablist" aria-label="Account access">
@@ -533,6 +563,7 @@
           <button id="shuraTab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="shuraSurface" tabindex="-1" data-workspace-tab="shura">Shura</button>
           <button id="financeTab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="financeSurface" tabindex="-1" data-workspace-tab="finance">Finance sandbox</button>
           <button id="bazaarTab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="bazaarSurface" tabindex="-1" data-workspace-tab="bazaar">Bazaar</button>
+          <button id="accountTab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="accountSurface" tabindex="-1" data-workspace-tab="account">Account</button>
           <span id="workspaceRole" class="workspace-role" aria-live="polite">Select a workspace</span>
         </nav>
         <div id="workspaceAnnouncer" class="visually-hidden" role="status" aria-live="polite"></div>
@@ -737,6 +768,12 @@
                     <button id="claimDomainButton" class="button tertiary" type="button">Issue DNS proof</button>
                     <div id="domainProof" class="field-help" hidden></div>
                     <button id="verifyDomainButton" class="button tertiary" type="button" disabled>Verify DNS proof</button>
+                    <button id="revokeDomainButton" class="button tertiary" type="button" disabled>Revoke domain</button>
+                    <div id="domainRevokeConfirm" class="inline-confirm" role="alertdialog" aria-labelledby="domainRevokeConfirmTitle" aria-describedby="domainRevokeConfirmCopy" hidden>
+                      <strong id="domainRevokeConfirmTitle">Revoke this exact domain claim?</strong>
+                      <p id="domainRevokeConfirmCopy"></p>
+                      <div class="surface-actions"><button id="confirmDomainRevoke" class="button" type="button">Revoke domain claim</button><button id="cancelDomainRevoke" class="button secondary" type="button">Cancel</button></div>
+                    </div>
                     <div id="domainPublicationState" class="compact-state" role="status">Select an Architect workspace and domain claim to load publication history.</div>
                     <ul id="domainPublicationList" class="surface-list" aria-label="Selected domain publication history"></ul>
                     <button id="loadMoreDomainPublications" class="button secondary" type="button" hidden>Load older publications</button>
@@ -775,13 +812,13 @@
             <div class="panel-head"><div><span class="panel-number">People</span><h2>Membership and invitations</h2></div><button id="retryPeople" class="button tertiary" type="button">Reload people</button></div>
             <div class="panel-body surface-grid">
               <section class="surface-section" aria-labelledby="membersTitle">
-                <h3 id="membersTitle">Workspace members</h3>
+                <h3 id="membersTitle" tabindex="-1">Workspace members</h3>
                 <p>Authoritative names and roles for this workspace only. Email addresses are not exposed here.</p>
                 <div id="peopleState" class="compact-state" role="status">Select a workspace to load members.</div>
                 <ul id="peopleList" class="surface-list" aria-label="Workspace members"></ul>
               </section>
               <section class="surface-section" aria-labelledby="inviteTitle">
-                <h3 id="inviteTitle">Invite a teammate</h3>
+                <h3 id="inviteTitle" tabindex="-1">Invite a teammate</h3>
                 <p>Architects may issue a time-limited invitation. Viewers can read; Maintainers can propose and vote; Architects also invite and decide.</p>
                 <div class="surface-fields">
                   <div class="field"><label for="invitee">Invitee email or user ID</label><input id="invitee" autocomplete="off" placeholder="member@example.org"></div>
@@ -878,6 +915,42 @@
             </div>
           </div>
         </section>
+
+        <section id="accountSurface" class="workspace-surface" role="tabpanel" aria-labelledby="accountTab" tabindex="-1" hidden>
+          <div class="panel">
+            <div class="panel-head"><div><span class="panel-number">Account</span><h2>Your account and sessions</h2></div></div>
+            <div class="panel-body surface-grid">
+              <section class="surface-section" aria-labelledby="passwordTitle">
+                <h3 id="passwordTitle">Change password</h3>
+                <p>Use at least 12 characters. A successful change invalidates this and every other signed-in session, so you must sign in again with the new password.</p>
+                <form id="passwordForm" class="surface-fields">
+                  <div class="field"><label for="newPassword">New password</label><input id="newPassword" type="password" autocomplete="new-password" minlength="12" aria-describedby="newPasswordHelp" required><div id="newPasswordHelp" class="field-help">Use at least 12 characters.</div></div>
+                  <div class="field"><label for="confirmNewPassword">Confirm new password</label><input id="confirmNewPassword" type="password" autocomplete="new-password" minlength="12" required></div>
+                  <button id="changePasswordButton" class="button" type="submit">Change password and sign out</button>
+                  <div id="passwordResult" class="notice" role="status" aria-live="polite" hidden></div>
+                </form>
+              </section>
+              <section class="surface-section danger-zone" aria-labelledby="deleteAccountTitle">
+                <h3 id="deleteAccountTitle">Delete account</h3>
+                <p>Account deletion is self-service only. It anonymizes sign-in identity and removes non-audit membership or consent records. Required audit and control records remain retained. Owned workspaces must be deleted through supported workspace cleanup first.</p>
+                <div class="surface-actions"><button id="openDeleteOwnedWorkspace" class="button secondary" type="button" disabled>Delete selected owned workspace</button></div>
+                <div id="deleteOwnedWorkspaceConfirm" class="inline-confirm" role="alertdialog" aria-labelledby="deleteOwnedWorkspaceTitle" aria-describedby="deleteOwnedWorkspaceCopy" hidden>
+                  <strong id="deleteOwnedWorkspaceTitle">Delete the selected workspace?</strong>
+                  <p id="deleteOwnedWorkspaceCopy"></p>
+                  <div class="surface-actions"><button id="confirmDeleteOwnedWorkspace" class="button danger" type="button">Delete workspace</button><button id="cancelDeleteOwnedWorkspace" class="button secondary" type="button">Cancel</button></div>
+                </div>
+                <div id="deleteOwnedWorkspaceResult" class="notice" role="status" aria-live="polite" hidden></div>
+                <div class="surface-actions"><button id="openDeleteAccount" class="button danger" type="button">Delete my account</button></div>
+                <div id="deleteAccountConfirm" class="inline-confirm" role="alertdialog" aria-labelledby="deleteAccountConfirmTitle" aria-describedby="deleteAccountConfirmCopy" hidden>
+                  <strong id="deleteAccountConfirmTitle">Permanently delete your account?</strong>
+                  <p id="deleteAccountConfirmCopy">This signs you out and removes account access. It does not erase required audit or control history. If you own any workspace, nothing will be deleted and you will receive cleanup guidance.</p>
+                  <div class="surface-actions"><button id="confirmDeleteAccount" class="button danger" type="button">Permanently delete account</button><button id="cancelDeleteAccount" class="button secondary" type="button">Cancel</button></div>
+                </div>
+                <div id="deleteAccountResult" class="notice" role="status" aria-live="polite" hidden></div>
+              </section>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   </div>
@@ -894,6 +967,7 @@
       templateReady: false,
       catalogHealthy: false,
       workspacesReady: false,
+      workspaceCleanupNeedsReload: false,
       workspaces: [],
       workspaceScopeId: 0,
       templates: [],
@@ -912,6 +986,10 @@
       shuraToken: '',
       shuraClaims: null,
       invitations: [],
+      invitationGrantID: '',
+      invitationAction: null,
+      invitationMutation: null,
+      memberAction: null,
       peopleLoadState: 'idle',
       proposals: [],
       proposalRecord: null,
@@ -931,6 +1009,7 @@
       invitationEpoch: 0,
       acceptanceEpoch: 0,
       domainEpoch: 0,
+      domainRevokeEpoch: 0,
       domainPublicationEpoch: 0,
       publicationEpoch: 0,
       previewReady: false,
@@ -961,8 +1040,12 @@
       publicationDeadlineTimer: 0,
       publicationDeadlineRecheck: null,
       domainClaim: null,
+      domainRevokeTarget: null,
+      domainMutation: null,
       domainOrigin: '',
       domainLoadState: 'idle',
+      accountEpoch: 0,
+      accountAction: null,
     };
 
     const element = (id) => document.getElementById(id);
@@ -1059,7 +1142,9 @@
       state.trackRecordEpoch += 1;
       state.invitationEpoch += 1;
       state.acceptanceEpoch += 1;
+      state.accountEpoch += 1;
       state.domainEpoch += 1;
+      state.domainRevokeEpoch += 1;
       state.domainPublicationEpoch += 1;
       state.publicationEpoch += 1;
       state.token = '';
@@ -1070,6 +1155,7 @@
       state.templateReady = false;
       state.catalogHealthy = false;
       state.workspacesReady = false;
+      state.workspaceCleanupNeedsReload = false;
       state.workspaces = [];
       state.workspaceScopeId = 0;
       state.templates = [];
@@ -1089,6 +1175,10 @@
       state.shuraToken = '';
       state.shuraClaims = null;
       state.invitations = [];
+      state.invitationGrantID = '';
+      state.invitationAction = null;
+      state.invitationMutation = null;
+      state.memberAction = null;
       state.proposals = [];
       state.proposalRecord = null;
       state.proposalMutation = null;
@@ -1118,8 +1208,11 @@
       state.publicationAction = '';
       state.replacementAttempt = null;
       state.domainClaim = null;
+      state.domainRevokeTarget = null;
+      state.domainMutation = null;
       state.domainOrigin = '';
       state.domainLoadState = 'idle';
+      state.accountAction = null;
       const frame = element('previewFrame');
       frame.removeAttribute('src');
       frame.removeAttribute('srcdoc');
@@ -1132,8 +1225,11 @@
       setBusy(element('createWorkspaceButton'), false, 'Creating…', 'Create workspace');
       setBusy(element('claimDomainButton'), false, 'Creating…', 'Issue DNS proof');
       setBusy(element('verifyDomainButton'), false, 'Verifying…', 'Verify DNS proof');
+      setBusy(element('revokeDomainButton'), false, 'Revoking…', 'Revoke domain');
       setBusy(element('createInviteButton'), false, 'Creating…', 'Create invitation');
       setBusy(element('acceptInviteButton'), false, 'Joining…', 'Accept and join');
+      setBusy(element('changePasswordButton'), false, 'Changing password…', 'Change password and sign out');
+      setBusy(element('confirmDeleteAccount'), false, 'Deleting account…', 'Permanently delete account');
       element('manifestList').replaceChildren();
       element('manifestList').hidden = true;
       element('manifestEmpty').hidden = false;
@@ -1174,6 +1270,17 @@
       element('acceptInviteToken').value = '';
       element('inviteTokenOutput').value = '';
       element('inviteGrant').hidden = true;
+      element('domainRevokeConfirm').hidden = true;
+      element('passwordForm').reset();
+      element('deleteAccountConfirm').hidden = true;
+      element('deleteOwnedWorkspaceConfirm').hidden = true;
+      setBusy(element('changePasswordButton'), false, 'Changing password…', 'Change password and sign out');
+      element('openDeleteAccount').disabled = false;
+      setBusy(element('confirmDeleteAccount'), false, 'Deleting account…', 'Permanently delete account');
+      element('cancelDeleteAccount').disabled = false;
+      setBusy(element('confirmDeleteOwnedWorkspace'), false, 'Deleting workspace…', 'Delete workspace');
+      element('cancelDeleteOwnedWorkspace').disabled = false;
+      for (const id of ['passwordResult', 'deleteAccountResult', 'deleteOwnedWorkspaceResult']) setNotice(element(id), '');
       element('proposalTitle').value = '';
       element('proposalBody').value = '';
       element('proposalLookup').value = '';
@@ -1210,12 +1317,12 @@
       setLifecycle(0);
     }
 
-    function showAuth(message = '') {
+    function showAuth(message = '', kind = 'error') {
       clearSession();
       element('appView').hidden = true;
       element('authView').hidden = false;
       setSkipDestination('authPanel', 'Skip to account access');
-      setNotice(element('authAlert'), message, message ? 'error' : '');
+      setNotice(element('authAlert'), message, message ? kind : '');
     }
 
     async function enterBuilder(loginUser) {
@@ -1271,11 +1378,20 @@
     }
 
     function workspaceMarker() {
-      return { sessionEpoch: state.sessionEpoch, workspaceEpoch: state.workspaceEpoch, workspaceID: currentWorkspaceID() };
+      return {
+        sessionEpoch: state.sessionEpoch,
+        workspaceEpoch: state.workspaceEpoch,
+        workspaceScopeId: state.workspaceScopeId,
+        workspaceID: currentWorkspaceID(),
+        principalID: Number(state.user && (state.user.id || state.user.userId)) || 0,
+        bearer: state.token,
+      };
     }
 
     function currentWorkspace(marker) {
-      return currentSession(marker.sessionEpoch) && marker.workspaceEpoch === state.workspaceEpoch && marker.workspaceID === currentWorkspaceID();
+      return currentSession(marker.sessionEpoch) && marker.workspaceEpoch === state.workspaceEpoch
+        && marker.workspaceScopeId === state.workspaceScopeId && marker.workspaceID === currentWorkspaceID()
+        && marker.principalID === (Number(state.user && (state.user.id || state.user.userId)) || 0) && marker.bearer === state.token;
     }
 
     class StaleWorkspaceView extends Error {}
@@ -1334,6 +1450,8 @@
       const workspaceID = currentWorkspaceID();
       const historySucceededEmpty = workspaceID > 0 && state.buildHistoryLoadState === 'success' && state.buildHistory.length === 0;
       const path = element('signedStarterPath');
+      const starterWasVisible = !path.hidden;
+      const starterStatus = element('starterPathStatus');
       path.hidden = !historySucceededEmpty;
       const openNewest = element('openNewestBuildButton');
       openNewest.hidden = !workspaceID || state.buildHistory.length === 0;
@@ -1345,7 +1463,14 @@
       recoveryInvite.hidden = !recoveryInviteAllowed;
       recoveryInvite.disabled = !recoveryInviteAllowed;
       recoveryInvite.title = recoveryInviteAllowed ? 'Creates a Viewer invitation whose acceptance token is shown only in this browser session.' : '';
-      if (!historySucceededEmpty) return;
+      if (!historySucceededEmpty) {
+        const ownedSummary = starterStatus.dataset.summary;
+        if (starterWasVisible && ownedSummary) {
+          if (starterStatus.textContent === ownedSummary) starterStatus.textContent = '';
+          delete starterStatus.dataset.summary;
+        }
+        return;
+      }
 
       const selected = selectedTemplate();
       const selectedCount = state.catalogHealthy ? selectedModules().length : 0;
@@ -1445,9 +1570,9 @@
         invite.title = 'Workspace membership must resolve before invitations are available.';
       }
       const summary = `${steps.filter((step) => step[1]).length} of ${steps.length} signed starter checks complete. ${primary.textContent}.`;
-      if (element('starterPathStatus').dataset.summary !== summary) {
-        element('starterPathStatus').dataset.summary = summary;
-        element('starterPathStatus').textContent = summary;
+      if (starterStatus.dataset.summary !== summary) {
+        starterStatus.dataset.summary = summary;
+        starterStatus.textContent = summary;
       }
     }
 
@@ -1620,7 +1745,8 @@
       if (element('loadTrackButton').getAttribute('aria-busy') !== 'true') element('loadTrackButton').disabled = !workspaceID || !accessResolved;
       element('retryBuildHistory').disabled = !workspaceID;
       element('loadMoreBuildHistory').disabled = !workspaceID;
-      element('createInviteButton').disabled = !publishAllowed;
+      const invitationBlocked = Boolean(state.invitationMutation || state.invitationAction);
+      element('createInviteButton').disabled = !publishAllowed || invitationBlocked;
       element('createInviteButton').title = publishAllowed ? '' : 'Only an Architect may invite workspace members.';
       element('createProposalButton').disabled = !workspaceID || !['Architect', 'Maintainer'].includes(state.productRole);
       element('loadProposalButton').disabled = !workspaceID;
@@ -1651,19 +1777,28 @@
       element('domainAccessHelp').textContent = publishAllowed
         ? 'Architect access: claims and publication history are loaded from this exact workspace.'
         : (workspaceID ? `${roleLabel} access is read-only here. Only an Architect may issue DNS proof, verify, or publish.` : 'Select an Architect workspace to manage exact delivery origins.');
-      element('domainClaimSelect').disabled = !publishAllowed || !state.domainClaims.length;
-      element('domainOrigin').disabled = !publishAllowed;
-      element('retryDomainClaims').disabled = !publishAllowed;
-      if (element('claimDomainButton').getAttribute('aria-busy') !== 'true') element('claimDomainButton').disabled = !publishAllowed;
-      if (element('verifyDomainButton').getAttribute('aria-busy') !== 'true') element('verifyDomainButton').disabled = !publishAllowed || !state.domainClaim || String(state.domainClaim.status).toLowerCase() !== 'pending';
-      element('loadMoreDomainPublications').disabled = !publishAllowed || state.domainPublicationLoadState === 'loading';
-      element('refreshDomainPublication').disabled = !publishAllowed || !state.selectedDomainPublication || state.publishing;
+      const domainEvidenceUnavailable = state.domainLoadState !== 'success';
+      const domainBlocked = Boolean(domainEvidenceUnavailable || state.domainMutation || state.domainRevokeTarget || state.publishing || state.publicationAction);
+      const domainSelectionBlocked = Boolean(domainEvidenceUnavailable || state.domainRevokeTarget || state.domainMutation?.kind === 'revoke' || state.publishing || state.publicationAction);
+      element('domainClaimSelect').disabled = !publishAllowed || !state.domainClaims.length || domainSelectionBlocked;
+      element('domainOrigin').disabled = !publishAllowed || domainSelectionBlocked;
+      element('retryDomainClaims').disabled = !publishAllowed || state.domainLoadState === 'loading' || state.domainRevokeTarget || state.domainMutation?.kind === 'revoke' || state.publishing || state.publicationAction;
+      if (element('claimDomainButton').getAttribute('aria-busy') !== 'true') element('claimDomainButton').disabled = !publishAllowed || domainBlocked;
+      if (element('verifyDomainButton').getAttribute('aria-busy') !== 'true') element('verifyDomainButton').disabled = !publishAllowed || domainBlocked || !state.domainClaim || String(state.domainClaim.status).toLowerCase() !== 'pending';
+      if (element('revokeDomainButton').getAttribute('aria-busy') !== 'true') {
+        element('revokeDomainButton').disabled = !publishAllowed || domainBlocked || !state.domainClaim || !['pending', 'verified'].includes(domainClaimLabel(state.domainClaim));
+      }
+      element('loadMoreDomainPublications').disabled = !publishAllowed || state.domainLoadState !== 'success' || state.domainPublicationLoadState === 'loading'
+        || state.domainMutation || state.domainRevokeTarget || state.publishing || state.publicationAction;
+      element('refreshDomainPublication').disabled = !publishAllowed || state.domainLoadState !== 'success' || !state.selectedDomainPublication
+        || state.domainMutation || state.domainRevokeTarget || state.publishing || state.publicationAction;
       if (!publishAllowed) {
         state.selectedDomainPublicationExact = false;
         state.publicationAction = '';
       }
       renderDomainPublications();
       renderApprovedDecisions();
+      renderInvitations();
       if (!buildAllowed && workspaceID) {
         element('workspaceHelp').textContent = 'This workspace is read-only for your Viewer role. Ask an Architect to assign Maintainer access to build.';
       } else {
@@ -1671,6 +1806,9 @@
       }
       if (state.listings.length) renderBazaar();
       if (state.templates.length) renderComponentEditors();
+      const selectedWorkspace = selectedWorkspaceIdentity();
+      element('openDeleteOwnedWorkspace').disabled = Boolean(state.accountAction) || !state.workspacesReady || state.workspaceCleanupNeedsReload || state.peopleLoadState !== 'success' || state.workspaceRole !== 'owner' || !selectedWorkspace.id;
+      element('openDeleteOwnedWorkspace').textContent = selectedWorkspace.id ? `Delete ${selectedWorkspace.name}` : 'Delete selected owned workspace';
       updatePreviewAvailability();
       renderSignedStarterPath();
     }
@@ -1687,6 +1825,175 @@
         meta.textContent = summary.meta;
         item.append(strong, meta);
         target.append(item);
+      }
+    }
+
+    function principalID() {
+      return Number(state.user && (state.user.id || state.user.userId)) || 0;
+    }
+
+    function memberFingerprint(member) {
+      return JSON.stringify({
+        userID: Number(member && member.user_id),
+        username: String(member && member.username || ''),
+        role: String(member && member.role || ''),
+      });
+    }
+
+    function memberRemovalAllowed(member) {
+      return state.peopleLoadState === 'success' && canPublishWorkspace() && member
+        && Number(member.user_id) > 0 && Number(member.user_id) !== principalID()
+        && String(member.role || '').toLowerCase() !== 'owner';
+    }
+
+    function selectedWorkspaceIdentity() {
+      const id = currentWorkspaceID();
+      const workspace = state.workspaces.find((candidate) => Number(candidate && candidate.id) === id);
+      return { id, name: String(workspace && workspace.name || `Workspace ${id}`) };
+    }
+
+    function renderPeople({ focusRemoveUserID = 0 } = {}) {
+      const target = element('peopleList');
+      target.replaceChildren();
+      const workspace = selectedWorkspaceIdentity();
+      for (const member of state.members) {
+        const item = document.createElement('li');
+        item.className = 'surface-record';
+        const title = document.createElement('strong');
+        title.textContent = String(member.username || `User ${member.user_id}`);
+        const meta = document.createElement('span');
+        meta.textContent = `User ID ${member.user_id} · ${productRoleForWorkspaceRole(String(member.role || '')) || 'Unknown role'} · workspace role ${member.role || 'unknown'} · ${workspace.name} (workspace ID ${workspace.id})`;
+        item.append(title, meta);
+        if (memberRemovalAllowed(member)) {
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'button tertiary';
+          remove.textContent = 'Remove member';
+          remove.dataset.removeMember = String(member.user_id);
+          remove.setAttribute('aria-label', `Remove ${String(member.username || 'member')}, user ID ${member.user_id}, from ${workspace.name}, workspace ID ${workspace.id}`);
+          remove.addEventListener('click', () => openMemberRemoval(member));
+          item.append(remove);
+          const action = state.memberAction;
+          if (action && action.userID === Number(member.user_id)) {
+            const confirm = document.createElement('div');
+            confirm.className = 'inline-confirm';
+            confirm.setAttribute('role', 'alertdialog');
+            const titleID = `member-removal-title-${action.userID}`;
+            const copyID = `member-removal-copy-${action.userID}`;
+            confirm.setAttribute('aria-labelledby', titleID);
+            confirm.setAttribute('aria-describedby', copyID);
+            const confirmationTitle = document.createElement('strong');
+            confirmationTitle.id = titleID;
+            confirmationTitle.textContent = `Remove ${String(member.username || 'member')} (user ID ${member.user_id})?`;
+            const copy = document.createElement('p');
+            copy.id = copyID;
+            copy.textContent = `Remove this exact member from ${action.workspaceName} (workspace ID ${action.marker.workspaceID})? Their existing sign-in token will no longer authorize that workspace. This does not delete their account or retained audit history.`;
+            const actions = document.createElement('div');
+            actions.className = 'surface-actions';
+            const approve = document.createElement('button');
+            approve.id = 'confirmMemberRemoval';
+            approve.type = 'button';
+            approve.className = 'button';
+            approve.textContent = 'Remove from workspace';
+            approve.addEventListener('click', removeSelectedMember);
+            const cancel = document.createElement('button');
+            cancel.id = 'cancelMemberRemoval';
+            cancel.type = 'button';
+            cancel.className = 'button secondary';
+            cancel.textContent = 'Cancel';
+            cancel.disabled = Boolean(action.inFlight);
+            cancel.addEventListener('click', cancelMemberRemoval);
+            actions.append(approve, cancel);
+            confirm.append(confirmationTitle, copy, actions);
+            item.append(confirm);
+          }
+        }
+        target.append(item);
+      }
+      if (focusRemoveUserID) target.querySelector(`[data-remove-member="${focusRemoveUserID}"]`)?.focus();
+    }
+
+    function openMemberRemoval(member) {
+      if (!memberRemovalAllowed(member) || state.memberAction) return;
+      state.memberAction = {
+        marker: workspaceMarker(),
+        userID: Number(member.user_id),
+        workspaceName: selectedWorkspaceIdentity().name,
+        inFlight: false,
+        fingerprint: memberFingerprint(member),
+      };
+      renderPeople();
+      element('confirmMemberRemoval')?.focus();
+    }
+
+    function cancelMemberRemoval() {
+      const action = state.memberAction;
+      if (!action || action.inFlight) return;
+      const userID = Number(action.userID);
+      state.memberAction = null;
+      renderPeople({ focusRemoveUserID: userID });
+      announce('Member removal cancelled. No request was sent.');
+    }
+
+    function applyPeopleReadback(payload) {
+      const members = normalizeCollection(payload, 'members');
+      state.members = members;
+      const current = members.find((member) => Number(member.user_id) === principalID());
+      const platformAdmin = String(state.user && state.user.role || '').toLowerCase() === 'admin';
+      state.workspaceRole = current ? String(current.role || '') : (platformAdmin ? 'admin' : '');
+      state.productRole = productRoleForWorkspaceRole(state.workspaceRole);
+      state.peopleLoadState = 'success';
+      renderPeople();
+      element('peopleState').textContent = members.length ? `${members.length} real workspace member${members.length === 1 ? '' : 's'}.` : 'No active workspace members were returned.';
+      renderWorkspaceAccess();
+      return members;
+    }
+
+    async function removeSelectedMember() {
+      const action = state.memberAction;
+      const targetMember = action && state.members.find((member) => Number(member.user_id) === action.userID);
+      if (!action || !targetMember || !currentWorkspace(action.marker) || memberFingerprint(targetMember) !== action.fingerprint || !memberRemovalAllowed(targetMember)) return;
+      const button = element('confirmMemberRemoval');
+      if (!button || button.getAttribute('aria-busy') === 'true') return;
+      const cancel = element('cancelMemberRemoval');
+      action.inFlight = true;
+      setBusy(button, true, 'Removing…', 'Remove from workspace');
+      if (cancel) cancel.disabled = true;
+      let mutationCompleted = false;
+      try {
+        await api(`/workspaces/${action.marker.workspaceID}/users/${action.userID}`, { method: 'DELETE' });
+        mutationCompleted = true;
+        if (state.memberAction !== action || !currentWorkspace(action.marker)) return;
+        const payload = await api(`/workspaces/${action.marker.workspaceID}/people`);
+        if (state.memberAction !== action || !currentWorkspace(action.marker)) return;
+        const members = normalizeCollection(payload, 'members');
+        if (members.some((member) => Number(member.user_id) === action.userID)) throw new Error('Authoritative People still includes the selected member.');
+        state.memberAction = null;
+        applyPeopleReadback(payload);
+        element('peopleState').textContent = `Removal confirmed by authoritative People readback. ${members.length} workspace member${members.length === 1 ? '' : 's'} remain.`;
+        announce('Member removed. Authoritative workspace membership was reloaded.');
+        element('membersTitle').focus();
+      } catch (error) {
+        if (state.memberAction !== action || !currentWorkspace(action.marker)) return;
+        state.memberAction = null;
+        const explicitRejection = error instanceof ApiError && error.status >= 400 && error.status < 500;
+        if (mutationCompleted || !explicitRejection) {
+          state.peopleLoadState = 'error';
+          element('peopleState').textContent = 'Member removal outcome is unknown because the mutation or authoritative People readback did not complete cleanly. Membership controls are disabled; use Reload people before relying on workspace scope.';
+          renderPeople();
+          renderWorkspaceAccess();
+          element('retryPeople').focus();
+        } else {
+          element('peopleState').textContent = 'The server explicitly rejected the member removal, so no removal is asserted. Reload authoritative People before retrying.';
+          renderPeople({ focusRemoveUserID: action.userID });
+        }
+        announce('Member removal outcome requires authoritative People recovery before retrying.');
+      } finally {
+        if (state.memberAction === action && currentWorkspace(action.marker) && button) {
+          action.inFlight = false;
+          setBusy(button, false, 'Removing…', 'Remove from workspace');
+          if (cancel) cancel.disabled = false;
+        }
       }
     }
 
@@ -1886,8 +2193,13 @@
 
     async function loadWorkspaceContext() {
       const workspaceID = currentWorkspaceID();
-      const marker = { sessionEpoch: state.sessionEpoch, workspaceEpoch: ++state.workspaceEpoch, workspaceID };
+      state.workspaceEpoch += 1;
+      const marker = workspaceMarker();
       state.members = [];
+      state.memberAction = null;
+      state.invitationAction = null;
+      state.invitationMutation = null;
+      state.domainRevokeTarget = null;
       state.workspaceRole = '';
       state.productRole = '';
       state.peopleLoadState = workspaceID ? 'loading' : 'idle';
@@ -1908,6 +2220,8 @@
       element('questRecord').hidden = true;
       element('inviteTokenOutput').value = '';
       element('inviteGrant').hidden = true;
+      state.invitationGrantID = '';
+      element('domainRevokeConfirm').hidden = true;
       renderWorkspaceAccess();
       setNotice(element('proposalAlert'), '');
       setNotice(element('questAlert'), '');
@@ -1929,19 +2243,8 @@
       try {
         const payload = await api(`/workspaces/${workspaceID}/people`);
         if (!currentWorkspace(marker)) return;
-        state.members = normalizeCollection(payload, 'members');
-        const current = state.members.find((member) => Number(member.user_id) === Number(state.user && state.user.id));
-        const platformAdmin = String(state.user && state.user.role || '').toLowerCase() === 'admin';
-        state.workspaceRole = current ? String(current.role || '') : (platformAdmin ? 'admin' : '');
-        state.productRole = productRoleForWorkspaceRole(state.workspaceRole);
-        renderRecordList(element('peopleList'), state.members, (member) => ({
-          title: String(member.username || `User ${member.user_id}`),
-          meta: `${productRoleForWorkspaceRole(String(member.role || '')) || 'Unknown role'} · workspace role ${member.role || 'unknown'}`,
-        }));
-        element('peopleState').textContent = state.members.length ? `${state.members.length} real workspace member${state.members.length === 1 ? '' : 's'}.` : 'No active workspace members were returned.';
-        state.peopleLoadState = 'success';
+        applyPeopleReadback(payload);
         renderBuildHistory();
-        renderWorkspaceAccess();
         void maybeRecoverSignedStarterProgress();
         await Promise.allSettled([historyPromise, domainPromise]);
         if (!currentWorkspace(marker)) return;
@@ -2000,12 +2303,15 @@
       element('previewButton').textContent = 'Create staging preview';
 
       state.domainEpoch += 1;
+      state.domainRevokeEpoch += 1;
       state.domainPublicationEpoch += 1;
       state.invitationEpoch += 1;
       state.acceptanceEpoch += 1;
       state.publicationEpoch += 1;
       state.publishing = false;
       state.domainClaims = [];
+      state.domainRevokeTarget = null;
+      state.domainMutation = null;
       state.domainPublications = [];
       state.domainPublicationCursor = '';
       state.domainPublicationLoadState = 'idle';
@@ -2032,6 +2338,7 @@
       element('workspaceEmpty').hidden = true;
       element('retryWorkspaces').hidden = true;
       state.workspacesReady = false;
+      syncAccountActionControls();
       try {
         const payload = await api('/workspaces');
         if (!currentSession(sessionEpoch) || requestEpoch !== state.workspacesEpoch) return;
@@ -2053,6 +2360,8 @@
           element('workspaceReady').hidden = false;
         }
         state.workspacesReady = true;
+        state.workspaceCleanupNeedsReload = false;
+        syncAccountActionControls();
         activateWorkspaceScope();
         seedOrganizationFromWorkspace();
         await loadWorkspaceContext();
@@ -2060,6 +2369,7 @@
         if (!currentSession(sessionEpoch) || requestEpoch !== state.workspacesEpoch) return;
         setNotice(element('workspaceError'), error.message || 'Could not load workspaces.', 'error');
         element('retryWorkspaces').hidden = false;
+        syncAccountActionControls();
       } finally {
         if (currentSession(sessionEpoch) && requestEpoch === state.workspacesEpoch) {
           element('workspaceLoading').hidden = true;
@@ -2416,6 +2726,7 @@
     function renderCustomFieldRow(componentID, key, value, list, errorTarget, readOnly) {
       const row = document.createElement('div');
       row.className = 'custom-field';
+      row.dataset.fieldKey = key;
       const keyInput = document.createElement('input');
       keyInput.value = key;
       keyInput.placeholder = 'field_name';
@@ -2471,7 +2782,10 @@
       remove.addEventListener('click', () => {
         const candidate = cloneDocument(state.componentDocuments[componentID]);
         delete candidate[key];
-        if (setComponentDocument(componentID, candidate, errorTarget)) renderComponentEditors();
+        if (setComponentDocument(componentID, candidate, errorTarget)) {
+          renderComponentEditors();
+          focusComponentHeading(componentID, `Removed custom field ${key}. Focus returned to the surviving ${componentID} component heading.`);
+        }
       });
       for (const control of [keyInput, type, valueInput, remove]) control.disabled = readOnly;
       row.append(keyInput, type, valueInput, remove);
@@ -2500,6 +2814,8 @@
       const copy = document.createElement('div');
       const strong = document.createElement('strong');
       strong.textContent = String(module.title || id);
+      strong.tabIndex = -1;
+      strong.dataset.componentHeading = 'true';
       const small = document.createElement('small');
       small.textContent = `One curated instance · ${id}. JSON supplies escaped content only.`;
       copy.append(strong, small);
@@ -2561,8 +2877,14 @@
         const candidate = cloneDocument(state.componentDocuments[id]);
         let index = 1;
         while (Object.hasOwn(candidate, `custom_${index}`)) index += 1;
-        candidate[`custom_${index}`] = '';
-        if (setComponentDocument(id, candidate, error)) renderComponentEditors();
+        const key = `custom_${index}`;
+        candidate[key] = '';
+        if (setComponentDocument(id, candidate, error)) {
+          renderComponentEditors();
+          const row = [...(componentCard(id)?.querySelectorAll('.custom-field') || [])].find((candidateRow) => candidateRow.dataset.fieldKey === key);
+          row?.querySelector('input')?.focus();
+          announce(`Added ${key} to ${id}. Focus moved to its field name.`);
+        }
       });
       tools.append(add);
       const advanced = document.createElement('details');
@@ -2577,14 +2899,23 @@
       applyJSON.type = 'button';
       applyJSON.className = 'button tertiary';
       applyJSON.textContent = 'Apply valid JSON';
+      applyJSON.dataset.applyComponentJson = id;
       applyJSON.disabled = readOnly;
       applyJSON.addEventListener('click', () => {
         try {
           const candidate = parseCanonicalJSONText(jsonInput.value);
-          if (setComponentDocument(id, candidate, error)) renderComponentEditors();
+          if (setComponentDocument(id, candidate, error)) {
+            renderComponentEditors();
+            const nextCard = componentCard(id);
+            const nextAdvanced = nextCard?.querySelector('.advanced-document');
+            if (nextAdvanced) nextAdvanced.open = true;
+            nextCard?.querySelector('[data-apply-component-json]')?.focus();
+            announce(`Applied valid JSON for ${id}. Focus returned to Apply valid JSON.`);
+          }
         } catch (parseError) {
           error.textContent = `Component ${id}: invalid JSON (${parseError.message}). The last valid document is retained.`;
           error.hidden = false;
+          applyJSON.focus();
         }
       });
       advanced.append(summary, jsonInput, applyJSON);
@@ -2595,6 +2926,8 @@
         } else state.selectedComponentIds = state.selectedComponentIds.filter((entry) => entry !== id);
         saveComponentDraft();
         renderComponentEditors();
+        componentCard(id)?.querySelector('.component-head input')?.focus();
+        announce(`${String(module.title || id)} component ${checkbox.checked ? 'included' : 'removed from this draft'}.`);
         markPreviewDirty();
       });
       fields.append(error, customTitle, customHelp, customList, tools, advanced);
@@ -2632,6 +2965,15 @@
       for (const id of allowed) moduleList.append(renderComponentEditor(id, allowed));
       state.templateReady = state.catalogHealthy;
       updatePreviewAvailability();
+    }
+
+    function componentCard(componentID) {
+      return [...element('moduleList').querySelectorAll('.component-editor')].find((card) => card.dataset.componentId === componentID) || null;
+    }
+
+    function focusComponentHeading(componentID, message) {
+      componentCard(componentID)?.querySelector('[data-component-heading]')?.focus();
+      if (message) announce(message);
     }
 
     function applyTemplateSelection(templateID, { markDirty = true } = {}) {
@@ -2837,7 +3179,8 @@
         return;
       }
       const publicationRequested = state.track && String(state.track.status).toUpperCase() === 'PUBLICATION_REQUESTED' && state.domainClaim && state.track.claimId === state.domainClaim.id;
-      const canPublish = canPublishWorkspace() && state.previewReady && claimIsVerified() && currentPreviewIncludesDomain() && !state.building && !state.publishing;
+      const canPublish = state.peopleLoadState === 'success' && state.domainLoadState === 'success' && canPublishWorkspace()
+        && state.previewReady && claimIsVerified() && currentPreviewIncludesDomain() && !state.domainMutation && !state.domainRevokeTarget && !state.building && !state.publishing;
       element('deployButton').disabled = !canPublish;
       element('deployButton').textContent = publicationRequested ? 'Retry activation' : 'Publish verified domain';
       if (publicationRequested) {
@@ -3065,6 +3408,14 @@
       element('loadMoreDomainPublications').hidden = true;
       element('domainPublicationRecord').hidden = true;
       element('domainPublicationConfirm').hidden = true;
+      element('refreshDomainPublication').disabled = true;
+      element('replaceDomainPublication').hidden = true;
+      element('replaceDomainPublication').disabled = true;
+      element('rollbackDomainPublication').hidden = true;
+      element('rollbackDomainPublication').disabled = true;
+      element('domainPublicationConfirmCopy').textContent = '';
+      element('confirmDomainPublicationAction').disabled = true;
+      element('cancelDomainPublicationAction').disabled = true;
       setNotice(element('domainPublicationAlert'), '');
       element('domainPublicationState').textContent = message;
     }
@@ -3075,7 +3426,7 @@
       record.hidden = !publication;
       if (!publication) return;
       const exact = state.selectedDomainPublicationExact;
-      const controlsReady = exact && state.domainPublicationLoadState === 'success' && state.peopleLoadState === 'success' && canPublishWorkspace() && !state.publishing;
+      const controlsReady = exact && state.domainLoadState === 'success' && state.domainPublicationLoadState === 'success' && state.peopleLoadState === 'success' && canPublishWorkspace() && claimIsVerified() && !state.domainMutation && !state.domainRevokeTarget && !state.publishing;
       element('domainPublicationRecordTitle').textContent = `${publicationTruth(publication)} · ${publication.id}`;
       element('domainPublicationRecordMeta').textContent = `${publication.origin} · activated ${formatCockpitTime(publication.activatedAt)}${publication.deactivatedAt ? ` · deactivated ${formatCockpitTime(publication.deactivatedAt)}` : ''}${publication.sourcePublicationId ? ` · source ${publication.sourcePublicationId}` : ''}`;
       element('domainPublicationRecordExpiry').textContent = exact
@@ -3085,12 +3436,14 @@
       element('domainPublicationRecordBinding').textContent = exact && publication.trackBinding
         ? `Exact stored build binding ${publication.trackBinding.trackId} · ${publication.trackBinding.status} · version ${publication.trackBinding.version}`
         : (exact ? 'No unique stored build binding is available. Open an exact signed build from Build history, or create a new signed preview.' : 'Build binding is not resolved from ordinary history.');
-      element('refreshDomainPublication').disabled = !canPublishWorkspace() || state.peopleLoadState !== 'success' || state.publishing;
+      element('refreshDomainPublication').disabled = state.domainLoadState !== 'success' || !canPublishWorkspace() || state.peopleLoadState !== 'success' || state.domainMutation || state.domainRevokeTarget || state.publishing;
       const proofPresent = Boolean(publication.authorizationExpiresAt && publication.manifestDigest);
       const replacementAllowed = controlsReady && publication.active && ['serving', 'expired'].includes(publication.servingState) && proofPresent && publication.trackBinding;
       const rollbackAllowed = controlsReady && !publication.active && publication.servingState === 'inactive' && proofPresent;
       element('replaceDomainPublication').hidden = !replacementAllowed;
+      element('replaceDomainPublication').disabled = !replacementAllowed;
       element('rollbackDomainPublication').hidden = !rollbackAllowed;
+      element('rollbackDomainPublication').disabled = !rollbackAllowed;
       element('domainPublicationConfirm').hidden = !state.publicationAction;
       if (state.publicationAction === 'replace') {
         element('domainPublicationConfirmCopy').textContent = `Create and activate a new immutable 90-day signed replacement from exact stored build ${publication.trackBinding && publication.trackBinding.trackId}. The current activation record and stored bytes remain unchanged in history.`;
@@ -3118,13 +3471,15 @@
         inspect.className = 'button secondary publication-action';
         inspect.dataset.publicationId = publication.id;
         inspect.textContent = 'Inspect publication';
-        inspect.disabled = state.peopleLoadState !== 'success' || !canPublishWorkspace() || state.publishing;
+        inspect.disabled = state.domainLoadState !== 'success' || state.peopleLoadState !== 'success' || !canPublishWorkspace()
+          || state.domainMutation || state.domainRevokeTarget || state.publishing || state.publicationAction;
         inspect.addEventListener('click', () => selectDomainPublication(publication.id, { focus: true }));
         item.append(title, meta, inspect);
         target.append(item);
       }
       element('loadMoreDomainPublications').hidden = !state.domainPublicationCursor;
-      element('loadMoreDomainPublications').disabled = state.domainPublicationLoadState === 'loading' || !canPublishWorkspace();
+      element('loadMoreDomainPublications').disabled = state.domainLoadState !== 'success' || state.domainPublicationLoadState === 'loading'
+        || !canPublishWorkspace() || state.domainMutation || state.domainRevokeTarget || state.publishing || state.publicationAction;
       renderDomainPublicationRecord();
     }
 
@@ -3137,7 +3492,8 @@
         select.append(option);
       }
       select.value = state.domainClaims.some((claim) => String(claim.id) === selectedID) ? selectedID : '';
-      select.disabled = !canPublishWorkspace() || !state.domainClaims.length;
+      select.disabled = state.domainLoadState !== 'success' || !canPublishWorkspace() || !state.domainClaims.length || state.domainRevokeTarget
+        || state.domainMutation?.kind === 'revoke' || state.publishing || state.publicationAction;
     }
 
     async function loadDomainPublications(claim, { append = false } = {}) {
@@ -3197,7 +3553,8 @@
     async function selectDomainPublication(publicationID, { focus = false, preserveFailClosed = false, automatic = false } = {}) {
       const workspaceID = currentWorkspaceID();
       const claimID = String(state.domainClaim && state.domainClaim.id || '');
-      if (!workspaceID || !claimID || !publicationID || state.peopleLoadState !== 'success' || !canPublishWorkspace()) return null;
+      if (!workspaceID || !claimID || !publicationID || state.domainLoadState !== 'success'
+        || state.peopleLoadState !== 'success' || !canPublishWorkspace()) return null;
       const marker = workspaceMarker();
       const requestEpoch = ++state.domainPublicationEpoch;
       if (!preserveFailClosed) state.selectedDomainPublication = state.domainPublications.find((publication) => publication.id === publicationID) || null;
@@ -3320,8 +3677,10 @@
       element('domainOrigin').value = state.domainOrigin;
       element('domainClaimSelect').value = String(claim.id);
       const status = domainClaimLabel(claim);
-      element('verifyDomainButton').disabled = status !== 'pending' || !canPublishWorkspace();
-      element('claimDomainButton').textContent = status === 'pending' ? 'Rotate DNS proof' : 'Issue DNS proof';
+      const mutationBlocked = Boolean(state.domainLoadState !== 'success' || state.domainMutation || state.domainRevokeTarget || state.publishing || state.publicationAction);
+      element('verifyDomainButton').disabled = mutationBlocked || status !== 'pending' || !canPublishWorkspace();
+      element('revokeDomainButton').disabled = mutationBlocked || !['pending', 'verified'].includes(status) || !canPublishWorkspace();
+      if (element('claimDomainButton').getAttribute('aria-busy') !== 'true') element('claimDomainButton').textContent = status === 'pending' ? 'Rotate DNS proof' : 'Issue DNS proof';
       const next = status === 'verified'
         ? `Verified until ${formatCockpitTime(claim.verificationExpiresAt)}. ${currentPreviewIncludesDomain() ? 'Bound into the current signed preview.' : 'Refresh the signed preview to bind this exact origin before publication.'}`
         : status === 'pending'
@@ -3334,6 +3693,7 @@
     }
 
     async function loadDomainClaims() {
+      if (state.domainLoadState === 'loading' || state.domainRevokeTarget || state.domainMutation?.kind === 'revoke' || state.publishing || state.publicationAction) return;
       const workspaceID = currentWorkspaceID();
       if (!workspaceID) {
         state.domainLoadState = 'idle';
@@ -3349,25 +3709,35 @@
       }
       const marker = workspaceMarker();
       const requestEpoch = ++state.domainEpoch;
+      const publicationEpoch = state.publicationEpoch;
+      const previousLoadState = state.domainLoadState;
+      const loaderCurrent = () => currentWorkspace(marker) && requestEpoch === state.domainEpoch
+        && publicationEpoch === state.publicationEpoch && !state.publishing && !state.publicationAction;
       const previousID = String(state.domainClaim && state.domainClaim.id || '');
       state.domainLoadState = 'loading';
-      setBusy(element('claimDomainButton'), false, 'Creating…', 'Issue DNS proof');
-      setBusy(element('verifyDomainButton'), false, 'Verifying…', 'Verify DNS proof');
+      if (!state.domainMutation) {
+        setBusy(element('claimDomainButton'), false, 'Creating…', 'Issue DNS proof');
+        setBusy(element('verifyDomainButton'), false, 'Verifying…', 'Verify DNS proof');
+      }
       element('claimDomainButton').disabled = true;
       element('verifyDomainButton').disabled = true;
       element('domainClaimsState').textContent = 'Loading real domain claims for this workspace…';
       element('domainClaimsState').hidden = false;
       element('retryDomainClaims').disabled = true;
+      renderDomainClaims();
+      renderWorkspaceAccess();
+      updateDeploymentAvailability();
       try {
         const payload = await api(`/workspaces/${workspaceID}/domains`);
-        if (!currentWorkspace(marker) || requestEpoch !== state.domainEpoch) return;
-        state.domainClaims = normalizeCollection(payload, 'claims');
-        state.domainLoadState = 'success';
-        const selected = state.domainClaims.find((claim) => String(claim.id) === previousID)
-          || state.domainClaims.find((claim) => domainClaimLabel(claim) === 'verified')
-          || state.domainClaims.find((claim) => domainClaimLabel(claim) === 'pending')
-          || state.domainClaims[0]
+        if (!loaderCurrent()) return;
+        const claims = normalizeCollection(payload, 'claims');
+        const selected = claims.find((claim) => String(claim.id) === previousID)
+          || claims.find((claim) => domainClaimLabel(claim) === 'verified')
+          || claims.find((claim) => domainClaimLabel(claim) === 'pending')
+          || claims[0]
           || null;
+        if (!loaderCurrent()) return;
+        state.domainClaims = claims;
         state.domainClaim = selected;
         renderDomainClaims();
         if (selected) await selectDomainClaim(selected.id);
@@ -3376,8 +3746,12 @@
           resetPublicationContextUI('No publication activation records exist because no domain claim is selected.');
           element('domainClaimsState').textContent = 'No domain claims yet. Issue a DNS proof for one exact HTTPS origin; external DNS remains required.';
         }
+        if (!loaderCurrent()) return;
+        state.domainLoadState = 'success';
+        renderWorkspaceAccess();
+        updateDeploymentAvailability();
       } catch (error) {
-        if (!currentWorkspace(marker) || requestEpoch !== state.domainEpoch) return;
+        if (!loaderCurrent()) return;
         state.domainLoadState = 'error';
         state.domainClaims = [];
         state.domainClaim = null;
@@ -3387,13 +3761,20 @@
         element('domainClaimsState').textContent = `${error.message || 'Domain claims could not be loaded.'} Domain evidence is unavailable for this membership; no mutation controls are enabled. Use Reload domain claims to retry.`;
       } finally {
         if (currentWorkspace(marker) && requestEpoch === state.domainEpoch) {
-          element('retryDomainClaims').disabled = false;
+          if (!loaderCurrent()) state.domainLoadState = previousLoadState;
+          element('retryDomainClaims').disabled = !loaderCurrent();
           renderWorkspaceAccess();
+          updateDeploymentAvailability();
         }
       }
     }
 
     function resetDomainClaim(clearOrigin = false) {
+      const mutation = state.domainMutation;
+      if ((!clearOrigin && state.domainLoadState !== 'success') || state.domainRevokeTarget || mutation?.kind === 'revoke' || state.publishing || state.publicationAction) {
+        element('domainOrigin').value = state.domainOrigin;
+        return;
+      }
       state.domainEpoch += 1;
       state.domainPublicationEpoch += 1;
       state.domainClaim = null;
@@ -3403,13 +3784,148 @@
       resetPublicationContextUI('Select or create a domain claim to load publication history.');
       element('domainProof').textContent = '';
       element('domainProof').hidden = true;
-      setBusy(element('claimDomainButton'), false, 'Creating…', 'Issue DNS proof');
-      element('claimDomainButton').disabled = !canPublishWorkspace();
-      setBusy(element('verifyDomainButton'), false, 'Verifying…', 'Verify DNS proof');
-      element('verifyDomainButton').disabled = true;
+      state.domainRevokeTarget = null;
+      element('domainRevokeConfirm').hidden = true;
+      if (!mutation) {
+        setBusy(element('claimDomainButton'), false, 'Creating…', 'Issue DNS proof');
+        element('claimDomainButton').disabled = !canPublishWorkspace();
+        setBusy(element('verifyDomainButton'), false, 'Verifying…', 'Verify DNS proof');
+        element('verifyDomainButton').disabled = true;
+      }
+      element('revokeDomainButton').disabled = true;
       if (canPublishWorkspace()) element('domainClaimsState').textContent = 'Enter a new exact origin, or choose an existing claim above.';
       setNotice(element('domainStatus'), '');
+      renderWorkspaceAccess();
       updateDeploymentAvailability();
+    }
+
+    function domainClaimFingerprint(claim) {
+      return JSON.stringify({
+        id: String(claim && claim.id || ''),
+        workspaceID: Number(claim && claim.workspaceId),
+        origin: String(claim && claim.origin || ''),
+        status: domainClaimLabel(claim),
+        updatedAt: String(claim && claim.updatedAt || ''),
+        challengeExpiresAt: String(claim && claim.challengeExpiresAt || ''),
+        verificationExpiresAt: String(claim && claim.verificationExpiresAt || ''),
+      });
+    }
+
+    function openDomainRevoke() {
+      const claim = state.domainClaim;
+      const status = domainClaimLabel(claim);
+      if (!claim || state.domainLoadState !== 'success' || state.domainMutation || state.domainRevokeTarget || state.publishing || state.publicationAction || element('revokeDomainButton').getAttribute('aria-busy') === 'true'
+        || !['pending', 'verified'].includes(status) || state.peopleLoadState !== 'success' || !canPublishWorkspace()) return;
+      const epoch = ++state.domainRevokeEpoch;
+      state.domainRevokeTarget = {
+        marker: workspaceMarker(),
+        epoch,
+        claimID: String(claim.id),
+        origin: String(claim.origin || ''),
+        status,
+        fingerprint: domainClaimFingerprint(claim),
+        inFlight: false,
+      };
+      element('domainRevokeConfirmCopy').textContent = status === 'verified'
+        ? `Revoke verified claim ${state.domainRevokeTarget.origin}? Public serving and publication authority for this exact claim ends immediately. Immutable publication and audit history remains. The trusted staging preview stays visible but cannot be published through this claim.`
+        : `Revoke pending claim ${state.domainRevokeTarget.origin}? Its DNS verification and future publication authority ends. This pending claim is not presented as currently serving. Immutable audit history remains, and the trusted staging preview stays non-publishable through this claim.`;
+      element('domainRevokeConfirm').hidden = false;
+      renderWorkspaceAccess();
+      updateDeploymentAvailability();
+      element('confirmDomainRevoke').focus();
+    }
+
+    function cancelDomainRevoke() {
+      if (!state.domainRevokeTarget || state.domainRevokeTarget.inFlight || state.domainMutation) return;
+      state.domainRevokeTarget = null;
+      element('domainRevokeConfirm').hidden = true;
+      renderWorkspaceAccess();
+      updateDeploymentAvailability();
+      element('revokeDomainButton').focus();
+      announce('Domain revocation cancelled. No request was sent.');
+    }
+
+    async function revokeSelectedDomain() {
+      const action = state.domainRevokeTarget;
+      const targetCurrent = () => action && state.domainRevokeTarget === action && currentWorkspace(action.marker)
+        && state.domainRevokeEpoch === action.epoch && state.domainClaim && String(state.domainClaim.id || '') === action.claimID
+        && String(state.domainClaim.origin || '') === action.origin;
+      const mutationCurrent = () => targetCurrent() && state.domainLoadState === 'success' && domainClaimFingerprint(state.domainClaim) === action.fingerprint
+        && ['pending', 'verified'].includes(domainClaimLabel(state.domainClaim)) && state.peopleLoadState === 'success' && canPublishWorkspace();
+      if (!mutationCurrent() || state.domainMutation || state.publishing || state.publicationAction || action.inFlight) return;
+      const button = element('confirmDomainRevoke');
+      const cancel = element('cancelDomainRevoke');
+      if (button.getAttribute('aria-busy') === 'true') return;
+      action.inFlight = true;
+      const mutation = { kind: 'revoke', action };
+      state.domainMutation = mutation;
+      setBusy(button, true, 'Revoking…', 'Revoke domain claim');
+      cancel.disabled = true;
+      try {
+        const path = `/workspaces/${action.marker.workspaceID}/domains/${encodeURIComponent(action.claimID)}`;
+        const revoked = await api(path, { method: 'DELETE' });
+        if (state.domainMutation !== mutation || !targetCurrent()) return;
+        if (!revoked || String(revoked.id || '') !== action.claimID || Number(revoked.workspaceId) !== action.marker.workspaceID
+          || String(revoked.origin || '') !== action.origin || domainClaimLabel(revoked) !== 'revoked') {
+          throw new Error('The revoke response did not match the exact selected domain claim.');
+        }
+        state.domainClaim = revoked;
+        state.domainClaims = [revoked, ...state.domainClaims.filter((claim) => String(claim && claim.id || '') !== action.claimID)];
+        state.domainOrigin = action.origin;
+        state.domainLoadState = 'loading';
+        element('domainProof').textContent = '';
+        element('domainProof').hidden = true;
+        renderDomainClaims();
+        renderWorkspaceAccess();
+        const readback = await api(path);
+        if (state.domainMutation !== mutation || !targetCurrent()) return;
+        if (!readback || String(readback.id || '') !== action.claimID || Number(readback.workspaceId) !== action.marker.workspaceID
+          || String(readback.origin || '') !== action.origin || domainClaimLabel(readback) !== 'revoked') {
+          throw new Error('Authoritative claim readback did not confirm the exact revoked claim.');
+        }
+        state.domainClaim = readback;
+        state.domainClaims = [readback, ...state.domainClaims.filter((claim) => String(claim && claim.id || '') !== action.claimID)];
+        state.domainLoadState = 'success';
+        renderDomainClaims();
+        resetPublicationContextUI('Reloading immutable publication history after claim revocation…');
+        await loadDomainPublications(readback);
+        if (state.domainMutation !== mutation || !targetCurrent()) return;
+        if (state.domainPublicationLoadState !== 'success') throw new Error('The claim is revoked, but authoritative publication history could not be reloaded.');
+        element('domainClaimsState').textContent = action.status === 'verified'
+          ? `Revoked ${action.origin}. Public serving and publication authority ended; immutable activation history remains.`
+          : `Revoked pending claim ${action.origin}. DNS verification and future publication authority ended; this claim was not presented as publicly serving. Immutable history remains.`;
+        setNotice(element('domainStatus'), 'Domain revocation confirmed by exact claim and publication-history readback. DNS proof is hidden; verify, publish, replacement, and rollback are disabled. The trusted preview remains staging-only.', 'success');
+        announce(action.status === 'verified'
+          ? 'Domain claim revoked. Public serving ended and retained publication history was reloaded.'
+          : 'Pending domain claim revoked. Future publication authority ended and retained history was reloaded.');
+        updateDeploymentAvailability();
+      } catch (error) {
+        if (state.domainMutation !== mutation || !currentWorkspace(action.marker) || state.domainRevokeEpoch !== action.epoch) return;
+        state.domainLoadState = 'error';
+        state.domainClaims = [];
+        state.domainClaim = null;
+        state.domainOrigin = '';
+        element('domainProof').textContent = '';
+        element('domainProof').hidden = true;
+        renderDomainClaims();
+        resetPublicationContextUI('Domain claim and publication truth are unknown after an unconfirmed revoke outcome. Reload exact domain evidence before relying on serving state.');
+        state.domainPublicationLoadState = 'error';
+        setNotice(element('domainStatus'), 'Domain revoke outcome is unknown. DNS proof and every verify, publish, replacement, and rollback control remain disabled until exact claim and publication history reload successfully.', 'gold');
+        announce('Domain revoke outcome is unknown. Reload exact domain evidence before any publication action.');
+        updateDeploymentAvailability();
+      } finally {
+        if (state.domainMutation === mutation) state.domainMutation = null;
+        if (action && currentWorkspace(action.marker) && state.domainRevokeEpoch === action.epoch) {
+          action.inFlight = false;
+          setBusy(button, false, 'Revoking…', 'Revoke domain claim');
+          cancel.disabled = false;
+          state.domainRevokeTarget = null;
+          element('domainRevokeConfirm').hidden = true;
+          renderWorkspaceAccess();
+          updateDeploymentAvailability();
+          element('domainClaimSelect').focus();
+        }
+      }
     }
 
     function selectedModules() {
@@ -4195,6 +4711,7 @@
     }
 
     async function claimDomain() {
+      if (state.domainLoadState !== 'success' || state.domainMutation || state.domainRevokeTarget || state.publishing || state.publicationAction) return;
       const workspaceID = currentWorkspaceID();
       const marker = workspaceMarker();
       const origin = element('domainOrigin').value.trim();
@@ -4208,11 +4725,15 @@
         return;
       }
       const operationEpoch = ++state.domainEpoch;
-      const operationCurrent = () => currentWorkspace(marker)
+      const mutation = { kind: 'claim', marker, operationEpoch, origin };
+      state.domainMutation = mutation;
+      const operationCurrent = () => state.domainMutation === mutation && currentWorkspace(marker)
         && operationEpoch === state.domainEpoch
         && element('domainOrigin').value.trim() === origin;
       const button = element('claimDomainButton');
       setBusy(button, true, 'Creating…', 'Create DNS proof');
+      renderWorkspaceAccess();
+      updateDeploymentAvailability();
       setNotice(element('domainStatus'), '');
       try {
         const result = await api(`/workspaces/${workspaceID}/domains`, { method: 'POST', body: { origin } });
@@ -4231,16 +4752,21 @@
         updateDeploymentAvailability();
       } catch (error) {
         if (!operationCurrent()) return;
-        setNotice(element('domainStatus'), error.message || 'Could not create the DNS proof.', 'error');
+        setNotice(element('domainStatus'), 'The DNS proof could not be created. No claim change is asserted; reload domain evidence before retrying if the request may have reached the server.', 'error');
       } finally {
-        if (operationCurrent()) {
-          setBusy(button, false, 'Creating…', state.domainClaim && domainClaimLabel(state.domainClaim) === 'pending' ? 'Rotate DNS proof' : 'Issue DNS proof');
-          renderWorkspaceAccess();
+        if (state.domainMutation === mutation) {
+          state.domainMutation = null;
+          if (currentWorkspace(marker)) {
+            setBusy(button, false, 'Creating…', state.domainClaim && domainClaimLabel(state.domainClaim) === 'pending' ? 'Rotate DNS proof' : 'Issue DNS proof');
+            renderWorkspaceAccess();
+            updateDeploymentAvailability();
+          }
         }
       }
     }
 
     async function verifyDomain() {
+      if (state.domainLoadState !== 'success' || state.domainMutation || state.domainRevokeTarget || state.publishing || state.publicationAction) return;
       const workspaceID = currentWorkspaceID();
       const marker = workspaceMarker();
       if (!workspaceID || !state.domainClaim || !state.domainClaim.id) {
@@ -4250,7 +4776,9 @@
       const claimID = String(state.domainClaim.id);
       const origin = String(state.domainClaim.origin || state.domainOrigin || '');
       const operationEpoch = ++state.domainEpoch;
-      const operationCurrent = () => currentWorkspace(marker)
+      const mutation = { kind: 'verify', marker, operationEpoch, claimID, origin };
+      state.domainMutation = mutation;
+      const operationCurrent = () => state.domainMutation === mutation && currentWorkspace(marker)
         && operationEpoch === state.domainEpoch
         && state.domainClaim
         && String(state.domainClaim.id) === claimID
@@ -4259,6 +4787,8 @@
         && element('domainClaimSelect').value === claimID;
       const button = element('verifyDomainButton');
       setBusy(button, true, 'Verifying…', 'Verify DNS proof');
+      renderWorkspaceAccess();
+      updateDeploymentAvailability();
       try {
         const path = `/workspaces/${workspaceID}/domains/${encodeURIComponent(claimID)}`;
         const inspected = await api(path);
@@ -4282,11 +4812,15 @@
         updateDeploymentAvailability();
       } catch (error) {
         if (!operationCurrent()) return;
-        setNotice(element('domainStatus'), error.message || 'The DNS proof could not be verified yet.', 'error');
+        setNotice(element('domainStatus'), 'DNS verification did not complete. Reload the exact claim before retrying; no verified state is asserted from this response.', 'error');
       } finally {
-        if (operationCurrent()) {
-          setBusy(button, false, 'Verifying…', 'Verify DNS proof');
-          renderWorkspaceAccess();
+        if (state.domainMutation === mutation) {
+          state.domainMutation = null;
+          if (currentWorkspace(marker)) {
+            setBusy(button, false, 'Verifying…', 'Verify DNS proof');
+            renderWorkspaceAccess();
+            updateDeploymentAvailability();
+          }
         }
       }
     }
@@ -4318,6 +4852,7 @@
     }
 
     async function publishVerifiedDomain() {
+      if (state.domainLoadState !== 'success' || state.publishing || state.publicationAction || state.domainMutation || state.domainRevokeTarget) return;
       if (!state.track || !state.track.id || !claimIsVerified() || !currentPreviewIncludesDomain()) {
         setNotice(element('domainStatus'), 'Verify the domain and create a fresh preview that includes it before publishing.', 'error');
         return;
@@ -4342,7 +4877,11 @@
         && state.domainClaim
         && String(state.domainClaim.id) === claimID
         && String(state.domainClaim.origin || '') === claimOrigin
-        && state.domainOrigin === claimOrigin;
+        && state.domainOrigin === claimOrigin
+        && state.domainLoadState === 'success'
+        && !state.domainMutation
+        && !state.domainRevokeTarget
+        && !state.publicationAction;
       const reconcileCapturedTrack = async () => {
         if (!selectionCurrent()) return null;
         const latest = await api(`/conductor/tracks/${encodeURIComponent(trackID)}`);
@@ -4363,6 +4902,7 @@
         return latest;
       };
       state.publishing = true;
+      renderWorkspaceAccess();
       updateDeploymentAvailability();
       setBusy(button, true, 'Publishing…', 'Publish verified domain');
       try {
@@ -4419,6 +4959,7 @@
         if (operationEpoch === state.publicationEpoch) {
           state.publishing = false;
           setBusy(button, false, 'Publishing…', 'Publish verified domain');
+          renderWorkspaceAccess();
         }
         if (currentWorkspace(marker)) {
           updateDeploymentAvailability();
@@ -4509,7 +5050,8 @@
     function startPublicationAction(action) {
       const publication = state.selectedDomainPublication;
       if (!publication || !state.selectedDomainPublicationExact || state.domainPublicationLoadState !== 'success'
-        || state.peopleLoadState !== 'success' || !canPublishWorkspace() || state.publishing) return;
+        || state.domainLoadState !== 'success' || state.peopleLoadState !== 'success' || !canPublishWorkspace() || state.publishing || state.publicationAction
+        || state.domainMutation || state.domainRevokeTarget) return;
       const proofPresent = Boolean(publication.authorizationExpiresAt && publication.manifestDigest);
       if (action === 'replace') {
         if (!publication.active || !['serving', 'expired'].includes(publication.servingState) || !proofPresent || !publication.trackBinding) return;
@@ -4520,14 +5062,17 @@
         if (publication.active || publication.servingState !== 'inactive' || !proofPresent) return;
       } else return;
       state.publicationAction = action;
+      renderWorkspaceAccess();
       renderDomainPublicationRecord();
       focusPublicationConfirmation(action, publication.id);
     }
 
     function cancelPublicationAction() {
+      if (state.publishing) return;
       const action = state.publicationAction;
       if (action === 'replace' && state.replacementAttempt && !state.replacementAttempt.started) state.replacementAttempt = null;
       state.publicationAction = '';
+      renderWorkspaceAccess();
       renderDomainPublicationRecord();
       const target = action === 'rollback' ? element('rollbackDomainPublication') : element('replaceDomainPublication');
       if (!target.hidden) target.focus();
@@ -4565,17 +5110,22 @@
     async function createPublicationReplacement() {
       const sourcePublication = state.selectedDomainPublication;
       const attempt = state.replacementAttempt;
-      if (!sourcePublication || !attempt || attempt.publicationID !== sourcePublication.id) return;
+      if (state.publishing || state.publicationAction !== 'replace' || state.domainMutation || state.domainRevokeTarget
+        || state.domainLoadState !== 'success' || !state.selectedDomainPublicationExact || state.domainPublicationLoadState !== 'success'
+        || !sourcePublication || !attempt || attempt.publicationID !== sourcePublication.id || !claimIsVerified()) return;
       const marker = workspaceMarker();
       const claimID = String(state.domainClaim && state.domainClaim.id || '');
+      const claimFingerprint = domainClaimFingerprint(state.domainClaim);
       const origin = String(sourcePublication.origin);
       const operationEpoch = ++state.publicationEpoch;
       const operationCurrent = () => currentWorkspace(marker) && operationEpoch === state.publicationEpoch
-        && state.domainClaim && String(state.domainClaim.id || '') === claimID && String(state.domainClaim.origin || '') === origin;
+        && state.domainClaim && String(state.domainClaim.id || '') === claimID && String(state.domainClaim.origin || '') === origin
+        && state.domainLoadState === 'success' && domainClaimFingerprint(state.domainClaim) === claimFingerprint && !state.domainMutation && !state.domainRevokeTarget;
       state.publishing = true;
       attempt.started = true;
       setBusy(element('confirmDomainPublicationAction'), true, 'Replacing…', 'Create and activate replacement');
       setNotice(element('domainPublicationAlert'), 'Verifying the exact source build before creating a new immutable 90-day artifact…', 'gold');
+      renderWorkspaceAccess();
       renderDomainPublicationRecord();
       let replacementTrackID = attempt.trackID;
       try {
@@ -4639,6 +5189,7 @@
         if (operationEpoch === state.publicationEpoch) {
           state.publishing = false;
           setBusy(element('confirmDomainPublicationAction'), false, 'Replacing…', 'Create and activate replacement');
+          renderWorkspaceAccess();
           renderDomainPublications();
           updateDeploymentAvailability();
         }
@@ -4647,15 +5198,21 @@
 
     async function activatePriorPublication() {
       const sourcePublication = state.selectedDomainPublication;
-      if (!sourcePublication || sourcePublication.active || sourcePublication.servingState !== 'inactive') return;
+      if (state.publishing || state.publicationAction !== 'rollback' || state.domainMutation || state.domainRevokeTarget
+        || state.domainLoadState !== 'success' || !state.selectedDomainPublicationExact || state.domainPublicationLoadState !== 'success' || !claimIsVerified()
+        || !sourcePublication || sourcePublication.active || sourcePublication.servingState !== 'inactive') return;
       const marker = workspaceMarker();
       const claimID = String(state.domainClaim && state.domainClaim.id || '');
+      const claimOrigin = String(state.domainClaim && state.domainClaim.origin || '');
+      const claimFingerprint = domainClaimFingerprint(state.domainClaim);
       const operationEpoch = ++state.publicationEpoch;
       const operationCurrent = () => currentWorkspace(marker) && operationEpoch === state.publicationEpoch
-        && state.domainClaim && String(state.domainClaim.id || '') === claimID;
+        && state.domainClaim && String(state.domainClaim.id || '') === claimID && String(state.domainClaim.origin || '') === claimOrigin
+        && state.domainLoadState === 'success' && domainClaimFingerprint(state.domainClaim) === claimFingerprint && !state.domainMutation && !state.domainRevokeTarget;
       state.publishing = true;
       setBusy(element('confirmDomainPublicationAction'), true, 'Activating…', 'Activate prior publication');
       setNotice(element('domainPublicationAlert'), 'Activating an exact verified historical artifact as a new immutable publication event…', 'gold');
+      renderWorkspaceAccess();
       renderDomainPublicationRecord();
       try {
         const currentPublication = await readExactPublicationContext(sourcePublication.id, marker, claimID);
@@ -4699,6 +5256,7 @@
         if (operationEpoch === state.publicationEpoch) {
           state.publishing = false;
           setBusy(element('confirmDomainPublicationAction'), false, 'Activating…', 'Activate prior publication');
+          renderWorkspaceAccess();
           renderDomainPublications();
           updateDeploymentAvailability();
         }
@@ -4706,6 +5264,7 @@
     }
 
     async function confirmPublicationAction() {
+      if (state.domainLoadState !== 'success' || state.publishing || state.domainMutation || state.domainRevokeTarget) return;
       if (state.publicationAction === 'replace') await createPublicationReplacement();
       else if (state.publicationAction === 'rollback') await activatePriorPublication();
     }
@@ -4731,37 +5290,205 @@
     function renderInvitations() {
       const workspaceID = currentWorkspaceID();
       const visible = state.invitations.filter((invitation) => Number(invitation && invitation.workspace_id) === workspaceID);
-      renderRecordList(element('invitationList'), visible, (invitation) => ({
-        title: `${invitation.role || 'Unknown role'} · ${invitation.status || 'UNKNOWN'}`,
-        meta: `${invitation.id || 'Invitation'} · workspace ${invitation.workspace_id || 'unknown'}`,
-      }));
+      const target = element('invitationList');
+      target.replaceChildren();
+      for (const invitation of visible) {
+        const item = document.createElement('li');
+        item.className = 'surface-record';
+        const title = document.createElement('strong');
+        title.textContent = `${invitation.role || 'Unknown role'} · ${invitation.status || 'UNKNOWN'}`;
+        const meta = document.createElement('span');
+        meta.textContent = `${invitation.id || 'Invitation'} · workspace ${invitation.workspace_id || 'unknown'} · version ${invitation.version || '?'}`;
+        item.append(title, meta);
+        const pending = String(invitation.status || '').toUpperCase() === 'PENDING';
+        const revocable = pending && Boolean(String(invitation.id || '')) && Number.isInteger(Number(invitation.version)) && Number(invitation.version) > 0;
+        if (revocable && state.peopleLoadState === 'success' && canPublishWorkspace()) {
+          const revoke = document.createElement('button');
+          revoke.type = 'button';
+          revoke.className = 'button tertiary';
+          revoke.textContent = 'Revoke invitation';
+          revoke.dataset.revokeInvitation = String(invitation.id || '');
+          revoke.disabled = Boolean(state.invitationMutation);
+          revoke.addEventListener('click', () => openInvitationRevoke(invitation));
+          item.append(revoke);
+          if (state.invitationAction && state.invitationAction.id === String(invitation.id || '')) {
+            const dialogSuffix = Array.from(String(invitation.id)).map((character) => character.codePointAt(0).toString(16)).join('-');
+            const titleID = `invitation-revoke-title-${dialogSuffix}`;
+            const copyID = `invitation-revoke-copy-${dialogSuffix}`;
+            const confirm = document.createElement('div');
+            confirm.className = 'inline-confirm';
+            confirm.setAttribute('role', 'alertdialog');
+            confirm.setAttribute('aria-labelledby', titleID);
+            confirm.setAttribute('aria-describedby', copyID);
+            const confirmationTitle = document.createElement('strong');
+            confirmationTitle.id = titleID;
+            confirmationTitle.textContent = `Revoke invitation ${invitation.id}?`;
+            const copy = document.createElement('p');
+            copy.id = copyID;
+            copy.textContent = `Revoke this exact current-session invitation for workspace ID ${invitation.workspace_id} at version ${invitation.version}? The displayed acceptance secret will be cleared if the server returns REVOKED. There is no durable invitation list to read after a conflict or reload.`;
+            const actions = document.createElement('div');
+            actions.className = 'surface-actions';
+            const approve = document.createElement('button');
+            approve.id = 'confirmInvitationRevoke';
+            approve.type = 'button';
+            approve.className = 'button';
+            approve.textContent = 'Revoke invitation';
+            approve.addEventListener('click', revokeSelectedInvitation);
+            const cancel = document.createElement('button');
+            cancel.id = 'cancelInvitationRevoke';
+            cancel.type = 'button';
+            cancel.className = 'button secondary';
+            cancel.textContent = 'Cancel';
+            cancel.disabled = Boolean(state.invitationAction.inFlight);
+            cancel.addEventListener('click', cancelInvitationRevoke);
+            actions.append(approve, cancel);
+            confirm.append(confirmationTitle, copy, actions);
+            item.append(confirm);
+          }
+        }
+        target.append(item);
+      }
+    }
+
+    function upsertInvitation(invitation) {
+      if (!invitation || !invitation.id) return;
+      state.invitations = [invitation, ...state.invitations.filter((candidate) => String(candidate && candidate.id || '') !== String(invitation.id))];
+    }
+
+    function invitationFingerprint(invitation) {
+      return JSON.stringify({
+        id: String(invitation && invitation.id || ''),
+        workspaceID: Number(invitation && invitation.workspace_id),
+        status: String(invitation && invitation.status || ''),
+        version: Number(invitation && invitation.version),
+      });
+    }
+
+    function openInvitationRevoke(invitation) {
+      if (!invitation || !String(invitation.id || '') || !Number.isInteger(Number(invitation.version)) || Number(invitation.version) <= 0
+        || state.invitationAction || state.invitationMutation || String(invitation.status || '').toUpperCase() !== 'PENDING' || !canPublishWorkspace() || state.peopleLoadState !== 'success') return;
+      state.invitationAction = {
+        marker: workspaceMarker(),
+        id: String(invitation.id),
+        version: Number(invitation.version),
+        inFlight: false,
+        fingerprint: invitationFingerprint(invitation),
+      };
+      element('createInviteButton').disabled = true;
+      renderInvitations();
+      element('confirmInvitationRevoke')?.focus();
+    }
+
+    function cancelInvitationRevoke() {
+      const action = state.invitationAction;
+      if (!action || action.inFlight) return;
+      const id = String(action.id || '');
+      state.invitationAction = null;
+      renderInvitations();
+      element('createInviteButton').disabled = !canPublishWorkspace() || state.peopleLoadState !== 'success';
+      element('invitationList').querySelector(`[data-revoke-invitation="${CSS.escape(id)}"]`)?.focus();
+      announce('Invitation revocation cancelled. No request was sent.');
+    }
+
+    async function revokeSelectedInvitation() {
+      const action = state.invitationAction;
+      const invitation = action && state.invitations.find((candidate) => String(candidate && candidate.id || '') === action.id);
+      if (!action || !invitation || !currentWorkspace(action.marker) || invitationFingerprint(invitation) !== action.fingerprint
+        || !action.id || !Number.isInteger(action.version) || action.version <= 0 || String(invitation.status || '').toUpperCase() !== 'PENDING'
+        || !canPublishWorkspace() || state.peopleLoadState !== 'success') return;
+      const button = element('confirmInvitationRevoke');
+      if (!button || button.getAttribute('aria-busy') === 'true') return;
+      const cancel = element('cancelInvitationRevoke');
+      const requestEpoch = ++state.invitationEpoch;
+      action.inFlight = true;
+      const mutation = { kind: 'revoke', action, requestEpoch };
+      state.invitationMutation = mutation;
+      element('createInviteButton').disabled = true;
+      setBusy(button, true, 'Revoking…', 'Revoke invitation');
+      if (cancel) cancel.disabled = true;
+      try {
+        const revoked = await api(`/shura/v1/invitations/${encodeURIComponent(action.id)}/revoke`, { method: 'POST', body: { expected_version: action.version } });
+        if (state.invitationMutation !== mutation || state.invitationAction !== action || !currentWorkspace(action.marker) || requestEpoch !== state.invitationEpoch) return;
+        if (!revoked || String(revoked.id || '') !== action.id || Number(revoked.workspace_id) !== action.marker.workspaceID
+          || String(revoked.status || '').toUpperCase() !== 'REVOKED' || Number(revoked.version) !== action.version + 1) {
+          throw new Error('The revoke response did not match the exact pending invitation and expected next version.');
+        }
+        upsertInvitation(revoked);
+        if (state.invitationGrantID === action.id) {
+          state.invitationGrantID = '';
+          element('inviteTokenOutput').value = '';
+          element('inviteGrant').hidden = true;
+        }
+        state.invitationAction = null;
+        renderInvitations();
+        setNotice(element('inviteResult'), 'Invitation revoked at the expected version. Its displayed secret was cleared. This browser still has no durable invitation index after reload.', 'success');
+        announce('Invitation revoked and displayed acceptance secret cleared.');
+        element('inviteTitle').focus();
+      } catch (error) {
+        if (state.invitationMutation !== mutation || state.invitationAction !== action || !currentWorkspace(action.marker) || requestEpoch !== state.invitationEpoch) return;
+        state.invitationMutation = null;
+        state.invitationAction = null;
+        if (error instanceof ApiError && error.status === 409) {
+          const local = state.invitations.find((candidate) => String(candidate && candidate.id || '') === action.id);
+          if (local) local.status = 'STATUS UNKNOWN';
+          if (state.invitationGrantID === action.id) {
+            state.invitationGrantID = '';
+            element('inviteTokenOutput').value = '';
+            element('inviteGrant').hidden = true;
+          }
+          setNotice(element('inviteResult'), 'The invitation changed before revoke completed. It may have been accepted or revoked. No durable invitation read route exists, so this browser cannot claim its current status; the displayed secret was cleared.', 'gold');
+        } else {
+          setNotice(element('inviteResult'), 'The invitation was not confirmed revoked. No revoked status is claimed; retry only while this current-session record is still pending.', 'error');
+        }
+        renderInvitations();
+        announce('Invitation revocation was not confirmed.');
+        (element('invitationList').querySelector(`[data-revoke-invitation="${CSS.escape(action.id)}"]`) || element('inviteTitle')).focus();
+      } finally {
+        if (state.invitationMutation === mutation) state.invitationMutation = null;
+        if (state.invitationAction === action && currentWorkspace(action.marker) && requestEpoch === state.invitationEpoch && button) {
+          action.inFlight = false;
+          setBusy(button, false, 'Revoking…', 'Revoke invitation');
+          if (cancel) cancel.disabled = false;
+        }
+        if (currentWorkspace(action.marker)) element('createInviteButton').disabled = !canPublishWorkspace() || state.peopleLoadState !== 'success';
+      }
     }
 
     async function createInvitation() {
       const invitee = element('invitee').value.trim();
+      if (state.invitationMutation || state.invitationAction) return;
       if (!invitee || !currentWorkspaceID()) {
         setNotice(element('inviteResult'), 'Select a workspace and enter an invitee.', 'error');
         return;
       }
       const marker = workspaceMarker();
       const operationEpoch = ++state.invitationEpoch;
+      const mutation = { kind: 'create', marker, operationEpoch };
+      state.invitationMutation = mutation;
+      renderInvitations();
+      const operationCurrent = () => state.invitationMutation === mutation && currentWorkspace(marker) && operationEpoch === state.invitationEpoch;
       const button = element('createInviteButton');
       setBusy(button, true, 'Creating…', 'Create invitation');
       try {
         const result = await api('/shura/v1/invitations', { method: 'POST', body: { workspace_id: currentWorkspaceID(), invitee, role: element('inviteRole').value, ttl_seconds: 604800 } });
-        if (!currentWorkspace(marker)) return;
+        if (!operationCurrent()) return;
         if (!result || !result.invitation || !result.token) throw new Error('Invitation response was incomplete.');
-        state.invitations.unshift(result.invitation);
+        if (Number(result.invitation.workspace_id) !== marker.workspaceID || String(result.invitation.invitee || '') !== invitee
+          || String(result.invitation.role || '') !== element('inviteRole').value || String(result.invitation.status || '').toUpperCase() !== 'PENDING'
+          || !Number.isInteger(Number(result.invitation.version)) || Number(result.invitation.version) < 1) throw new Error('Invitation response did not match the exact workspace, invitee, role, and pending version.');
+        upsertInvitation(result.invitation);
+        state.invitationGrantID = String(result.invitation.id || '');
         element('inviteTokenOutput').value = String(result.token);
         element('inviteGrant').hidden = false;
         renderInvitations();
         setNotice(element('inviteResult'), 'Invitation created. Share the acceptance token through a trusted channel; it is shown only in this session.', 'success');
         announce('Invitation created.');
       } catch (error) {
-        if (!currentWorkspace(marker)) return;
-        setNotice(element('inviteResult'), error.message || 'Invitation could not be created.', 'error');
+        if (!operationCurrent()) return;
+        setNotice(element('inviteResult'), 'Invitation creation did not complete. No pending invitation is asserted; retry only after the current request finishes.', 'error');
       } finally {
-        if (operationEpoch === state.invitationEpoch && currentSession(marker.sessionEpoch) && marker.workspaceID === currentWorkspaceID()) {
+        if (operationCurrent()) {
+          state.invitationMutation = null;
           setBusy(button, false, 'Creating…', 'Create invitation');
           renderWorkspaceAccess();
         }
@@ -4789,7 +5516,12 @@
       try {
         const invitation = await api('/shura/v1/invitations/accept', { method: 'POST', body: { token } });
         if (!operationCurrent()) return;
-        state.invitations.unshift(invitation);
+        upsertInvitation(invitation);
+        if (state.invitationGrantID === String(invitation && invitation.id || '')) {
+          state.invitationGrantID = '';
+          element('inviteTokenOutput').value = '';
+          element('inviteGrant').hidden = true;
+        }
         element('acceptInviteToken').value = '';
         renderInvitations();
         setNotice(element('acceptInviteResult'), `Invitation accepted as ${invitation.role}. Loading workspace ${invitation.workspace_id}.`, 'success');
@@ -5225,6 +5957,246 @@
       }
     }
 
+    function accountMarker(epoch) {
+      return { epoch, sessionEpoch: state.sessionEpoch, userID: principalID(), bearer: state.token };
+    }
+
+    function currentAccount(marker) {
+      return marker && marker.epoch === state.accountEpoch && currentSession(marker.sessionEpoch)
+        && marker.userID === principalID() && marker.bearer === state.token;
+    }
+
+    function currentAccountAction(action, kind) {
+      return Boolean(action && state.accountAction === action && action.kind === kind && currentAccount(action.marker));
+    }
+
+    function syncAccountActionControls() {
+      const active = Boolean(state.accountAction);
+      const workspaceDeleteInFlight = state.accountAction?.kind === 'workspace-delete' && state.accountAction.inFlight;
+      if (element('changePasswordButton').getAttribute('aria-busy') !== 'true') element('changePasswordButton').disabled = active;
+      element('openDeleteAccount').disabled = active || !state.workspacesReady || state.workspaceCleanupNeedsReload;
+      element('workspaceSelect').disabled = workspaceDeleteInFlight;
+      if (element('createWorkspaceButton').getAttribute('aria-busy') !== 'true') element('createWorkspaceButton').disabled = workspaceDeleteInFlight;
+      element('retryWorkspaces').disabled = workspaceDeleteInFlight;
+      if (element('confirmDeleteOwnedWorkspace').getAttribute('aria-busy') !== 'true') {
+        const workspace = selectedWorkspaceIdentity();
+        element('openDeleteOwnedWorkspace').disabled = active || !state.workspacesReady || state.workspaceCleanupNeedsReload || state.peopleLoadState !== 'success' || state.workspaceRole !== 'owner' || !workspace.id;
+      }
+    }
+
+    async function changePassword(event) {
+      event.preventDefault();
+      if (state.accountAction || element('changePasswordButton').getAttribute('aria-busy') === 'true') return;
+      let password = element('newPassword').value;
+      let confirmation = element('confirmNewPassword').value;
+      if (password.length < 12) {
+        setNotice(element('passwordResult'), 'Password was not changed. Use at least 12 characters.', 'error');
+        element('newPassword').focus();
+        return;
+      }
+      if (password !== confirmation) {
+        setNotice(element('passwordResult'), 'Password was not changed. The confirmation must exactly match the new password.', 'error');
+        element('confirmNewPassword').focus();
+        return;
+      }
+      const operationEpoch = ++state.accountEpoch;
+      const marker = accountMarker(operationEpoch);
+      const action = { kind: 'password', marker, inFlight: true };
+      state.accountAction = action;
+      const email = String(state.user && state.user.email || '');
+      const button = element('changePasswordButton');
+      let mutationCompleted = false;
+      syncAccountActionControls();
+      setBusy(button, true, 'Changing password…', 'Change password and sign out');
+      setNotice(element('passwordResult'), 'Changing the password and invalidating all active sessions…', 'gold');
+      try {
+        const updated = await api(`/users/${marker.userID}`, { method: 'PUT', body: { password } });
+        mutationCompleted = true;
+        password = '';
+        confirmation = '';
+        element('passwordForm').reset();
+        if (!currentAccountAction(action, 'password')) return;
+        if (!updated || Number(updated.id) !== marker.userID) throw new Error('account_update_mismatch');
+        switchAuthTab('login');
+        showAuth('Password changed. This and every other session were invalidated. Sign in again with your new password.', 'success');
+        element('loginEmail').value = email;
+        element('loginPassword').value = '';
+        element('loginPassword').focus();
+      } catch (error) {
+        if (!currentAccountAction(action, 'password')) return;
+        element('passwordForm').reset();
+        if (mutationCompleted) {
+          switchAuthTab('login');
+          showAuth('The password update returned unexpected confirmation. Your sessions may have been invalidated; sign in again with the new password before retrying.', 'gold');
+          element('loginEmail').value = email;
+          element('loginPassword').value = '';
+          element('loginPassword').focus();
+          return;
+        }
+        const explicitRejection = error instanceof ApiError && error.status >= 400 && error.status < 500;
+        if (!explicitRejection) {
+          switchAuthTab('login');
+          showAuth('Password change outcome is unknown because the server response was incomplete. Sign in again with the new password; if it is rejected, use the previous password or supported account recovery. Do not retry while still assuming the old session is valid.', 'gold');
+          element('loginEmail').value = email;
+          element('loginPassword').value = '';
+          element('loginPassword').focus();
+          return;
+        }
+        setNotice(element('passwordResult'), error.status === 400
+          ? 'The server explicitly rejected the password change. Use at least 12 characters and try again.'
+          : 'The server explicitly rejected the password change. No password change is asserted; the current session remains available.', 'error');
+        element('newPassword').focus();
+      } finally {
+        password = '';
+        confirmation = '';
+        if (currentAccountAction(action, 'password')) {
+          state.accountAction = null;
+          setBusy(button, false, 'Changing password…', 'Change password and sign out');
+          syncAccountActionControls();
+        }
+      }
+    }
+
+    function openAccountDeletion() {
+      if (state.accountAction || !state.workspacesReady || state.workspaceCleanupNeedsReload || element('confirmDeleteAccount').getAttribute('aria-busy') === 'true') return;
+      const operationEpoch = ++state.accountEpoch;
+      state.accountAction = { kind: 'delete', marker: accountMarker(operationEpoch), inFlight: false };
+      syncAccountActionControls();
+      element('deleteAccountConfirm').hidden = false;
+      setNotice(element('deleteAccountResult'), '');
+      element('confirmDeleteAccount').focus();
+    }
+
+    function openOwnedWorkspaceDeletion() {
+      if (state.accountAction || !state.workspacesReady || state.workspaceCleanupNeedsReload || state.peopleLoadState !== 'success' || state.workspaceRole !== 'owner') return;
+      const workspace = selectedWorkspaceIdentity();
+      if (!workspace.id) return;
+      const operationEpoch = ++state.accountEpoch;
+      state.accountAction = { kind: 'workspace-delete', marker: accountMarker(operationEpoch), workspaceMarker: workspaceMarker(), workspace, inFlight: false };
+      syncAccountActionControls();
+      element('deleteOwnedWorkspaceCopy').textContent = `Permanently delete ${workspace.name} (workspace ID ${workspace.id})? Members will lose workspace access. Required audit and control records may remain. This is the supported cleanup required before deleting an owner account.`;
+      element('deleteOwnedWorkspaceConfirm').hidden = false;
+      setNotice(element('deleteOwnedWorkspaceResult'), '');
+      element('confirmDeleteOwnedWorkspace').focus();
+    }
+
+    function cancelOwnedWorkspaceDeletion() {
+      const action = state.accountAction;
+      if (!action || action.kind !== 'workspace-delete' || action.inFlight) return;
+      state.accountAction = null;
+      element('deleteOwnedWorkspaceConfirm').hidden = true;
+      syncAccountActionControls();
+      element('openDeleteOwnedWorkspace').focus();
+      announce('Workspace deletion cancelled. No request was sent.');
+    }
+
+    async function deleteOwnedWorkspace() {
+      const action = state.accountAction;
+      if (!currentAccountAction(action, 'workspace-delete') || action.inFlight || !currentWorkspace(action.workspaceMarker)) return;
+      const button = element('confirmDeleteOwnedWorkspace');
+      const cancel = element('cancelDeleteOwnedWorkspace');
+      action.inFlight = true;
+      state.workspaceCleanupNeedsReload = true;
+      setBusy(button, true, 'Deleting workspace…', 'Delete workspace');
+      cancel.disabled = true;
+      syncAccountActionControls();
+      try {
+        const result = await api(`/workspaces/${action.workspace.id}`, { method: 'DELETE' });
+        if (!currentAccountAction(action, 'workspace-delete')) return;
+        if (result !== null) throw new Error('workspace_delete_response_mismatch');
+        state.accountAction = null;
+        element('deleteOwnedWorkspaceConfirm').hidden = true;
+        setNotice(element('deleteOwnedWorkspaceResult'), `${action.workspace.name} (workspace ID ${action.workspace.id}) was deleted through supported workspace cleanup. Reloading your workspace list…`, 'success');
+        setBusy(button, false, 'Deleting workspace…', 'Delete workspace');
+        cancel.disabled = false;
+        syncAccountActionControls();
+        await loadWorkspaces();
+        element('accountTab').focus();
+      } catch (error) {
+        if (!currentAccountAction(action, 'workspace-delete')) return;
+        state.accountAction = null;
+        element('deleteOwnedWorkspaceConfirm').hidden = true;
+        const explicitRejection = error instanceof ApiError && error.status >= 400 && error.status < 500;
+        const recoveryMessage = explicitRejection
+          ? 'The server explicitly rejected workspace deletion. No deletion is asserted; reload workspaces before retrying.'
+          : 'Workspace deletion outcome is unknown. Reload workspaces before relying on ownership or attempting account deletion.';
+        setNotice(element('deleteOwnedWorkspaceResult'), recoveryMessage, explicitRejection ? 'error' : 'gold');
+        setNotice(element('workspaceError'), recoveryMessage, explicitRejection ? 'error' : 'gold');
+        element('retryWorkspaces').hidden = false;
+        setBusy(button, false, 'Deleting workspace…', 'Delete workspace');
+        cancel.disabled = false;
+        syncAccountActionControls();
+        switchWorkspaceTab('build');
+        element('retryWorkspaces').focus();
+      } finally {
+        if (state.accountAction === action) state.accountAction = null;
+        if (currentSession(action.marker.sessionEpoch) && principalID() === action.marker.userID) {
+          setBusy(button, false, 'Deleting workspace…', 'Delete workspace');
+          cancel.disabled = false;
+          syncAccountActionControls();
+        }
+      }
+    }
+
+    function cancelAccountDeletion() {
+      const action = state.accountAction;
+      if (!action || action.kind !== 'delete' || action.inFlight) return;
+      state.accountAction = null;
+      syncAccountActionControls();
+      element('deleteAccountConfirm').hidden = true;
+      element('openDeleteAccount').focus();
+      announce('Account deletion cancelled. No request was sent.');
+    }
+
+    async function deleteCurrentAccount() {
+      const action = state.accountAction;
+      if (!currentAccountAction(action, 'delete') || action.inFlight) return;
+      const marker = action.marker;
+      const button = element('confirmDeleteAccount');
+      const cancel = element('cancelDeleteAccount');
+      if (button.getAttribute('aria-busy') === 'true') return;
+      action.inFlight = true;
+      setBusy(button, true, 'Deleting account…', 'Permanently delete account');
+      cancel.disabled = true;
+      try {
+        const result = await api(`/users/${marker.userID}`, { method: 'DELETE' });
+        if (!currentAccountAction(action, 'delete')) return;
+        if (result !== null) throw new Error('account_delete_response_mismatch');
+        switchAuthTab('login');
+        showAuth('Account deleted. You are signed out. Required audit and control records remain retained.', 'success');
+        element('loginEmail').value = '';
+        element('loginPassword').value = '';
+        element('loginEmail').focus();
+      } catch (error) {
+        if (!currentAccountAction(action, 'delete')) return;
+        state.accountAction = null;
+        element('deleteAccountConfirm').hidden = true;
+        if (error instanceof ApiError && error.status === 409 && error.code === 'owned_workspaces_remaining') {
+          setNotice(element('deleteAccountResult'), 'Nothing was deleted. Delete every workspace you own through supported workspace cleanup, then return here and try again. Your account and current session remain active.', 'gold');
+        } else if (!(error instanceof ApiError) || error.status >= 500) {
+          switchAuthTab('login');
+          showAuth('Account deletion outcome is unknown because the server response was incomplete. You were signed out locally; sign in to determine whether the account still exists before taking another action.', 'gold');
+          element('loginEmail').value = '';
+          element('loginPassword').value = '';
+          element('loginEmail').focus();
+        } else {
+          setNotice(element('deleteAccountResult'), 'The server explicitly rejected account deletion. No deletion is asserted and the current session remains active.', 'error');
+        }
+        if (!currentSession(marker.sessionEpoch)) return;
+        setBusy(button, false, 'Deleting account…', 'Permanently delete account');
+        cancel.disabled = false;
+        syncAccountActionControls();
+        element('openDeleteAccount').focus();
+      } finally {
+        if (currentAccountAction(action, 'delete')) {
+          action.inFlight = false;
+          setBusy(button, false, 'Deleting account…', 'Permanently delete account');
+          cancel.disabled = false;
+          syncAccountActionControls();
+        }
+      }
+    }
+
     const authTabs = [...document.querySelectorAll('[data-auth-tab]')];
     authTabs.forEach((button, index) => {
       button.addEventListener('click', () => switchAuthTab(button.dataset.authTab));
@@ -5238,6 +6210,17 @@
         event.preventDefault();
         switchAuthTab(authTabs[nextIndex].dataset.authTab, { focusTab: true });
       });
+    });
+
+    element('landingRegisterButton').addEventListener('click', () => {
+      switchAuthTab('register');
+      element('registerUsername').focus();
+      element('authPanel').scrollIntoView({ block: 'start' });
+    });
+    element('landingLoginButton').addEventListener('click', () => {
+      switchAuthTab('login');
+      element('loginEmail').focus();
+      element('authPanel').scrollIntoView({ block: 'start' });
     });
 
     const workspaceTabs = [...document.querySelectorAll('[data-workspace-tab]')];
@@ -5339,15 +6322,27 @@
     element('templateSelect').addEventListener('change', () => {
       requestTemplateSelection(element('templateSelect').value);
     });
-    element('applyTemplateSwitch').addEventListener('click', () => applyTemplateSelection(state.pendingTemplateId));
+    element('applyTemplateSwitch').addEventListener('click', () => {
+      const pendingTemplateID = state.pendingTemplateId;
+      applyTemplateSelection(pendingTemplateID);
+      element('templateSelect').focus();
+      announce(`Template switch to ${pendingTemplateID} applied. Focus returned to the template selector.`);
+    });
     element('cancelTemplateSwitch').addEventListener('click', () => {
       state.pendingTemplateId = '';
       element('templateSelect').value = state.selectedTemplateId;
       element('templateReconcile').hidden = true;
       element('templateSelect').focus();
+      announce('Template switch cancelled. No draft change was applied.');
     });
     element('createWorkspaceButton').addEventListener('click', createWorkspace);
     element('workspaceSelect').addEventListener('change', async () => {
+      const cleanup = state.accountAction;
+      if (cleanup?.kind === 'workspace-delete' && cleanup.inFlight) {
+        element('workspaceSelect').value = String(cleanup.workspace.id);
+        announce(`Workspace selection is locked while ${cleanup.workspace.name} (workspace ID ${cleanup.workspace.id}) is being deleted.`);
+        return;
+      }
       activateWorkspaceScope();
       seedOrganizationFromWorkspace();
       await loadWorkspaceContext();
@@ -5381,12 +6376,20 @@
     element('resumeBuildButton').addEventListener('click', resumeSelectedBuild);
     element('domainOrigin').addEventListener('input', () => resetDomainClaim());
     element('domainClaimSelect').addEventListener('change', () => {
+      if (state.domainLoadState !== 'success' || state.domainRevokeTarget || state.domainMutation?.kind === 'revoke' || state.publishing || state.publicationAction) {
+        element('domainClaimSelect').value = String(state.domainClaim && state.domainClaim.id || '');
+        return;
+      }
       state.domainEpoch += 1;
       selectDomainClaim(element('domainClaimSelect').value);
+      renderWorkspaceAccess();
     });
     element('retryDomainClaims').addEventListener('click', loadDomainClaims);
     element('claimDomainButton').addEventListener('click', claimDomain);
     element('verifyDomainButton').addEventListener('click', verifyDomain);
+    element('revokeDomainButton').addEventListener('click', openDomainRevoke);
+    element('confirmDomainRevoke').addEventListener('click', revokeSelectedDomain);
+    element('cancelDomainRevoke').addEventListener('click', cancelDomainRevoke);
     element('loadMoreDomainPublications').addEventListener('click', () => loadDomainPublications(state.domainClaim, { append: true }));
     element('refreshDomainPublication').addEventListener('click', () => selectDomainPublication(String(state.selectedDomainPublication && state.selectedDomainPublication.id || ''), { focus: true }));
     element('replaceDomainPublication').addEventListener('click', () => startPublicationAction('replace'));
@@ -5440,6 +6443,13 @@
     element('questReconcileButton').addEventListener('click', () => mutateQuest('reconcile'));
     element('questCancelButton').addEventListener('click', () => mutateQuest('cancel'));
     element('retryBazaar').addEventListener('click', loadBazaar);
+    element('passwordForm').addEventListener('submit', changePassword);
+    element('openDeleteOwnedWorkspace').addEventListener('click', openOwnedWorkspaceDeletion);
+    element('confirmDeleteOwnedWorkspace').addEventListener('click', deleteOwnedWorkspace);
+    element('cancelDeleteOwnedWorkspace').addEventListener('click', cancelOwnedWorkspaceDeletion);
+    element('openDeleteAccount').addEventListener('click', openAccountDeletion);
+    element('confirmDeleteAccount').addEventListener('click', deleteCurrentAccount);
+    element('cancelDeleteAccount').addEventListener('click', cancelAccountDeletion);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') revalidatePublicationDeadlineAfterResume();
     });
