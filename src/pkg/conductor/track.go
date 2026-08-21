@@ -117,21 +117,22 @@ type PreviewMetadata struct {
 }
 
 type Track struct {
-	ID           string                  `json:"id"`
-	WorkspaceID  int                     `json:"workspaceId"`
-	Request      CompositionRequest      `json:"request"`
-	BuildRequest *artifacts.BuildRequest `json:"buildRequest,omitempty"`
-	Status       TrackStatus             `json:"status"`
-	Version      int64                   `json:"version"`
-	Compliance   *ComplianceEvidence     `json:"compliance,omitempty"`
-	Artifact     *ArtifactReference      `json:"artifact,omitempty"`
-	Preview      *PreviewMetadata        `json:"preview,omitempty"`
-	ClaimID      string                  `json:"claimId,omitempty"`
-	Publication  *domains.Publication    `json:"publication,omitempty"`
-	FailureCode  string                  `json:"failureCode,omitempty"`
-	CreatedBy    int                     `json:"createdBy"`
-	CreatedAt    time.Time               `json:"createdAt"`
-	UpdatedAt    time.Time               `json:"updatedAt"`
+	ID            string                  `json:"id"`
+	WorkspaceID   int                     `json:"workspaceId"`
+	Request       CompositionRequest      `json:"request"`
+	BuildRequest  *artifacts.BuildRequest `json:"buildRequest,omitempty"`
+	Status        TrackStatus             `json:"status"`
+	Version       int64                   `json:"version"`
+	Compliance    *ComplianceEvidence     `json:"compliance,omitempty"`
+	Artifact      *ArtifactReference      `json:"artifact,omitempty"`
+	Preview       *PreviewMetadata        `json:"preview,omitempty"`
+	ClaimID       string                  `json:"claimId,omitempty"`
+	Publication   *domains.Publication    `json:"publication,omitempty"`
+	PublicationID string                  `json:"-"`
+	FailureCode   string                  `json:"failureCode,omitempty"`
+	CreatedBy     int                     `json:"createdBy"`
+	CreatedAt     time.Time               `json:"createdAt"`
+	UpdatedAt     time.Time               `json:"updatedAt"`
 }
 
 // TrackSummary is the bounded workspace list view; verified reload remains the artifact trust gate.
@@ -207,7 +208,7 @@ type StagingOriginAuthority interface {
 type DomainPublicationService interface {
 	Inspect(context.Context, *models.User, int, string) (domains.Claim, error)
 	Publish(context.Context, *models.User, int, string, string) (domains.Publication, error)
-	PublicationHistory(context.Context, *models.User, int, string) ([]domains.Publication, error)
+	ActivePublication(context.Context, *models.User, int, string) (domains.Publication, error)
 }
 
 type ActorSubjectResolver struct{}
@@ -238,10 +239,15 @@ type Service struct {
 }
 
 func NewService(repository *Repository, workspaces WorkspaceAuthorizer, subjects SubjectResolver, validator CompositionValidator, compliance ComplianceAuditor, builder SignedArtifactBuilder, origins StagingOriginAuthority, publications DomainPublicationService) (*Service, error) {
-	if repository == nil || workspaces == nil || subjects == nil || validator == nil || compliance == nil || builder == nil || !builder.ProductionReady() || origins == nil || publications == nil {
+	return NewServiceWithClock(repository, workspaces, subjects, validator, compliance, builder, origins, publications, time.Now)
+}
+
+// NewServiceWithClock binds all Conductor lifecycle decisions to the server clock.
+func NewServiceWithClock(repository *Repository, workspaces WorkspaceAuthorizer, subjects SubjectResolver, validator CompositionValidator, compliance ComplianceAuditor, builder SignedArtifactBuilder, origins StagingOriginAuthority, publications DomainPublicationService, now func() time.Time) (*Service, error) {
+	if repository == nil || workspaces == nil || subjects == nil || validator == nil || compliance == nil || builder == nil || !builder.ProductionReady() || origins == nil || publications == nil || now == nil {
 		return nil, ErrInvalidComposition
 	}
-	return &Service{repository: repository, workspaces: workspaces, subjects: subjects, validator: validator, compliance: compliance, builder: builder, origins: origins, publications: publications, now: time.Now}, nil
+	return &Service{repository: repository, workspaces: workspaces, subjects: subjects, validator: validator, compliance: compliance, builder: builder, origins: origins, publications: publications, now: now}, nil
 }
 
 func (s *Service) Compose(ctx context.Context, actor *models.User, request CompositionRequest) (*ComposeResult, error) {
@@ -467,11 +473,6 @@ func (s *Service) ActivatePublication(ctx context.Context, actor *models.User, t
 	if err := s.requireVerifiedPublicationClaim(ctx, actor, track.WorkspaceID, track.ClaimID); err != nil {
 		return track, err
 	}
-	reserved := cloneTrack(track)
-	track, err = s.repository.transition(ctx, track, reserved, TrackPublicationRequested, "PUBLICATION_ACTIVATION_STARTED", actor.ID, map[string]any{"claimId": track.ClaimID}, s.now())
-	if err != nil {
-		return nil, err
-	}
 	publication, err := s.recoverOrPublish(ctx, actor, track)
 	if err != nil {
 		updated := cloneTrack(track)
@@ -489,6 +490,7 @@ func (s *Service) ActivatePublication(ctx context.Context, actor *models.User, t
 	}
 	updated := cloneTrack(track)
 	updated.Publication = &publication
+	updated.PublicationID = publication.ID
 	return s.repository.transition(ctx, track, updated, TrackPublished, "PUBLICATION_ACTIVATED", actor.ID, map[string]any{"publicationId": publication.ID, "origin": publication.Origin}, s.now())
 }
 
@@ -516,13 +518,14 @@ func (s *Service) requireVerifiedPublicationClaim(ctx context.Context, actor *mo
 }
 
 func (s *Service) recoverOrPublish(ctx context.Context, actor *models.User, track *Track) (domains.Publication, error) {
-	history, err := s.publications.PublicationHistory(ctx, actor, track.WorkspaceID, track.ClaimID)
+	publication, err := s.publications.ActivePublication(ctx, actor, track.WorkspaceID, track.ClaimID)
 	if err == nil {
-		for _, publication := range history {
-			if publication.Active && publication.ContentHash == track.Artifact.ContentHash && publication.ArtifactID == track.Artifact.ArtifactID {
-				return publication, nil
-			}
+		if publication.WorkspaceID == track.WorkspaceID && publication.ClaimID == track.ClaimID &&
+			publication.ContentHash == track.Artifact.ContentHash && publication.ArtifactID == track.Artifact.ArtifactID && publication.Active {
+			return publication, nil
 		}
+	} else if !errors.Is(err, domains.ErrPublicationMissing) {
+		return domains.Publication{}, err
 	}
 	return s.publications.Publish(ctx, actor, track.WorkspaceID, track.ClaimID, track.Artifact.ContentHash)
 }

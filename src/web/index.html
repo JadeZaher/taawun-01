@@ -170,6 +170,10 @@
     .surface-record strong, .surface-record span { display: block; overflow-wrap: anywhere; }
     .surface-record strong { font-size: 12px; }
     .surface-record span { margin-top: 3px; color: var(--parchment-dim); font-size: 10px; }
+    .publication-action, .publication-confirm .button, #loadMoreDomainPublications { min-height: 44px; min-width: 44px; }
+    .publication-confirm { margin-top: 12px; padding: 12px; border: 1px solid rgba(199, 162, 74, 0.42); background: var(--soft-gold); }
+    .publication-confirm p { color: var(--parchment-dim); font-size: 11px; }
+    .publication-proof { font-family: var(--mono); overflow-wrap: anywhere; }
     .capability-note { margin-top: 12px; padding: 10px 11px; border-left: 2px solid var(--gold); background: var(--soft-gold); color: var(--parchment-dim); font-size: 11px; }
     .copy-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
     .copy-field input { font-family: var(--mono); font-size: 10px; }
@@ -179,7 +183,7 @@
     .trust-boundary { border-color: rgba(199, 162, 74, 0.32); background: var(--soft-gold); }
 
     .builder-grid { max-width: 1500px; margin: 0 auto; display: grid; grid-template-columns: minmax(330px, 430px) minmax(430px, 1fr); gap: 18px; align-items: start; }
-    .panel { border: 1px solid var(--line-strong); background: rgba(23, 30, 36, 0.88); }
+    .panel { min-width: 0; border: 1px solid var(--line-strong); background: rgba(23, 30, 36, 0.88); }
     .panel-head { min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
     .panel-head h2 { font: 500 18px/1.2 var(--serif); }
     .panel-number { color: var(--gold); font: 500 10px/1 var(--mono); }
@@ -265,7 +269,7 @@
     .history-head .button { min-height: 44px; }
     .privacy-copy { color: var(--parchment-dim); font-size: 10px; text-align: center; }
 
-    .preview-column { display: grid; gap: 18px; min-width: 0; }
+    .preview-column { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; min-width: 0; }
     .preview-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .status-pill { display: inline-flex; align-items: center; gap: 7px; color: var(--parchment-dim); font: 500 10px/1 var(--mono); text-transform: uppercase; letter-spacing: 0.05em; }
     .status-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); }
@@ -286,7 +290,7 @@
     .spinner { width: 26px; height: 26px; margin: 0 auto 12px; border: 2px solid var(--line-strong); border-top-color: var(--emerald-bright); border-radius: 50%; animation: spin 700ms linear infinite; }
     .preview-loading p { color: var(--parchment-dim); font: 500 11px/1.3 var(--mono); text-transform: uppercase; letter-spacing: 0.08em; }
 
-    .contract-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(270px, 0.95fr); gap: 18px; }
+    .contract-grid { min-width: 0; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(270px, 0.95fr); gap: 18px; }
     .contract-section { border: 1px solid var(--line-strong); background: rgba(23, 30, 36, 0.78); }
     .contract-head { padding: 13px 15px; border-bottom: 1px solid var(--line); }
     .contract-head h2 { font: 500 16px/1.2 var(--serif); }
@@ -314,7 +318,7 @@
     .adapter code { color: var(--emerald-bright); font: 500 9px/1.4 var(--mono); }
     .adapter p { color: var(--parchment-dim); font-size: 10px; }
 
-    .deploy-strip { display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; padding: 15px 16px; border: 1px solid var(--line-strong); background: linear-gradient(90deg, rgba(199, 162, 74, 0.08), rgba(23, 30, 36, 0.86) 40%); }
+    .deploy-strip { min-width: 0; display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; padding: 15px 16px; border: 1px solid var(--line-strong); background: linear-gradient(90deg, rgba(199, 162, 74, 0.08), rgba(23, 30, 36, 0.86) 40%); }
     .deploy-strip strong { display: block; font-size: 12px; }
     .deploy-strip p { margin-top: 3px; color: var(--parchment-dim); font-size: 10px; }
 
@@ -326,7 +330,7 @@
       .rail { padding-inline: 16px; }
       .workspace { padding: 28px 22px; }
       .builder-grid { grid-template-columns: minmax(300px, 390px) minmax(390px, 1fr); }
-      .contract-grid { grid-template-columns: 1fr; }
+      .contract-grid { grid-template-columns: minmax(0, 1fr); }
     }
     @media (max-width: 880px) {
       .cockpit { display: block; }
@@ -340,7 +344,7 @@
       .step strong { font-size: 10px; }
       .rail-boundary { margin-top: 12px; padding-top: 12px; }
       .rail-boundary p { max-width: 68ch; margin-top: 4px; }
-      .builder-grid { grid-template-columns: 1fr; }
+      .builder-grid { grid-template-columns: minmax(0, 1fr); }
       .preview-frame, .preview-frame-wrap, .preview-empty { min-height: 480px; height: 480px; }
     }
     @media (max-width: 720px) {
@@ -356,7 +360,7 @@
       .workspace-header { display: block; }
       .build-state { margin-top: 18px; }
       .field-row { grid-template-columns: 1fr; }
-      .deploy-strip { grid-template-columns: 1fr; }
+      .deploy-strip { grid-template-columns: minmax(0, 1fr); }
       .surface-grid { grid-template-columns: 1fr; }
       .workspace-role { margin-left: 0; }
     }
@@ -571,7 +575,7 @@
                     <li id="starterTemplateStep" class="starter-step" data-complete="false"><strong>Template chosen</strong><span id="starterTemplateStatus">Choose one real catalog template.</span></li>
                     <li id="starterComponentsStep" class="starter-step" data-complete="false"><strong>Components chosen</strong><span id="starterComponentsStatus">Choose at least one allowed component.</span></li>
                     <li id="starterCustomizationStep" class="starter-step" data-complete="false"><strong>Content customized</strong><span id="starterCustomizationStatus">Change at least one declared component field from its catalog default.</span></li>
-                    <li id="starterPreviewStep" class="starter-step" data-complete="false"><strong>Preview verified</strong><span id="starterPreviewStatus">Create and verify the exact signed preview.</span></li>
+                    <li id="starterPreviewStep" class="starter-step" data-complete="false"><strong>Signed preview evidence</strong><span id="starterPreviewStatus">Create and verify the exact signed preview.</span></li>
                     <li id="starterHistoryStep" class="starter-step" data-complete="false"><strong>History confirmed</strong><span id="starterHistoryStatus">Confirm the exact track independently in Build history.</span></li>
                   </ol>
                   <div class="starter-actions">
@@ -658,7 +662,7 @@
                       <span id="buildRecordExpiry"></span>
                       <div class="copy-field"><input id="buildRecordTrackID" readonly aria-label="Selected build track ID"><button id="copyBuildTrackButton" class="button secondary" type="button">Copy track ID</button></div>
                       <div class="surface-actions">
-                        <button id="reopenBuildPreviewButton" class="button secondary" type="button">Reopen verified preview</button>
+                        <button id="reopenBuildPreviewButton" class="button secondary" type="button">Reopen signed preview</button>
                         <button id="restoreBuildDraftButton" class="button secondary" type="button">Start new draft from build</button>
                         <button id="resumeBuildButton" class="button tertiary" type="button">Resume build</button>
                       </div>
@@ -675,15 +679,15 @@
           <div class="preview-column">
             <section class="panel" aria-labelledby="previewTitle">
               <div class="panel-head preview-toolbar">
-                <div><span class="panel-number">02</span><h2 id="previewTitle">Live staging preview</h2></div>
+                <div><span class="panel-number">02</span><h2 id="previewTitle">Signed staging preview</h2></div>
                 <span id="previewStatus" class="status-pill">Waiting for build</span>
               </div>
               <div class="preview-frame-wrap">
                 <div id="previewEmpty" class="preview-empty">
                   <div>
                     <div class="empty-star" aria-hidden="true"></div>
-                    <h3>Preview <span class="sample-title" data-text="$_appName">Community Iftar</span></h3>
-                    <p>Complete the build contract and create a staging artifact. The preview is sandboxed and cannot navigate the builder.</p>
+                    <h3 id="previewEmptyTitle">Preview <span class="sample-title" data-text="$_appName">Community Iftar</span></h3>
+                    <p id="previewEmptyCopy">Complete the build contract and create a staging artifact. The preview is sandboxed and cannot navigate the builder.</p>
                   </div>
                 </div>
                 <div id="previewLoading" class="preview-loading" role="status" hidden><div><div class="spinner" aria-hidden="true"></div><p>Building immutable artifact…</p></div></div>
@@ -733,7 +737,29 @@
                     <button id="claimDomainButton" class="button tertiary" type="button">Issue DNS proof</button>
                     <div id="domainProof" class="field-help" hidden></div>
                     <button id="verifyDomainButton" class="button tertiary" type="button" disabled>Verify DNS proof</button>
+                    <div id="domainPublicationState" class="compact-state" role="status">Select an Architect workspace and domain claim to load publication history.</div>
                     <ul id="domainPublicationList" class="surface-list" aria-label="Selected domain publication history"></ul>
+                    <button id="loadMoreDomainPublications" class="button secondary" type="button" hidden>Load older publications</button>
+                    <article id="domainPublicationRecord" class="surface-record" aria-labelledby="domainPublicationRecordTitle" tabindex="-1" hidden>
+                      <strong id="domainPublicationRecordTitle"></strong>
+                      <span id="domainPublicationRecordMeta"></span>
+                      <span id="domainPublicationRecordExpiry"></span>
+                      <span id="domainPublicationRecordDigest" class="publication-proof"></span>
+                      <span id="domainPublicationRecordBinding"></span>
+                      <div class="surface-actions">
+                        <button id="refreshDomainPublication" class="button secondary publication-action" type="button">Recheck publication</button>
+                        <button id="replaceDomainPublication" class="button secondary publication-action" type="button" hidden>Prepare 90-day replacement</button>
+                        <button id="rollbackDomainPublication" class="button secondary publication-action" type="button" hidden>Activate this prior publication</button>
+                      </div>
+                      <div id="domainPublicationConfirm" class="publication-confirm" hidden>
+                        <p id="domainPublicationConfirmCopy"></p>
+                        <div class="surface-actions">
+                          <button id="confirmDomainPublicationAction" class="button publication-action" type="button">Confirm</button>
+                          <button id="cancelDomainPublicationAction" class="button secondary publication-action" type="button">Cancel</button>
+                        </div>
+                      </div>
+                      <div id="domainPublicationAlert" class="notice" role="status" aria-live="polite" hidden></div>
+                    </article>
                     <div id="domainStatus" class="notice" role="status" hidden></div>
                   </div>
                 </details>
@@ -925,12 +951,28 @@
       trackEvents: [],
       domainClaims: [],
       domainPublications: [],
+      domainPublicationCursor: '',
+      domainPublicationLoadState: 'idle',
+      selectedDomainPublication: null,
+      selectedDomainPublicationExact: false,
+      publicationAction: '',
+      replacementAttempt: null,
+      publicationDeadline: null,
+      publicationDeadlineTimer: 0,
+      publicationDeadlineRecheck: null,
       domainClaim: null,
       domainOrigin: '',
       domainLoadState: 'idle',
     };
 
     const element = (id) => document.getElementById(id);
+
+    function clearPublicationDeadline({ resetRecheck = false } = {}) {
+      if (state.publicationDeadlineTimer) clearTimeout(state.publicationDeadlineTimer);
+      state.publicationDeadlineTimer = 0;
+      state.publicationDeadline = null;
+      if (resetRecheck) state.publicationDeadlineRecheck = null;
+    }
 
     class ApiError extends Error {
       constructor(message, status, code = '', details = null, requestID = '') {
@@ -1008,6 +1050,7 @@
     }
 
     function clearSession() {
+      clearPublicationDeadline({ resetRecheck: true });
       state.sessionEpoch += 1;
       state.workspacesEpoch += 1;
       state.workspaceEpoch += 1;
@@ -1068,12 +1111,19 @@
       state.trackEvents = [];
       state.domainClaims = [];
       state.domainPublications = [];
+      state.domainPublicationCursor = '';
+      state.domainPublicationLoadState = 'idle';
+      state.selectedDomainPublication = null;
+      state.selectedDomainPublicationExact = false;
+      state.publicationAction = '';
+      state.replacementAttempt = null;
       state.domainClaim = null;
       state.domainOrigin = '';
       state.domainLoadState = 'idle';
       const frame = element('previewFrame');
       frame.removeAttribute('src');
       frame.removeAttribute('srcdoc');
+      frame.title = 'Community Iftar signed staging preview';
       frame.hidden = true;
       element('previewEmpty').hidden = false;
       element('previewLoading').hidden = true;
@@ -1091,6 +1141,7 @@
       element('rawManifestDetails').hidden = true;
       element('workspaceSelect').replaceChildren();
       element('builderForm').reset();
+      resetPreviewEmptyCopy();
       element('accentHex').value = '#57A68E';
       ['appName', 'organizationName', 'city', 'madhhab', 'accentColor', 'buildBrief'].forEach((id) => {
         element(id)?.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1145,7 +1196,7 @@
       element('domainClaimSelect').disabled = true;
       element('domainClaimsState').textContent = 'Select an Architect workspace to load real domain claims.';
       element('domainClaimsState').hidden = false;
-      element('domainPublicationList').replaceChildren();
+      resetPublicationContextUI('Select an Architect workspace and domain claim to load publication history.');
       element('domainProof').textContent = '';
       element('domainProof').hidden = true;
       element('verifyDomainButton').disabled = true;
@@ -1605,6 +1656,13 @@
       element('retryDomainClaims').disabled = !publishAllowed;
       if (element('claimDomainButton').getAttribute('aria-busy') !== 'true') element('claimDomainButton').disabled = !publishAllowed;
       if (element('verifyDomainButton').getAttribute('aria-busy') !== 'true') element('verifyDomainButton').disabled = !publishAllowed || !state.domainClaim || String(state.domainClaim.status).toLowerCase() !== 'pending';
+      element('loadMoreDomainPublications').disabled = !publishAllowed || state.domainPublicationLoadState === 'loading';
+      element('refreshDomainPublication').disabled = !publishAllowed || !state.selectedDomainPublication || state.publishing;
+      if (!publishAllowed) {
+        state.selectedDomainPublicationExact = false;
+        state.publicationAction = '';
+      }
+      renderDomainPublications();
       renderApprovedDecisions();
       if (!buildAllowed && workspaceID) {
         element('workspaceHelp').textContent = 'This workspace is read-only for your Viewer role. Ask an Architect to assign Maintainer access to build.';
@@ -1887,6 +1945,8 @@
         void maybeRecoverSignedStarterProgress();
         await Promise.allSettled([historyPromise, domainPromise]);
         if (!currentWorkspace(marker)) return;
+        if (canPublishWorkspace() && state.domainClaim && state.domainPublicationLoadState !== 'success') await loadDomainPublications(state.domainClaim);
+        if (!currentWorkspace(marker)) return;
       } catch (error) {
         if (!currentWorkspace(marker)) return;
         state.peopleLoadState = 'error';
@@ -1947,6 +2007,12 @@
       state.publishing = false;
       state.domainClaims = [];
       state.domainPublications = [];
+      state.domainPublicationCursor = '';
+      state.domainPublicationLoadState = 'idle';
+      state.selectedDomainPublication = null;
+      state.selectedDomainPublicationExact = false;
+      state.publicationAction = '';
+      state.replacementAttempt = null;
       renderDomainClaims();
       renderDomainPublications();
       resetDomainClaim(true);
@@ -2737,9 +2803,37 @@
     }
 
     function updateDeploymentAvailability() {
+      const unavailableContext = state.selectedDomainPublication && state.selectedDomainPublication.active && state.selectedDomainPublication.servingState === 'untrusted'
+        ? state.selectedDomainPublication
+        : state.domainPublications.find((publication) => publication.active && publication.servingState === 'untrusted');
+      if (unavailableContext) {
+        element('deployButton').disabled = true;
+        element('deployButton').textContent = 'Publication activated';
+        element('deployStateText').textContent = 'Activated · not serving';
+        element('deployStateHelp').textContent = publicationTruth(unavailableContext);
+        return;
+      }
+      if (state.selectedDomainPublicationExact && state.selectedDomainPublication && state.selectedDomainPublication.active) {
+        const context = state.selectedDomainPublication;
+        element('deployButton').disabled = true;
+        element('deployButton').textContent = 'Publication activated';
+        element('deployStateText').textContent = context.servingState === 'serving' ? 'Serving' : 'Activated · not serving';
+        element('deployStateHelp').textContent = publicationTruth(context);
+        return;
+      }
       if (state.track && String(state.track.status).toLowerCase() === 'published') {
         element('deployButton').disabled = true;
-        element('deployButton').textContent = 'Published';
+        element('deployButton').textContent = 'Publication activated';
+        const publicationID = String(state.track.publication && state.track.publication.id || '');
+        const context = state.selectedDomainPublicationExact && state.selectedDomainPublication && state.selectedDomainPublication.id === publicationID
+          ? state.selectedDomainPublication : null;
+        if (context) {
+          element('deployStateText').textContent = context.servingState === 'serving' ? 'Serving' : 'Activated · not serving';
+          element('deployStateHelp').textContent = publicationTruth(context);
+        } else {
+          element('deployStateText').textContent = 'Activation recorded · serving unconfirmed';
+          element('deployStateHelp').textContent = 'Recheck the exact publication before relying on public delivery.';
+        }
         return;
       }
       const publicationRequested = state.track && String(state.track.status).toUpperCase() === 'PUBLICATION_REQUESTED' && state.domainClaim && state.track.claimId === state.domainClaim.id;
@@ -2775,6 +2869,240 @@
       return status === 'revoked' && String(claim.revocationReason || '').toLowerCase() === 'expired' ? 'expired' : status;
     }
 
+    const PUBLICATION_SERVING_STATES = new Set(['serving', 'inactive', 'expired', 'claim_unavailable', 'artifact_invalid']);
+
+    function publicationTruth(publication) {
+      switch (publication && publication.servingState) {
+        case 'serving': return 'Serving — activation record retained';
+        case 'expired': return 'Authorization expired · not serving — activation record retained';
+        case 'claim_unavailable': return 'Domain claim unavailable · not serving — activation record retained';
+        case 'artifact_invalid': return 'Artifact invalid · not serving — activation record retained';
+        case 'untrusted': return 'Public delivery truth unavailable · not serving — activation record retained';
+        default: return 'Inactive · not serving — activation record retained';
+      }
+    }
+
+    function normalizePublicationTrackBinding(value) {
+      if (value === null || value === undefined) return null;
+      if (!value || typeof value !== 'object' || !/^track_[A-Za-z0-9_-]+$/u.test(String(value.trackId || ''))
+        || String(value.status || '') !== 'PUBLISHED' || !Number.isInteger(value.version) || value.version < 1) {
+        throw new Error('Publication build binding is malformed.');
+      }
+      return { trackId: String(value.trackId), status: 'PUBLISHED', version: value.version };
+    }
+
+    function normalizePublicationContextEnvelope(value, requestStartedAt) {
+      const serverTime = value && typeof value === 'object' && !Array.isArray(value) ? String(value.serverTime || '') : '';
+      const serverTimeMilliseconds = Date.parse(serverTime);
+      if (!value || typeof value !== 'object' || Array.isArray(value) || !Array.isArray(value.publications)
+        || !serverTime || !Number.isFinite(serverTimeMilliseconds) || !Number.isFinite(requestStartedAt)) {
+        throw new Error('Publication context did not include an authoritative server time.');
+      }
+      return { publications: value.publications, serverTime, serverTimeMilliseconds, requestStartedAt };
+    }
+
+    function normalizePublicationContextRow(value, {
+      exact = false,
+      workspaceID = currentWorkspaceID(),
+      claimID = String(state.domainClaim && state.domainClaim.id || ''),
+      claimOrigin = String(state.domainClaim && state.domainClaim.origin || ''),
+      serverTimeMilliseconds,
+    } = {}) {
+      if (!value || typeof value !== 'object' || !/^[A-Za-z0-9_-]{1,200}$/u.test(String(value.id || ''))
+        || Number(value.workspaceId) !== workspaceID || String(value.claimId || '') !== claimID
+        || !claimOrigin || String(value.origin || '') !== claimOrigin || !/^[0-9a-f]{64}$/u.test(String(value.contentHash || ''))
+        || !String(value.artifactId || '') || typeof value.active !== 'boolean'
+        || !PUBLICATION_SERVING_STATES.has(String(value.servingState || ''))
+        || !Number.isFinite(Date.parse(value.activatedAt || '')) || !Number.isFinite(serverTimeMilliseconds)) {
+        throw new Error('Publication context did not match the selected workspace and claim.');
+      }
+      const digest = value.manifestDigest === null || value.manifestDigest === undefined ? null : String(value.manifestDigest);
+      const expiresAt = value.authorizationExpiresAt === null || value.authorizationExpiresAt === undefined ? null : String(value.authorizationExpiresAt);
+      const expiryMilliseconds = expiresAt === null ? NaN : Date.parse(expiresAt);
+      const deactivatedAt = value.deactivatedAt === null || value.deactivatedAt === undefined ? null : String(value.deactivatedAt);
+      if ((digest !== null && !/^[0-9a-f]{64}$/u.test(digest)) || (expiresAt !== null && !Number.isFinite(expiryMilliseconds))
+        || (deactivatedAt !== null && !Number.isFinite(Date.parse(deactivatedAt)))) {
+        throw new Error('Publication proof is malformed.');
+      }
+      const servingState = String(value.servingState);
+      if ((value.active && deactivatedAt !== null) || (!value.active && deactivatedAt === null)) throw new Error('Publication activation history is inconsistent.');
+      if (servingState === 'serving' && (!value.active || !digest || !expiresAt || expiryMilliseconds <= serverTimeMilliseconds)) throw new Error('Serving publication proof is incomplete.');
+      if (servingState === 'expired' && (!digest || !expiresAt || expiryMilliseconds > serverTimeMilliseconds)) throw new Error('Expired publication proof is inconsistent.');
+      if (servingState === 'inactive' && (value.active || (exact && (!digest || !expiresAt)))) throw new Error('Inactive publication proof is inconsistent.');
+      if (['claim_unavailable', 'artifact_invalid'].includes(servingState) && (digest !== null || expiresAt !== null)) throw new Error('Unavailable publication proof must remain redacted.');
+      if (!exact && !value.active && (servingState !== 'inactive' || digest !== null || expiresAt !== null)) throw new Error('Inactive history rows must remain lightweight.');
+      return {
+        id: String(value.id), workspaceId: Number(value.workspaceId), claimId: String(value.claimId), origin: String(value.origin),
+        contentHash: String(value.contentHash), artifactId: String(value.artifactId), sourcePublicationId: String(value.sourcePublicationId || ''),
+        activatedAt: String(value.activatedAt), deactivatedAt,
+        active: value.active, authorizationExpiresAt: expiresAt, manifestDigest: digest, servingState,
+        trackBinding: normalizePublicationTrackBinding(value.trackBinding),
+      };
+    }
+
+    function schedulePublicationDeadline() {
+      const deadline = state.publicationDeadline;
+      if (!deadline) return;
+      if (state.publicationDeadlineTimer) clearTimeout(state.publicationDeadlineTimer);
+      const remaining = deadline.monotonicDeadline - performance.now();
+      state.publicationDeadlineTimer = setTimeout(enforcePublicationDeadline, Math.max(0, Math.min(remaining, 2_147_000_000)));
+    }
+
+    function armPublicationDeadline(publication, envelope) {
+      if (!publication || publication.servingState !== 'serving' || !publication.active || !publication.authorizationExpiresAt) return;
+      clearPublicationDeadline();
+      const signedRemaining = Date.parse(publication.authorizationExpiresAt) - envelope.serverTimeMilliseconds;
+      state.publicationDeadline = {
+        sessionEpoch: state.sessionEpoch,
+        workspaceEpoch: state.workspaceEpoch,
+        workspaceID: publication.workspaceId,
+        claimID: publication.claimId,
+        publicationID: publication.id,
+        monotonicDeadline: envelope.requestStartedAt + Math.max(0, signedRemaining),
+      };
+      schedulePublicationDeadline();
+    }
+
+    function publicationDeadlineIsCurrent(deadline) {
+      return deadline && deadline.sessionEpoch === state.sessionEpoch && deadline.workspaceEpoch === state.workspaceEpoch
+        && deadline.workspaceID === currentWorkspaceID() && state.domainClaim
+        && deadline.claimID === String(state.domainClaim.id || '');
+    }
+
+    function reconcilePublicationDeadline(publications, envelope, { append = false, appendedRows = [] } = {}) {
+      const active = publications.filter((publication) => publication.active);
+      if (active.length > 1) throw new Error('Publication history returned multiple active activation records.');
+      if (append && !appendedRows.some((publication) => publication.active)) return;
+      if (!active.length) {
+        if (!append) clearPublicationDeadline();
+        return;
+      }
+      const current = active[0];
+      if (current.servingState === 'serving') {
+        armPublicationDeadline(current, envelope);
+      } else if (state.publicationDeadline && state.publicationDeadline.publicationID === current.id) {
+        clearPublicationDeadline();
+      }
+    }
+
+    function failClosedPublicationHistory() {
+      clearPublicationDeadline();
+      state.domainPublications = state.domainPublications.map((publication) => publication.servingState === 'serving'
+        ? { ...publication, servingState: 'untrusted', authorizationExpiresAt: null, manifestDigest: null }
+        : publication);
+      if (state.selectedDomainPublication && state.selectedDomainPublication.servingState === 'serving') {
+        state.selectedDomainPublication = { ...state.selectedDomainPublication, servingState: 'untrusted', authorizationExpiresAt: null, manifestDigest: null };
+      }
+      state.selectedDomainPublicationExact = false;
+      state.publicationAction = '';
+      renderDomainPublications();
+      updateDeploymentAvailability();
+    }
+
+    function recheckPublicationDeadline(deadline) {
+      if (!publicationDeadlineIsCurrent(deadline)) return;
+      const key = `${deadline.sessionEpoch}:${deadline.workspaceEpoch}:${deadline.workspaceID}:${deadline.claimID}:${deadline.publicationID}`;
+      if (state.publicationDeadlineRecheck === key) return;
+      state.publicationDeadlineRecheck = key;
+      void selectDomainPublication(deadline.publicationID, { preserveFailClosed: true, automatic: true })
+        .finally(() => {
+          if (state.publicationDeadlineRecheck === key) state.publicationDeadlineRecheck = null;
+        });
+    }
+
+    function expirePublicationDeadline(deadline) {
+      if (!publicationDeadlineIsCurrent(deadline)) return;
+      const listed = state.domainPublications.find((publication) => publication.id === deadline.publicationID);
+      const selected = state.selectedDomainPublication && state.selectedDomainPublication.id === deadline.publicationID
+        ? state.selectedDomainPublication : null;
+      const publication = selected || listed;
+      if (!publication || publication.servingState !== 'serving' || !publication.active) return;
+      const expired = { ...publication, servingState: 'expired' };
+      state.domainPublications = state.domainPublications.map((candidate) => candidate.id === expired.id ? { ...candidate, servingState: 'expired' } : candidate);
+      state.selectedDomainPublication = expired;
+      state.selectedDomainPublicationExact = false;
+      state.domainPublicationLoadState = 'loading';
+      state.publicationAction = '';
+      renderDomainPublications();
+      presentExpiredPublicationTruth(expired);
+      setNotice(element('domainPublicationAlert'), 'Authorization expired · not serving — activation record retained. Rechecking authoritative serving truth…', 'gold');
+      recheckPublicationDeadline(deadline);
+    }
+
+    function enforcePublicationDeadline() {
+      const deadline = state.publicationDeadline;
+      if (!deadline) return;
+      if (performance.now() < deadline.monotonicDeadline) {
+        schedulePublicationDeadline();
+        return;
+      }
+      clearPublicationDeadline();
+      expirePublicationDeadline(deadline);
+    }
+
+    function revalidatePublicationDeadlineAfterResume() {
+      const deadline = state.publicationDeadline;
+      if (!deadline) return;
+      clearPublicationDeadline();
+      expirePublicationDeadline(deadline);
+    }
+
+    function publicationContextPath(workspaceID, claimID, parameters) {
+      const query = new URLSearchParams(parameters);
+      return `/workspaces/${workspaceID}/domains/${encodeURIComponent(claimID)}/publications?${query}`;
+    }
+
+    function resetPublicationContextUI(message = 'Select a domain claim to load publication history.') {
+      clearPublicationDeadline({ resetRecheck: true });
+      state.domainPublications = [];
+      state.domainPublicationCursor = '';
+      state.domainPublicationLoadState = 'idle';
+      state.selectedDomainPublication = null;
+      state.selectedDomainPublicationExact = false;
+      state.publicationAction = '';
+      state.replacementAttempt = null;
+      element('domainPublicationList').replaceChildren();
+      element('loadMoreDomainPublications').hidden = true;
+      element('domainPublicationRecord').hidden = true;
+      element('domainPublicationConfirm').hidden = true;
+      setNotice(element('domainPublicationAlert'), '');
+      element('domainPublicationState').textContent = message;
+    }
+
+    function renderDomainPublicationRecord() {
+      const publication = state.selectedDomainPublication;
+      const record = element('domainPublicationRecord');
+      record.hidden = !publication;
+      if (!publication) return;
+      const exact = state.selectedDomainPublicationExact;
+      const controlsReady = exact && state.domainPublicationLoadState === 'success' && state.peopleLoadState === 'success' && canPublishWorkspace() && !state.publishing;
+      element('domainPublicationRecordTitle').textContent = `${publicationTruth(publication)} · ${publication.id}`;
+      element('domainPublicationRecordMeta').textContent = `${publication.origin} · activated ${formatCockpitTime(publication.activatedAt)}${publication.deactivatedAt ? ` · deactivated ${formatCockpitTime(publication.deactivatedAt)}` : ''}${publication.sourcePublicationId ? ` · source ${publication.sourcePublicationId}` : ''}`;
+      element('domainPublicationRecordExpiry').textContent = exact
+        ? (publication.authorizationExpiresAt ? `Signed authorization expires ${formatCockpitTime(publication.authorizationExpiresAt)}.` : 'Signed authorization proof is unavailable.')
+        : 'Exact-select this activation record before relying on artifact proof or taking action.';
+      element('domainPublicationRecordDigest').textContent = exact && publication.manifestDigest ? `Exact stored manifest SHA-256 ${publication.manifestDigest}` : 'No exact manifest proof is displayed for this history summary.';
+      element('domainPublicationRecordBinding').textContent = exact && publication.trackBinding
+        ? `Exact stored build binding ${publication.trackBinding.trackId} · ${publication.trackBinding.status} · version ${publication.trackBinding.version}`
+        : (exact ? 'No unique stored build binding is available. Open an exact signed build from Build history, or create a new signed preview.' : 'Build binding is not resolved from ordinary history.');
+      element('refreshDomainPublication').disabled = !canPublishWorkspace() || state.peopleLoadState !== 'success' || state.publishing;
+      const proofPresent = Boolean(publication.authorizationExpiresAt && publication.manifestDigest);
+      const replacementAllowed = controlsReady && publication.active && ['serving', 'expired'].includes(publication.servingState) && proofPresent && publication.trackBinding;
+      const rollbackAllowed = controlsReady && !publication.active && publication.servingState === 'inactive' && proofPresent;
+      element('replaceDomainPublication').hidden = !replacementAllowed;
+      element('rollbackDomainPublication').hidden = !rollbackAllowed;
+      element('domainPublicationConfirm').hidden = !state.publicationAction;
+      if (state.publicationAction === 'replace') {
+        element('domainPublicationConfirmCopy').textContent = `Create and activate a new immutable 90-day signed replacement from exact stored build ${publication.trackBinding && publication.trackBinding.trackId}. The current activation record and stored bytes remain unchanged in history.`;
+        element('confirmDomainPublicationAction').textContent = 'Create and activate replacement';
+      } else if (state.publicationAction === 'rollback') {
+        element('domainPublicationConfirmCopy').textContent = `Create a new activation event from prior publication ${publication.id}. Existing publication records and stored bytes remain unchanged.`;
+        element('confirmDomainPublicationAction').textContent = 'Activate prior publication';
+      }
+      element('cancelDomainPublicationAction').disabled = state.publishing;
+      element('confirmDomainPublicationAction').disabled = state.publishing || !(replacementAllowed || rollbackAllowed);
+    }
+
     function renderDomainPublications() {
       const target = element('domainPublicationList');
       target.replaceChildren();
@@ -2782,12 +3110,22 @@
         const item = document.createElement('li');
         item.className = 'surface-record';
         const title = document.createElement('strong');
-        title.textContent = `${publication.active ? 'Active' : 'Inactive'} publication · ${publication.id || 'unknown ID'}`;
+        title.textContent = `${publicationTruth(publication)} · ${publication.id}`;
         const meta = document.createElement('span');
-        meta.textContent = `${publication.origin || 'Unknown origin'} · activated ${formatCockpitTime(publication.activatedAt)}`;
-        item.append(title, meta);
+        meta.textContent = `${publication.origin} · activated ${formatCockpitTime(publication.activatedAt)}${publication.sourcePublicationId ? ` · source ${publication.sourcePublicationId}` : ''}`;
+        const inspect = document.createElement('button');
+        inspect.type = 'button';
+        inspect.className = 'button secondary publication-action';
+        inspect.dataset.publicationId = publication.id;
+        inspect.textContent = 'Inspect publication';
+        inspect.disabled = state.peopleLoadState !== 'success' || !canPublishWorkspace() || state.publishing;
+        inspect.addEventListener('click', () => selectDomainPublication(publication.id, { focus: true }));
+        item.append(title, meta, inspect);
         target.append(item);
       }
+      element('loadMoreDomainPublications').hidden = !state.domainPublicationCursor;
+      element('loadMoreDomainPublications').disabled = state.domainPublicationLoadState === 'loading' || !canPublishWorkspace();
+      renderDomainPublicationRecord();
     }
 
     function renderDomainClaims() {
@@ -2802,34 +3140,172 @@
       select.disabled = !canPublishWorkspace() || !state.domainClaims.length;
     }
 
-    async function loadDomainPublications(claim) {
+    async function loadDomainPublications(claim, { append = false } = {}) {
       const workspaceID = currentWorkspaceID();
-      if (!claim || !claim.id || !workspaceID) {
-        state.domainPublications = [];
-        renderDomainPublications();
+      if (!claim || !claim.id || !workspaceID || state.peopleLoadState !== 'success' || !canPublishWorkspace()) {
+        resetPublicationContextUI(workspaceID ? 'Only an Architect with resolved workspace access may load publication history.' : 'Select a workspace and domain claim to load publication history.');
         return;
       }
       const marker = workspaceMarker();
       const claimID = String(claim.id);
       const requestEpoch = ++state.domainPublicationEpoch;
+      const cursor = append ? state.domainPublicationCursor : '';
+      state.domainPublicationLoadState = 'loading';
+      state.selectedDomainPublicationExact = false;
+      state.publicationAction = '';
+      element('domainPublicationState').textContent = append ? 'Loading older immutable publication records…' : 'Loading bounded publication history and current serving truth…';
+      renderDomainPublications();
       try {
-        const payload = await api(`/workspaces/${workspaceID}/domains/${encodeURIComponent(claimID)}/publications`);
+        const parameters = cursor ? { limit: '20', cursor } : { limit: '20' };
+        const requestStartedAt = performance.now();
+        const payload = await api(publicationContextPath(workspaceID, claimID, parameters));
         if (!currentWorkspace(marker) || requestEpoch !== state.domainPublicationEpoch || !state.domainClaim || String(state.domainClaim.id) !== claimID) return;
-        state.domainPublications = normalizeCollection(payload, 'publications');
+        const envelope = normalizePublicationContextEnvelope(payload, requestStartedAt);
+        const rows = envelope.publications.map((row) => normalizePublicationContextRow(row, {
+          workspaceID, claimID, claimOrigin: String(claim.origin || ''), serverTimeMilliseconds: envelope.serverTimeMilliseconds,
+        }));
+        const nextCursor = payload && payload.nextCursor ? String(payload.nextCursor) : '';
+        if (nextCursor.length > 2048) throw new Error('Publication history cursor is malformed.');
+        let appendedRows = rows;
+        let publications = rows;
+        if (append) {
+          const known = new Set(state.domainPublications.map((publication) => publication.id));
+          appendedRows = rows.filter((publication) => !known.has(publication.id));
+          publications = [...state.domainPublications, ...appendedRows];
+        }
+        reconcilePublicationDeadline(publications, envelope, { append, appendedRows });
+        state.domainPublications = publications;
+        if (!append && state.selectedDomainPublication) {
+          state.selectedDomainPublication = publications.find((publication) => publication.id === state.selectedDomainPublication.id) || null;
+        }
+        state.domainPublicationCursor = nextCursor;
+        state.domainPublicationLoadState = 'success';
+        element('domainPublicationState').textContent = state.domainPublications.length
+          ? `${state.domainPublications.length} immutable activation record(s) loaded. Serving truth comes from the server${nextCursor ? '; older records remain available.' : '.'}`
+          : 'No publication activation records exist for this exact claim.';
         renderDomainPublications();
       } catch (error) {
         if (!currentWorkspace(marker) || requestEpoch !== state.domainPublicationEpoch || !state.domainClaim || String(state.domainClaim.id) !== claimID) return;
-        state.domainPublications = [];
-        renderDomainPublications();
-        setNotice(element('domainStatus'), `${error.message || 'Publication history could not be loaded.'} Domain claim readiness is still shown.`, 'error');
+        state.domainPublicationLoadState = 'error';
+        state.selectedDomainPublicationExact = false;
+        state.publicationAction = '';
+        failClosedPublicationHistory();
+        element('domainPublicationState').textContent = `${error.message || 'Publication history could not be loaded.'} Last visible activation records are retained as stale evidence; replacement and rollback are disabled until a successful recheck.`;
       }
+    }
+
+    async function selectDomainPublication(publicationID, { focus = false, preserveFailClosed = false, automatic = false } = {}) {
+      const workspaceID = currentWorkspaceID();
+      const claimID = String(state.domainClaim && state.domainClaim.id || '');
+      if (!workspaceID || !claimID || !publicationID || state.peopleLoadState !== 'success' || !canPublishWorkspace()) return null;
+      const marker = workspaceMarker();
+      const requestEpoch = ++state.domainPublicationEpoch;
+      if (!preserveFailClosed) state.selectedDomainPublication = state.domainPublications.find((publication) => publication.id === publicationID) || null;
+      state.selectedDomainPublicationExact = false;
+      state.domainPublicationLoadState = 'loading';
+      state.publicationAction = '';
+      setNotice(element('domainPublicationAlert'), 'Rechecking the exact activation record and its server-authoritative serving state…', 'gold');
+      renderDomainPublications();
+      try {
+        const requestStartedAt = performance.now();
+        const payload = await api(publicationContextPath(workspaceID, claimID, { publicationId: publicationID }));
+        if (!currentWorkspace(marker) || requestEpoch !== state.domainPublicationEpoch || !state.domainClaim || String(state.domainClaim.id) !== claimID) return null;
+        const envelope = normalizePublicationContextEnvelope(payload, requestStartedAt);
+        const rows = envelope.publications;
+        if (rows.length !== 1 || String(rows[0] && rows[0].id || '') !== publicationID || payload.nextCursor) throw new Error('Exact publication selection did not return one matching record.');
+        const selected = normalizePublicationContextRow(rows[0], {
+          exact: true, workspaceID, claimID, claimOrigin: String(state.domainClaim.origin || ''), serverTimeMilliseconds: envelope.serverTimeMilliseconds,
+        });
+        const listed = state.domainPublications.some((publication) => publication.id === selected.id);
+        const publications = listed
+          ? state.domainPublications.map((publication) => publication.id === selected.id ? selected : publication)
+          : [...state.domainPublications, selected];
+        reconcilePublicationDeadline(publications, envelope, { append: true, appendedRows: [selected] });
+        if (listed) state.domainPublications = publications;
+        state.selectedDomainPublication = selected;
+        state.selectedDomainPublicationExact = true;
+        state.domainPublicationLoadState = 'success';
+        setNotice(element('domainPublicationAlert'), `${publicationTruth(state.selectedDomainPublication)}. Exact selection and artifact proof were revalidated by the server.`, state.selectedDomainPublication.servingState === 'serving' ? 'success' : 'gold');
+        renderDomainPublications();
+        presentExpiredPublicationTruth(state.selectedDomainPublication);
+        if (focus) element('domainPublicationRecord').focus();
+        return state.selectedDomainPublication;
+      } catch (error) {
+        if (!currentWorkspace(marker) || requestEpoch !== state.domainPublicationEpoch || !state.domainClaim || String(state.domainClaim.id) !== claimID) return null;
+        state.selectedDomainPublicationExact = false;
+        state.domainPublicationLoadState = 'error';
+        state.publicationAction = '';
+        failClosedPublicationHistory();
+        setNotice(element('domainPublicationAlert'), `${error.message || 'The exact publication could not be rechecked.'} No replacement or rollback action is available.`, 'error');
+        if (automatic && state.selectedDomainPublication) presentExpiredPublicationTruth(state.selectedDomainPublication);
+        return null;
+      }
+    }
+
+    function presentExpiredPublicationTruth(publication) {
+      if (!publication || !publication.active || publication.servingState !== 'expired') return;
+      const exactCopy = 'Authorization expired · not serving — activation record retained';
+      neutralizeExpiredPreview(exactCopy);
+      setNotice(element('buildRecordAlert'), exactCopy, 'gold');
+      element('starterPreviewStatus').textContent = exactCopy;
+      element('starterPathStatus').textContent = exactCopy;
+      element('starterRecoveryState').textContent = exactCopy;
+      element('buildHistoryState').textContent = exactCopy;
+      setNotice(element('builderAlert'), exactCopy, 'gold');
+      updateDeploymentAvailability();
+    }
+
+    async function readExactPublicationContext(publicationID, marker, claimID) {
+      const requestStartedAt = performance.now();
+      const payload = await api(publicationContextPath(marker.workspaceID, claimID, { publicationId: publicationID }));
+      if (!currentWorkspace(marker) || !state.domainClaim || String(state.domainClaim.id || '') !== claimID) throw new StaleWorkspaceView();
+      const envelope = normalizePublicationContextEnvelope(payload, requestStartedAt);
+      const rows = envelope.publications;
+      if (rows.length !== 1 || String(rows[0] && rows[0].id || '') !== publicationID || payload.nextCursor) {
+        throw new Error('The exact publication changed or is no longer uniquely selectable.');
+      }
+      return normalizePublicationContextRow(rows[0], {
+        exact: true, workspaceID: marker.workspaceID, claimID, claimOrigin: String(state.domainClaim.origin || ''), serverTimeMilliseconds: envelope.serverTimeMilliseconds,
+      });
+    }
+
+    function publicationContextFingerprint(publication) {
+      return JSON.stringify({
+        id: publication.id,
+        workspaceId: publication.workspaceId,
+        claimId: publication.claimId,
+        origin: publication.origin,
+        contentHash: publication.contentHash,
+        artifactId: publication.artifactId,
+        sourcePublicationId: publication.sourcePublicationId,
+        activatedAt: publication.activatedAt,
+        deactivatedAt: publication.deactivatedAt,
+        active: publication.active,
+        authorizationExpiresAt: publication.authorizationExpiresAt,
+        manifestDigest: publication.manifestDigest,
+        servingState: publication.servingState,
+        trackBinding: publication.trackBinding,
+      });
+    }
+
+    function requireCurrentPublicationContext(selected, current, action) {
+      if (publicationContextFingerprint(selected) !== publicationContextFingerprint(current)) {
+        throw new Error('Publication context changed after confirmation opened. Recheck the exact activation record before continuing.');
+      }
+      const proofPresent = Boolean(current.authorizationExpiresAt && current.manifestDigest);
+      if (action === 'replace' && (!current.active || !['serving', 'expired'].includes(current.servingState) || !proofPresent || !current.trackBinding)) {
+        throw new Error('The exact publication is no longer eligible for replacement.');
+      }
+      if (action === 'rollback' && (current.active || current.servingState !== 'inactive' || !proofPresent)) {
+        throw new Error('The exact publication is no longer eligible for rollback activation.');
+      }
+      return current;
     }
 
     async function selectDomainClaim(claimID, { loadPublications = true } = {}) {
       const claim = state.domainClaims.find((entry) => String(entry.id || '') === String(claimID || '')) || null;
       state.domainClaim = claim;
-      state.domainPublications = [];
-      renderDomainPublications();
+      resetPublicationContextUI(claim ? 'Loading bounded publication history for this exact claim…' : 'Select a domain claim to load publication history.');
       element('domainProof').textContent = '';
       element('domainProof').hidden = true;
       if (!claim) {
@@ -2862,11 +3338,10 @@
       if (!workspaceID) {
         state.domainLoadState = 'idle';
         state.domainClaims = [];
-        state.domainPublications = [];
         state.domainClaim = null;
         state.domainOrigin = '';
         renderDomainClaims();
-        renderDomainPublications();
+        resetPublicationContextUI('Select a workspace and domain claim to load publication history.');
         element('domainClaimsState').textContent = 'Select a workspace to load server-authorized domain evidence.';
         element('domainClaimsState').hidden = false;
         renderWorkspaceAccess();
@@ -2898,19 +3373,17 @@
         if (selected) await selectDomainClaim(selected.id);
         else {
           state.domainOrigin = '';
-          state.domainPublications = [];
-          renderDomainPublications();
+          resetPublicationContextUI('No publication activation records exist because no domain claim is selected.');
           element('domainClaimsState').textContent = 'No domain claims yet. Issue a DNS proof for one exact HTTPS origin; external DNS remains required.';
         }
       } catch (error) {
         if (!currentWorkspace(marker) || requestEpoch !== state.domainEpoch) return;
         state.domainLoadState = 'error';
         state.domainClaims = [];
-        state.domainPublications = [];
         state.domainClaim = null;
         state.domainOrigin = '';
         renderDomainClaims();
-        renderDomainPublications();
+        resetPublicationContextUI('Publication history is unavailable until domain claims reload successfully.');
         element('domainClaimsState').textContent = `${error.message || 'Domain claims could not be loaded.'} Domain evidence is unavailable for this membership; no mutation controls are enabled. Use Reload domain claims to retry.`;
       } finally {
         if (currentWorkspace(marker) && requestEpoch === state.domainEpoch) {
@@ -2924,11 +3397,10 @@
       state.domainEpoch += 1;
       state.domainPublicationEpoch += 1;
       state.domainClaim = null;
-      state.domainPublications = [];
       state.domainOrigin = '';
       if (clearOrigin) element('domainOrigin').value = '';
       element('domainClaimSelect').value = '';
-      renderDomainPublications();
+      resetPublicationContextUI('Select or create a domain claim to load publication history.');
       element('domainProof').textContent = '';
       element('domainProof').hidden = true;
       setBusy(element('claimDomainButton'), false, 'Creating…', 'Issue DNS proof');
@@ -3135,6 +3607,37 @@
       status.textContent = text;
     }
 
+    function resetPreviewEmptyCopy() {
+      const sample = document.createElement('span');
+      sample.className = 'sample-title';
+      sample.dataset.text = '$_appName';
+      sample.textContent = element('appName').value.trim() || 'Community Iftar';
+      element('previewEmptyTitle').replaceChildren('Preview ', sample);
+      element('previewEmptyCopy').textContent = 'Complete the build contract and create a staging artifact. The preview is sandboxed and cannot navigate the builder.';
+      element('manifestEmpty').textContent = 'A manifest will appear after the first successful preview.';
+    }
+
+    function neutralizeExpiredPreview(copy = 'Signed authorization expired · preview unavailable') {
+      state.previewReady = false;
+      const frame = element('previewFrame');
+      frame.removeAttribute('src');
+      frame.removeAttribute('srcdoc');
+      frame.dataset.stale = 'true';
+      frame.title = 'Authorization expired; signed staging preview unavailable';
+      frame.hidden = true;
+      element('previewEmptyTitle').textContent = 'Signed preview unavailable';
+      element('previewEmptyCopy').textContent = copy;
+      element('previewEmpty').hidden = false;
+      element('manifestList').replaceChildren();
+      element('manifestList').hidden = true;
+      element('manifestEmpty').textContent = copy;
+      element('manifestEmpty').hidden = false;
+      element('rawManifest').textContent = '';
+      element('rawManifestDetails').hidden = true;
+      setPreviewState('error', 'Authorization expired · preview unavailable');
+      element('buildStateText').textContent = copy;
+    }
+
     function setLifecycle(stage) {
       const steps = [element('stepConfigure'), element('stepPreview'), element('stepReview'), element('stepDeploy')];
       steps.forEach((step, index) => {
@@ -3217,6 +3720,8 @@
 
     async function verifiedManifestReceipt(source, verification, expectedComponents) {
       if (!verification || verification.verified !== true || verification.status !== 'verified'
+        || !['active', 'expired'].includes(String(verification.authorizationState || ''))
+        || !Number.isFinite(Date.parse(verification.serverTime || ''))
         || typeof verification.manifestJson !== 'string' || !/^[0-9a-f]{64}$/.test(verification.manifestDigest || '')) {
         return { active: false, attested: false, expired: false };
       }
@@ -3259,8 +3764,10 @@
       } else if (expectedComponents !== undefined) componentsMatch = false;
       const expiry = Date.parse(authorization.expiresAt || '');
       if (!fieldsMatch || !componentsMatch || !Number.isFinite(expiry)) return { active: false, attested: false, expired: false };
-      const expired = expiry <= Date.now();
-      return { active: !expired, attested: true, expired };
+      const serverTime = Date.parse(verification.serverTime);
+      const expired = verification.authorizationState === 'expired';
+      if (expired !== (expiry <= serverTime)) return { active: false, attested: false, expired: false };
+      return { active: !expired, attested: true, expired, serverTime: verification.serverTime };
     }
 
     function manifestOrigins(policy) {
@@ -3271,13 +3778,13 @@
       return origins.join(' · ') || 'No exact origins listed';
     }
 
-    function manifestLifecycle(authorization) {
+    function manifestLifecycle(authorization, receipt) {
       const lifecycle = authorization && authorization.lifecycle ? String(authorization.lifecycle) : 'Lifecycle not provided';
       const expiresAt = authorization && authorization.expiresAt;
       const parsed = expiresAt ? Date.parse(expiresAt) : NaN;
       if (!Number.isFinite(parsed)) return `${lifecycle} · expiry not provided`;
       const expiry = new Date(parsed).toISOString();
-      return `${lifecycle} · expires ${expiry}${parsed <= Date.now() ? ' · expired' : ''}`;
+      return `${lifecycle} · expires ${expiry}${receipt && receipt.expired ? ' · expired' : ''}`;
     }
 
     function manifestReviewReferences(compliance) {
@@ -3309,7 +3816,7 @@
       appendManifestRow(list, 'Workspace binding', Number.isInteger(source.workspaceId) && subject.workspaceId === source.workspaceId
         ? `Workspace ${source.workspaceId}`
         : (source.workspaceId || subject.workspaceId ? 'Workspace binding mismatch' : 'Workspace binding not provided'));
-      appendManifestRow(list, 'Lifecycle / expiry', manifestLifecycle(authorization));
+      appendManifestRow(list, 'Lifecycle / expiry', manifestLifecycle(authorization, receipt));
       appendManifestRow(list, 'Exact allowed origins', manifestOrigins(authorization.allowedOrigins));
       appendManifestRow(list, 'Template', source.template && (source.template.id ? `${source.template.id} · v${source.template.version || '?'}` : source.template));
       appendManifestRow(list, 'Modules', source.modules);
@@ -3358,15 +3865,19 @@
       if (!result || !result.manifest || typeof result.manifest !== 'object') throw new Error('The build did not return an artifact manifest.');
       const receipt = await verifiedManifestReceipt(result.manifest, result.verification, expectedComponents);
       requirePreviewGuard(requestGuard);
-      if (!receipt.active && requireActive) throw new Error(receipt.expired ? 'The signed track authorization has expired.' : 'The signed track receipt could not be verified.');
+      if (!receipt.active && requireActive) {
+        if (receipt.expired) neutralizeExpiredPreview();
+        throw new Error(receipt.expired ? 'The signed track authorization has expired.' : 'The signed track receipt could not be verified.');
+      }
       if (!receipt.active) {
         state.previewReady = false;
+        if (receipt.expired) neutralizeExpiredPreview();
         state.track = null;
-        const retained = Boolean(element('previewFrame').srcdoc);
+        const retained = !receipt.expired && Boolean(element('previewFrame').srcdoc);
         if (retained) element('previewFrame').dataset.stale = 'true';
-        setPreviewState('error', receipt.expired ? 'Signed authorization expired' : 'Verification unavailable');
-        element('buildStateText').textContent = retained ? 'Unverified result · trusted preview and receipt retained' : 'Artifact evidence is not verified';
-        element('deployStateText').textContent = 'Not ready · active verification required';
+        if (!receipt.expired) setPreviewState('error', 'Verification unavailable');
+        element('buildStateText').textContent = receipt.expired ? 'Signed authorization expired · preview unavailable' : (retained ? 'Untrusted result · prior preview and receipt retained' : 'Artifact evidence is unavailable');
+        element('deployStateText').textContent = receipt.expired ? 'Authorization expired · not serving' : 'Not ready · trust recheck required';
         updateDeploymentAvailability();
         return false;
       }
@@ -3377,6 +3888,7 @@
       const restored = restoreDraft ? manifestComponentDocuments(result.manifest) : null;
       const preview = previewFiles(result);
       const frame = element('previewFrame');
+      resetPreviewEmptyCopy();
       const preparedManifest = await prepareManifest(result.manifest, result.verification, expectedComponents);
       requirePreviewGuard(requestGuard);
       await loadPreviewFrame(frame, preview, result.manifest, verifiedTrack.id, requestGuard, () => commitPreparedManifest(preparedManifest));
@@ -3391,7 +3903,7 @@
         renderComponentEditors();
         saveComponentDraft();
       }
-      frame.title = `${element('appName').value.trim() || 'Taawun'} verified staging preview`;
+      frame.title = `${element('appName').value.trim() || 'Taawun'} signed staging preview`;
       frame.hidden = false;
       frame.dataset.stale = 'false';
       element('previewEmpty').hidden = true;
@@ -3432,7 +3944,7 @@
       const operationCurrent = () => currentSession(sessionEpoch) && workspaceEpoch === state.workspaceEpoch && workspaceID === currentWorkspaceID() && previewEpoch === state.previewEpoch;
       const guard = () => operationCurrent() && currentDraft(marker);
       const button = element('reopenBuildPreviewButton');
-      setBusy(button, true, 'Verifying…', 'Reopen verified preview');
+      setBusy(button, true, 'Verifying…', 'Reopen signed preview');
       setNotice(element('buildRecordAlert'), 'Fetching and verifying the exact signed preview without changing the local draft…', 'gold');
       try {
         const result = await api(`/conductor/tracks/${encodeURIComponent(selected.id)}?includeVerifiedPreview=true`);
@@ -3445,16 +3957,17 @@
       } catch (error) {
         if (!operationCurrent()) return;
         const frame = element('previewFrame');
+        const authorizationExpired = !frame.srcdoc && frame.title.startsWith('Authorization expired;');
         state.previewReady = false;
         if (!frame.srcdoc) element('previewEmpty').hidden = false;
         else frame.dataset.stale = 'true';
-        setPreviewState('error', frame.srcdoc ? 'Last verified preview retained' : 'Track unavailable');
-        element('deployStateText').textContent = 'Not ready · verified reload required';
-        element('deployStateHelp').textContent = 'The selected track must exactly bind the signed artifact, preview authorization, workspace, origins, and expiry.';
+        if (!authorizationExpired) setPreviewState('error', frame.srcdoc ? 'Last verified preview retained' : 'Track unavailable');
+        element('deployStateText').textContent = authorizationExpired ? 'Authorization expired · not serving' : 'Not ready · verified reload required';
+        element('deployStateHelp').textContent = authorizationExpired ? 'Signed authorization expired; staging content is unavailable.' : 'The selected track must exactly bind the signed artifact, preview authorization, workspace, origins, and expiry.';
         updateDeploymentAvailability();
-        setNotice(element('buildRecordAlert'), `${error.message || 'The signed preview could not be reopened.'} Your current draft and last trusted iframe/receipt were not replaced.`, 'error');
+        setNotice(element('buildRecordAlert'), authorizationExpired ? 'Signed authorization expired · preview unavailable' : `${error.message || 'The signed preview could not be reopened.'} Your current draft and last trusted iframe/receipt were not replaced.`, authorizationExpired ? 'gold' : 'error');
       } finally {
-        if (operationCurrent()) setBusy(button, false, 'Verifying…', 'Reopen verified preview');
+        if (operationCurrent()) setBusy(button, false, 'Verifying…', 'Reopen signed preview');
       }
     }
 
@@ -3578,7 +4091,7 @@
         else if (active) showPendingHistoryConfirmation();
         setNotice(element('builderAlert'), active
           ? (confirmed ? signedHandoffCopy(state.track, customized) : 'Exact workspace-bound signed preview verified; exact history confirmation is pending. The verified preview and receipt are retained, and this preview is not published.')
-          : 'The returned evidence is not actively verified. Your last verified preview was retained and publication is disabled.', active ? (confirmed ? 'success' : 'gold') : 'error');
+          : 'The returned evidence is not authorized for use. Expired staging content is removed, prior evidence is not treated as current, and publication is disabled.', active ? (confirmed ? 'success' : 'gold') : 'error');
       } catch (error) {
         if (!operationCurrent()) return;
         const frame = element('previewFrame');
@@ -3621,6 +4134,7 @@
     }
 
     function clearVerifiedPreviewForScope() {
+      clearPublicationDeadline({ resetRecheck: true });
       state.previewEpoch += 1;
       state.trackRecordEpoch += 1;
       state.buildHistoryEpoch += 1;
@@ -3648,6 +4162,7 @@
       frame.removeAttribute('src');
       frame.removeAttribute('srcdoc');
       delete frame.dataset.stale;
+      frame.title = 'Community Iftar signed staging preview';
       frame.hidden = true;
       element('previewEmpty').hidden = false;
       element('previewLoading').hidden = true;
@@ -3658,6 +4173,7 @@
       element('manifestEmpty').hidden = false;
       element('rawManifest').textContent = '';
       element('rawManifestDetails').hidden = true;
+      resetPreviewEmptyCopy();
       setPreviewState('', 'Waiting for build');
       element('buildStateText').textContent = 'Draft · not yet previewed';
       element('deployStateText').textContent = 'Not ready';
@@ -3775,6 +4291,32 @@
       }
     }
 
+    async function reconcilePublicationServing(track, operationCurrent, { sourcePublicationID = '', successLabel = 'Publication activation' } = {}) {
+      const publication = track && track.publication;
+      if (!publication || !publication.id || !state.domainClaim) throw new Error('The activated track did not return a publication selector.');
+      await loadDomainPublications(state.domainClaim);
+      if (!operationCurrent()) return null;
+      const context = await selectDomainPublication(String(publication.id));
+      if (!operationCurrent() || !context) return null;
+      if (!context.active || context.workspaceId !== Number(track.workspaceId) || context.claimId !== String(track.claimId || '')
+        || context.artifactId !== String(track.artifact && track.artifact.artifactId || '')
+        || context.contentHash !== String(track.artifact && track.artifact.contentHash || '')
+        || (sourcePublicationID && context.sourcePublicationId !== sourcePublicationID)) {
+        throw new Error('The authoritative publication readback did not match the activated track and lineage.');
+      }
+      state.track = track;
+      state.selectedTrack = track;
+      renderSelectedBuild();
+      element('deployStateText').textContent = context.servingState === 'serving' ? 'Serving' : 'Activated · not serving';
+      element('deployStateHelp').textContent = publicationTruth(context);
+      setNotice(element('domainStatus'), context.servingState === 'serving'
+        ? `${successLabel} is confirmed serving at ${context.origin}.`
+        : `${successLabel} is retained, but the server reports: ${publicationTruth(context)}`, context.servingState === 'serving' ? 'success' : 'gold');
+      announce(context.servingState === 'serving' ? `${successLabel} confirmed serving.` : publicationTruth(context));
+      setLifecycle(4);
+      return context;
+    }
+
     async function publishVerifiedDomain() {
       if (!state.track || !state.track.id || !claimIsVerified() || !currentPreviewIncludesDomain()) {
         setNotice(element('domainStatus'), 'Verify the domain and create a fresh preview that includes it before publishing.', 'error');
@@ -3844,12 +4386,12 @@
         state.track = activated;
         state.selectedTrack = activated;
         renderSelectedBuild();
-        const origin = activated.publication && activated.publication.origin ? activated.publication.origin : state.domainOrigin;
-        element('deployStateText').textContent = 'Published';
-        element('deployStateHelp').textContent = `The signed card is active at ${origin}.`;
-        setNotice(element('domainStatus'), `Published and active at ${origin}.`, 'success');
-        setLifecycle(4);
-        await Promise.allSettled([loadBuildHistory(), loadDomainPublications(state.domainClaim)]);
+        element('deployStateText').textContent = 'Activation recorded · serving unconfirmed';
+        element('deployStateHelp').textContent = 'Rechecking the exact publication before relying on public delivery.';
+        await loadBuildHistory();
+        if (!selectionCurrent()) return;
+        const context = await reconcilePublicationServing(activated, selectionCurrent);
+        if (!context) throw new Error('Publication activation could not be revalidated.');
       } catch (error) {
         if (!selectionCurrent()) return;
         let latest;
@@ -3861,11 +4403,13 @@
         }
         if (!selectionCurrent()) return;
         if (latest && String(latest.status || '').toUpperCase() === 'PUBLISHED') {
-          const origin = latest.publication && latest.publication.origin ? latest.publication.origin : state.domainOrigin;
-          element('deployStateText').textContent = 'Published';
-          element('deployStateHelp').textContent = `The signed card is active at ${origin}.`;
-          setNotice(element('domainStatus'), `Publication completed and was reconciled at ${origin}.`, 'success');
-          setLifecycle(4);
+          try {
+            const context = await reconcilePublicationServing(latest, selectionCurrent, { successLabel: 'Reconciled publication activation' });
+            if (!selectionCurrent()) return;
+            if (!context) setNotice(element('domainStatus'), 'Activation was recorded, but exact serving state could not be confirmed. Recheck the publication before relying on delivery.', 'gold');
+          } catch (readbackError) {
+            if (selectionCurrent()) setNotice(element('domainStatus'), `${readbackError.message || 'Activation was recorded, but serving state could not be confirmed.'} Recheck the exact publication before relying on delivery.`, 'gold');
+          }
         } else if (latest && String(latest.status || '').toUpperCase() === 'PUBLICATION_REQUESTED') {
           setNotice(element('domainStatus'), `${error.message || 'Activation is temporarily unavailable.'} The publication request is durably recorded at version ${latest.version}; retry activation without requesting again.`, 'gold');
         } else {
@@ -3880,6 +4424,290 @@
           updateDeploymentAvailability();
         }
       }
+    }
+
+    async function verifiedReplacementSource(result, publication) {
+      const binding = publication && publication.trackBinding;
+      const track = result && result.track;
+      const manifest = result && result.manifest;
+      const verification = result && result.verification;
+      if (!binding || !track || !manifest || String(track.id || '') !== binding.trackId || Number(track.version) !== binding.version
+        || String(track.status || '') !== binding.status || Number(track.workspaceId) !== publication.workspaceId
+        || !track.artifact || track.artifact.artifactId !== publication.artifactId || track.artifact.contentHash !== publication.contentHash
+        || !track.publication || String(track.publication.id || '') !== publication.id || String(track.publication.claimId || '') !== publication.claimId
+        || String(track.publication.artifactId || '') !== publication.artifactId || String(track.publication.contentHash || '') !== publication.contentHash
+        || !verification || verification.manifestDigest !== publication.manifestDigest
+        || manifest.artifactId !== publication.artifactId || manifest.contentHash !== publication.contentHash
+        || Number(manifest.workspaceId) !== publication.workspaceId
+        || !Array.isArray(manifest.authorization && manifest.authorization.allowedOrigins && manifest.authorization.allowedOrigins.surfaces)
+        || !manifest.authorization.allowedOrigins.surfaces.includes(publication.origin)) {
+        throw new Error('The exact verified build does not match the selected publication context.');
+      }
+      const receipt = await verifiedManifestReceipt(manifest, verification, track.request && track.request.components);
+      if (!receipt.attested) throw new Error('The selected publication build could not be verified as an immutable signed source.');
+      return { track, manifest, restored: curatedDraftFromTrack(track) };
+    }
+
+    function replacementPayload(source, publication, idempotencyKey) {
+      const request = source.restored.request;
+      const surfaces = [...new Set([window.location.origin, publication.origin])];
+      return {
+        idempotencyKey,
+        workspaceId: publication.workspaceId,
+        appName: String(request.appName || ''),
+        organizationName: String(request.organizationName || ''),
+        city: String(request.city || ''),
+        madhhab: request.madhhab,
+        templateId: source.restored.templateID,
+        theme: cloneDocument(request.theme || {}),
+        modules: [...source.restored.ids],
+        components: source.restored.ids.map((id) => ({ id, type: id, data: cloneDocument(source.restored.documents[id]) })),
+        requestedOrigins: { surfaces, embedders: [], connections: [], resources: [] },
+        ttlHours: 2160,
+      };
+    }
+
+    function requireReplacementSuccessorBinding(result, payload, publication, claim, idempotencyKey) {
+      const newTrack = result && result.track;
+      const manifest = result && result.manifest;
+      const authorization = manifest && manifest.authorization;
+      const signedSubject = authorization && authorization.subject;
+      const preview = newTrack && newTrack.preview;
+      const previewSubject = preview && preview.subject;
+      const principalID = Number(state.user && (state.user.id || state.user.userId));
+      const subjectID = `taawun:user:${principalID}`;
+      const requestedPolicy = payload && payload.requestedOrigins;
+      if (!Number.isInteger(principalID) || principalID < 1 || !claim || String(claim.id || '') !== publication.claimId
+        || String(claim.origin || '') !== publication.origin || !requestedPolicy || !Array.isArray(requestedPolicy.surfaces)
+        || !requestedPolicy.surfaces.includes(publication.origin) || !newTrack || !newTrack.request
+        || Number(newTrack.createdBy) !== principalID || Number(newTrack.workspaceId) !== publication.workspaceId
+        || String(newTrack.request.idempotencyKey || '') !== idempotencyKey || !manifest || !authorization || !signedSubject || !preview || !previewSubject
+        || Number(signedSubject.userId) !== principalID || String(signedSubject.id || '') !== subjectID
+        || Number(previewSubject.userId) !== principalID || String(previewSubject.id || '') !== subjectID
+        || !exactOriginPolicyMatch(newTrack.request.requestedOrigins, requestedPolicy)
+        || !exactOriginPolicyMatch(preview.allowedOrigins, requestedPolicy)
+        || !exactOriginPolicyMatch(authorization.allowedOrigins, requestedPolicy)) {
+        throw new Error('The replacement preview did not retain the current principal, claim, and exact requested origin authority.');
+      }
+      return newTrack;
+    }
+
+    function focusPublicationConfirmation(action, publicationID) {
+      const control = element('confirmDomainPublicationAction');
+      const focusIfCurrent = () => {
+        const selected = state.selectedDomainPublication;
+        if (state.publicationAction !== action || !selected || selected.id !== publicationID
+          || element('domainPublicationConfirm').hidden || control.disabled) return;
+        control.focus({ preventScroll: true });
+      };
+      focusIfCurrent();
+      requestAnimationFrame(() => {
+        if (document.activeElement !== control) focusIfCurrent();
+      });
+    }
+
+    function startPublicationAction(action) {
+      const publication = state.selectedDomainPublication;
+      if (!publication || !state.selectedDomainPublicationExact || state.domainPublicationLoadState !== 'success'
+        || state.peopleLoadState !== 'success' || !canPublishWorkspace() || state.publishing) return;
+      const proofPresent = Boolean(publication.authorizationExpiresAt && publication.manifestDigest);
+      if (action === 'replace') {
+        if (!publication.active || !['serving', 'expired'].includes(publication.servingState) || !proofPresent || !publication.trackBinding) return;
+        if (!state.replacementAttempt || state.replacementAttempt.publicationID !== publication.id) {
+          state.replacementAttempt = { publicationID: publication.id, idempotencyKey: `replacement-${crypto.randomUUID()}`, started: false, trackID: '' };
+        }
+      } else if (action === 'rollback') {
+        if (publication.active || publication.servingState !== 'inactive' || !proofPresent) return;
+      } else return;
+      state.publicationAction = action;
+      renderDomainPublicationRecord();
+      focusPublicationConfirmation(action, publication.id);
+    }
+
+    function cancelPublicationAction() {
+      const action = state.publicationAction;
+      if (action === 'replace' && state.replacementAttempt && !state.replacementAttempt.started) state.replacementAttempt = null;
+      state.publicationAction = '';
+      renderDomainPublicationRecord();
+      const target = action === 'rollback' ? element('rollbackDomainPublication') : element('replaceDomainPublication');
+      if (!target.hidden) target.focus();
+      announce('Publication action cancelled. No request was sent.');
+    }
+
+    function restorePublicationFailureFocus(action, publicationID) {
+      const selected = state.selectedDomainPublication;
+      if (!selected || selected.id !== publicationID) return;
+      const actionControl = action === 'rollback' ? element('rollbackDomainPublication') : element('replaceDomainPublication');
+      if (state.selectedDomainPublicationExact && !actionControl.hidden && !actionControl.disabled) actionControl.focus();
+      else element('domainPublicationRecord').focus();
+    }
+
+    async function advanceReplacementTrack(track, claimID, operationCurrent) {
+      let current = track;
+      if (String(current.status || '').toUpperCase() === 'PREVIEW_READY') {
+        current = await api(`/conductor/tracks/${encodeURIComponent(current.id)}/publication`, {
+          method: 'POST', body: { expectedVersion: current.version, claimId: claimID },
+        });
+        if (!operationCurrent()) return null;
+      }
+      if (String(current.status || '').toUpperCase() === 'PUBLICATION_REQUESTED') {
+        current = await api(`/conductor/tracks/${encodeURIComponent(current.id)}/activate`, {
+          method: 'POST', body: { expectedVersion: current.version },
+        });
+        if (!operationCurrent()) return null;
+      }
+      if (!current || String(current.status || '').toUpperCase() !== 'PUBLISHED' || String(current.claimId || '') !== claimID || !current.publication) {
+        throw new Error('The replacement track did not reach a durable publication activation.');
+      }
+      return current;
+    }
+
+    async function createPublicationReplacement() {
+      const sourcePublication = state.selectedDomainPublication;
+      const attempt = state.replacementAttempt;
+      if (!sourcePublication || !attempt || attempt.publicationID !== sourcePublication.id) return;
+      const marker = workspaceMarker();
+      const claimID = String(state.domainClaim && state.domainClaim.id || '');
+      const origin = String(sourcePublication.origin);
+      const operationEpoch = ++state.publicationEpoch;
+      const operationCurrent = () => currentWorkspace(marker) && operationEpoch === state.publicationEpoch
+        && state.domainClaim && String(state.domainClaim.id || '') === claimID && String(state.domainClaim.origin || '') === origin;
+      state.publishing = true;
+      attempt.started = true;
+      setBusy(element('confirmDomainPublicationAction'), true, 'Replacing…', 'Create and activate replacement');
+      setNotice(element('domainPublicationAlert'), 'Verifying the exact source build before creating a new immutable 90-day artifact…', 'gold');
+      renderDomainPublicationRecord();
+      let replacementTrackID = attempt.trackID;
+      try {
+        const currentPublication = await readExactPublicationContext(sourcePublication.id, marker, claimID);
+        if (!operationCurrent()) return;
+        requireCurrentPublicationContext(sourcePublication, currentPublication, 'replace');
+        const sourceResult = await api(`/conductor/tracks/${encodeURIComponent(sourcePublication.trackBinding.trackId)}?includeVerifiedPreview=true`);
+        if (!operationCurrent()) return;
+        const source = await verifiedReplacementSource(sourceResult, sourcePublication);
+        if (!operationCurrent()) return;
+        const payload = replacementPayload(source, sourcePublication, attempt.idempotencyKey);
+        const result = await api('/artifacts/preview', { method: 'POST', body: payload });
+        if (!operationCurrent()) return;
+        const newTrack = requireReplacementSuccessorBinding(result, payload, sourcePublication, state.domainClaim, attempt.idempotencyKey);
+        if (!newTrack || !newTrack.request || newTrack.request.idempotencyKey !== attempt.idempotencyKey || Number(newTrack.request.ttlHours) !== 2160
+          || Number(newTrack.workspaceId) !== marker.workspaceID || !result.manifest || !result.verification
+          || Date.parse(result.manifest.authorization && result.manifest.authorization.expiresAt || '') - Date.parse(result.manifest.createdAt || '') !== 2160 * 60 * 60 * 1000) {
+          throw new Error('The replacement preview did not prove the requested immutable 90-day authorization.');
+        }
+        replacementTrackID = String(newTrack.id);
+        attempt.trackID = replacementTrackID;
+        const active = await applyVerifiedPreview(result, operationCurrent, { requireActive: true, expectedComponents: payload.components, expectedTrackID: replacementTrackID });
+        if (!operationCurrent() || !active || !state.track) throw new Error('The replacement preview could not be fully verified.');
+        const published = await advanceReplacementTrack(state.track, claimID, operationCurrent);
+        if (!operationCurrent() || !published) return;
+        const context = await reconcilePublicationServing(published, operationCurrent, { sourcePublicationID: sourcePublication.id, successLabel: '90-day replacement' });
+        if (!operationCurrent() || !context) throw new Error('The replacement activation could not be revalidated.');
+        state.replacementAttempt = null;
+        state.publicationAction = '';
+        await loadBuildHistory();
+        if (!operationCurrent()) return;
+        renderDomainPublications();
+        element('domainPublicationRecord').focus();
+      } catch (error) {
+        if (!operationCurrent()) return;
+        if (replacementTrackID) {
+          try {
+            const latest = await api(`/conductor/tracks/${encodeURIComponent(replacementTrackID)}`);
+            if (operationCurrent() && latest && String(latest.status || '').toUpperCase() === 'PUBLISHED') {
+              const context = await reconcilePublicationServing(latest, operationCurrent, { sourcePublicationID: sourcePublication.id, successLabel: 'Reconciled 90-day replacement' });
+              if (operationCurrent() && context) {
+                state.replacementAttempt = null;
+                state.publicationAction = '';
+                renderDomainPublications();
+                element('domainPublicationRecord').focus();
+                return;
+              }
+            }
+          } catch {}
+        }
+        if (!operationCurrent()) return;
+        state.publicationAction = '';
+        const failureMessage = `${error.message || 'The replacement was not confirmed.'} The same idempotency key is retained for a bounded retry; serving truth was not changed in the cockpit.`;
+        await selectDomainPublication(sourcePublication.id);
+        if (operationCurrent()) {
+          setNotice(element('domainPublicationAlert'), failureMessage, 'error');
+          renderDomainPublications();
+          restorePublicationFailureFocus('replace', sourcePublication.id);
+        }
+      } finally {
+        if (operationEpoch === state.publicationEpoch) {
+          state.publishing = false;
+          setBusy(element('confirmDomainPublicationAction'), false, 'Replacing…', 'Create and activate replacement');
+          renderDomainPublications();
+          updateDeploymentAvailability();
+        }
+      }
+    }
+
+    async function activatePriorPublication() {
+      const sourcePublication = state.selectedDomainPublication;
+      if (!sourcePublication || sourcePublication.active || sourcePublication.servingState !== 'inactive') return;
+      const marker = workspaceMarker();
+      const claimID = String(state.domainClaim && state.domainClaim.id || '');
+      const operationEpoch = ++state.publicationEpoch;
+      const operationCurrent = () => currentWorkspace(marker) && operationEpoch === state.publicationEpoch
+        && state.domainClaim && String(state.domainClaim.id || '') === claimID;
+      state.publishing = true;
+      setBusy(element('confirmDomainPublicationAction'), true, 'Activating…', 'Activate prior publication');
+      setNotice(element('domainPublicationAlert'), 'Activating an exact verified historical artifact as a new immutable publication event…', 'gold');
+      renderDomainPublicationRecord();
+      try {
+        const currentPublication = await readExactPublicationContext(sourcePublication.id, marker, claimID);
+        if (!operationCurrent()) return;
+        requireCurrentPublicationContext(sourcePublication, currentPublication, 'rollback');
+        const activated = await api(`/workspaces/${marker.workspaceID}/domains/${encodeURIComponent(claimID)}/publications/${encodeURIComponent(sourcePublication.id)}/activate`, { method: 'POST' });
+        if (!operationCurrent()) return;
+        if (!activated || !activated.id || String(activated.sourcePublicationId || '') !== sourcePublication.id
+          || String(activated.artifactId || '') !== sourcePublication.artifactId || String(activated.contentHash || '') !== sourcePublication.contentHash) {
+          throw new Error('Rollback activation did not return the exact selected artifact and lineage.');
+        }
+        await loadDomainPublications(state.domainClaim);
+        if (!operationCurrent()) return;
+        const context = await selectDomainPublication(String(activated.id));
+        if (!operationCurrent() || !context || !context.active || context.sourcePublicationId !== sourcePublication.id
+          || context.artifactId !== sourcePublication.artifactId || context.contentHash !== sourcePublication.contentHash) {
+          throw new Error('Rollback activation could not be revalidated from authoritative publication context.');
+        }
+        state.publicationAction = '';
+        element('deployStateText').textContent = context.servingState === 'serving' ? 'Serving' : 'Activated · not serving';
+        element('deployStateHelp').textContent = publicationTruth(context);
+        setNotice(element('domainStatus'), context.servingState === 'serving'
+          ? `Prior publication activated and confirmed serving at ${context.origin}.`
+          : `Rollback activation is retained, but the server reports: ${publicationTruth(context)}`, context.servingState === 'serving' ? 'success' : 'gold');
+        announce(context.servingState === 'serving' ? 'Prior publication activated and confirmed serving.' : publicationTruth(context));
+        renderDomainPublications();
+        element('domainPublicationRecord').focus();
+      } catch (error) {
+        if (!operationCurrent()) return;
+        state.publicationAction = '';
+        setNotice(element('domainPublicationAlert'), `${error.message || 'The prior publication was not activated.'} Reload publication history before retrying; no serving claim is made.`, 'error');
+        await loadDomainPublications(state.domainClaim);
+        if (operationCurrent()) {
+          await selectDomainPublication(sourcePublication.id);
+          if (operationCurrent()) {
+            setNotice(element('domainPublicationAlert'), `${error.message || 'The prior publication was not activated.'} Exact publication context was rechecked before retry.`, 'error');
+            restorePublicationFailureFocus('rollback', sourcePublication.id);
+          }
+        }
+      } finally {
+        if (operationEpoch === state.publicationEpoch) {
+          state.publishing = false;
+          setBusy(element('confirmDomainPublicationAction'), false, 'Activating…', 'Activate prior publication');
+          renderDomainPublications();
+          updateDeploymentAvailability();
+        }
+      }
+    }
+
+    async function confirmPublicationAction() {
+      if (state.publicationAction === 'replace') await createPublicationReplacement();
+      else if (state.publicationAction === 'rollback') await activatePriorPublication();
     }
 
     async function ensureShuraCapability() {
@@ -4559,6 +5387,12 @@
     element('retryDomainClaims').addEventListener('click', loadDomainClaims);
     element('claimDomainButton').addEventListener('click', claimDomain);
     element('verifyDomainButton').addEventListener('click', verifyDomain);
+    element('loadMoreDomainPublications').addEventListener('click', () => loadDomainPublications(state.domainClaim, { append: true }));
+    element('refreshDomainPublication').addEventListener('click', () => selectDomainPublication(String(state.selectedDomainPublication && state.selectedDomainPublication.id || ''), { focus: true }));
+    element('replaceDomainPublication').addEventListener('click', () => startPublicationAction('replace'));
+    element('rollbackDomainPublication').addEventListener('click', () => startPublicationAction('rollback'));
+    element('confirmDomainPublicationAction').addEventListener('click', confirmPublicationAction);
+    element('cancelDomainPublicationAction').addEventListener('click', cancelPublicationAction);
     element('deployButton').addEventListener('click', publishVerifiedDomain);
     element('accentColor').addEventListener('input', () => syncAccent(element('accentColor')));
     element('accentHex').addEventListener('input', () => syncAccent(element('accentHex')));
@@ -4606,6 +5440,10 @@
     element('questReconcileButton').addEventListener('click', () => mutateQuest('reconcile'));
     element('questCancelButton').addEventListener('click', () => mutateQuest('cancel'));
     element('retryBazaar').addEventListener('click', loadBazaar);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') revalidatePublicationDeadlineAfterResume();
+    });
+    window.addEventListener('focus', revalidatePublicationDeadlineAfterResume);
 
     syncSampleTitle();
     showAuth();

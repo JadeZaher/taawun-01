@@ -106,7 +106,7 @@ func TestCompositionPreviewRejectsUnverifiedArtifact(t *testing.T) {
 
 func TestCompositionPreviewFilesAreTrackScoped(t *testing.T) {
 	service := &compositionServiceStub{track: previewTrack()}
-	store := artifactReaderStub{file: artifacts.ArtifactFile{Path: "index.html", Contents: []byte("<!doctype html>"), SHA256: "digest"}}
+	store := artifactReaderStub{open: verifiedBuildResult(service.track), file: artifacts.ArtifactFile{Path: "index.html", Contents: []byte("<!doctype html>"), SHA256: "digest"}}
 	handler, err := NewCompositionHTTPHandler(service, store, CurrentUser, []string{"http://localhost:8080"})
 	if err != nil {
 		t.Fatalf("NewCompositionHTTPHandler() error = %v", err)
@@ -689,7 +689,8 @@ func sha256Hex(value []byte) string {
 }
 
 func verifiedBuildResult(track *conductor.Track) artifacts.BuildResult {
-	return artifacts.BuildResult{ArtifactID: track.Artifact.ArtifactID, ContentHash: track.Artifact.ContentHash, Manifest: track.Artifact.Manifest}
+	manifestJSON, _ := json.Marshal(track.Artifact.Manifest)
+	return artifacts.BuildResult{ArtifactID: track.Artifact.ArtifactID, ContentHash: track.Artifact.ContentHash, Manifest: track.Artifact.Manifest, ManifestJSON: manifestJSON}
 }
 
 func legacyPreviewTrack() *conductor.Track {

@@ -61,8 +61,12 @@ func ensureSchema(db *sql.DB) error {
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_domain_publications_active_origin
 			ON workspace_domain_publications(origin) WHERE deactivated_at IS NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_domain_publications_active_claim
+			ON workspace_domain_publications(workspace_id, claim_id) WHERE deactivated_at IS NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_domain_publications_history
 			ON workspace_domain_publications(workspace_id, claim_id, activated_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_domain_publications_context_page
+			ON workspace_domain_publications(workspace_id, claim_id, activated_at DESC, id DESC)`,
 	}
 	for _, statement := range statements {
 		if _, err := db.Exec(statement); err != nil {

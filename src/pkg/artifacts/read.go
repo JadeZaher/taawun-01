@@ -2,6 +2,7 @@ package artifacts
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -56,12 +57,23 @@ func (b *Builder) Open(ctx context.Context, contentHash string) (BuildResult, er
 
 // ReadFile verifies the whole bundle and returns only a manifest-listed file.
 func (b *Builder) ReadFile(ctx context.Context, contentHash, relativePath string) (ArtifactFile, error) {
-	if !safePublishedFilePath(relativePath) {
-		return ArtifactFile{}, fmt.Errorf("%w: unsafe path", ErrArtifactFileNotFound)
-	}
 	result, err := b.Open(ctx, contentHash)
 	if err != nil {
 		return ArtifactFile{}, err
+	}
+	return b.ReadVerifiedFile(ctx, result, relativePath)
+}
+
+// ReadVerifiedFile reads one manifest-listed file from an already verified bundle.
+func (b *Builder) ReadVerifiedFile(ctx context.Context, result BuildResult, relativePath string) (ArtifactFile, error) {
+	if b == nil || ctx == nil || contextError(ctx) != nil || !safePublishedFilePath(relativePath) ||
+		!validContentHash(result.ContentHash) || result.ContentHash != result.Manifest.ContentHash ||
+		result.ArtifactID == "" || result.ArtifactID != result.Manifest.ArtifactID || result.Directory == "" {
+		return ArtifactFile{}, fmt.Errorf("%w: invalid verified bundle", ErrArtifactFileNotFound)
+	}
+	directory, err := safeJoin(b.root, result.ContentHash)
+	if err != nil || filepath.Clean(directory) != filepath.Clean(result.Directory) {
+		return ArtifactFile{}, fmt.Errorf("%w: invalid verified bundle", ErrArtifactFileNotFound)
 	}
 	var expected *FileDigest
 	for i := range result.Manifest.Files {
@@ -90,6 +102,10 @@ func (b *Builder) ReadFile(ctx context.Context, contentHash, relativePath string
 	contents, err := os.ReadFile(path)
 	if err != nil {
 		return ArtifactFile{}, fmt.Errorf("read artifact file: %w", err)
+	}
+	digest := sha256.Sum256(contents)
+	if len(contents) != expected.Bytes || hex.EncodeToString(digest[:]) != expected.SHA256 {
+		return ArtifactFile{}, fmt.Errorf("%w: file digest mismatch", ErrArtifactConflict)
 	}
 	return ArtifactFile{Path: relativePath, Contents: contents, SHA256: expected.SHA256}, nil
 }

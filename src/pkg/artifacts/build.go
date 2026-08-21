@@ -36,10 +36,11 @@ type Builder struct {
 
 // BuildResult identifies a published content-addressed bundle.
 type BuildResult struct {
-	ArtifactID  string   `json:"artifactId"`
-	ContentHash string   `json:"contentHash"`
-	Directory   string   `json:"directory"`
-	Manifest    Manifest `json:"manifest"`
+	ArtifactID   string   `json:"artifactId"`
+	ContentHash  string   `json:"contentHash"`
+	Directory    string   `json:"directory"`
+	Manifest     Manifest `json:"manifest"`
+	ManifestJSON []byte   `json:"-"`
 }
 
 // NewBuilder prepares and resolves a dedicated artifact output root.
@@ -53,7 +54,20 @@ func NewBuilder(outputRoot string) (*Builder, error) {
 
 // NewSignedBuilder prepares a production builder with an injected Ed25519 signer.
 func NewSignedBuilder(outputRoot string, signing SigningConfig) (*Builder, error) {
-	return newSignedBuilder(outputRoot, signing, false)
+	return NewSignedBuilderWithClock(outputRoot, signing, time.Now)
+}
+
+// NewSignedBuilderWithClock binds artifact creation to the authoritative server clock.
+func NewSignedBuilderWithClock(outputRoot string, signing SigningConfig, now func() time.Time) (*Builder, error) {
+	if now == nil {
+		return nil, fmt.Errorf("%w: server clock is required", ErrInvalidSigningConfig)
+	}
+	builder, err := newSignedBuilder(outputRoot, signing, false)
+	if err != nil {
+		return nil, err
+	}
+	builder.now = now
+	return builder, nil
 }
 
 func newSignedBuilder(outputRoot string, signing SigningConfig, ephemeral bool) (*Builder, error) {
@@ -193,10 +207,11 @@ func (b *Builder) Build(ctx context.Context, request BuildRequest) (BuildResult,
 	}
 	published = true
 	return BuildResult{
-		ArtifactID:  manifest.ArtifactID,
-		ContentHash: manifest.ContentHash,
-		Directory:   destination,
-		Manifest:    manifest,
+		ArtifactID:   manifest.ArtifactID,
+		ContentHash:  manifest.ContentHash,
+		Directory:    destination,
+		Manifest:     manifest,
+		ManifestJSON: append([]byte(nil), manifestBytes...),
 	}, nil
 }
 
@@ -257,10 +272,11 @@ func (b *Builder) loadExisting(directory, expectedHash string) (BuildResult, err
 		return BuildResult{}, err
 	}
 	return BuildResult{
-		ArtifactID:  manifest.ArtifactID,
-		ContentHash: manifest.ContentHash,
-		Directory:   directory,
-		Manifest:    manifest,
+		ArtifactID:   manifest.ArtifactID,
+		ContentHash:  manifest.ContentHash,
+		Directory:    directory,
+		Manifest:     manifest,
+		ManifestJSON: append([]byte(nil), encoded...),
 	}, nil
 }
 

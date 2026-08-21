@@ -95,21 +95,18 @@ func main() {
 	dashboardHandler := handlers.NewDashboardHandler(userService, workspaceService, notificationService)
 
 	// Initialize Taawun engine primitives and the authenticated composition services.
+	serverNow := time.Now
 	p2pHub, err := configuredRelayHub()
 	if err != nil {
 		log.Fatalf("Failed to configure P2P relay: %v", err)
 	}
-	artifactBuilder, err := configuredArtifactBuilder()
+	artifactBuilder, err := configuredArtifactBuilderWithClock(serverNow)
 	if err != nil {
 		log.Fatalf("Failed to configure signed artifact builder: %v", err)
 	}
-	domainService, err := domains.NewService(sqlDB, workspaceService, domains.Options{Artifacts: artifactBuilder, PreviewOrigins: appOrigins})
+	domainService, err := domains.NewService(sqlDB, workspaceService, domains.Options{Artifacts: artifactBuilder, PreviewOrigins: appOrigins, Now: serverNow})
 	if err != nil {
 		log.Fatalf("Failed to configure verified domains: %v", err)
-	}
-	domainHandler, err := domains.NewHTTPHandler(domainService, handlers.CurrentUser)
-	if err != nil {
-		log.Fatalf("Failed to configure verified-domain HTTP API: %v", err)
 	}
 	ethicsEngine := ethics.NewHaramCheckEngine()
 	ethicsHandler := handlers.NewEthicsHTTPHandler(ethicsEngine)
@@ -118,15 +115,23 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize Conductor storage: %v", err)
 	}
+	publicationContexts, err := domains.NewPublicationContextService(domainService, conductorRepository)
+	if err != nil {
+		log.Fatalf("Failed to configure publication context: %v", err)
+	}
+	domainHandler, err := domains.NewHTTPHandlerWithPublicationContext(domainService, publicationContexts, handlers.CurrentUser)
+	if err != nil {
+		log.Fatalf("Failed to configure verified-domain HTTP API: %v", err)
+	}
 	complianceAuditor, err := conductor.NewReferenceComplianceAuditor(ethicsEngine, complianceCorpus)
 	if err != nil {
 		log.Fatalf("Failed to configure Conductor compliance audit: %v", err)
 	}
-	conductorService, err := conductor.NewService(conductorRepository, workspaceService, conductor.ActorSubjectResolver{}, conductor.CuratedCompositionValidator{}, complianceAuditor, artifactBuilder, domainService, domainService)
+	conductorService, err := conductor.NewServiceWithClock(conductorRepository, workspaceService, conductor.ActorSubjectResolver{}, conductor.CuratedCompositionValidator{}, complianceAuditor, artifactBuilder, domainService, domainService, serverNow)
 	if err != nil {
 		log.Fatalf("Failed to configure Conductor composition service: %v", err)
 	}
-	compositionHandler, err := handlers.NewCompositionHTTPHandler(conductorService, artifactBuilder, handlers.CurrentUser, appOrigins)
+	compositionHandler, err := handlers.NewCompositionHTTPHandlerWithClock(conductorService, artifactBuilder, handlers.CurrentUser, appOrigins, serverNow)
 	if err != nil {
 		log.Fatalf("Failed to configure central builder API: %v", err)
 	}
@@ -194,7 +199,7 @@ func main() {
 		log.Fatalf("Failed to configure OAuth authorization server: %v", err)
 	}
 	oauthHandler := oauth.NewHTTPHandler(oauthService)
-	mcpServer, err := mcp.NewMCPServer(artifactBuilder, workspaceService, handlers.CurrentUser, mcp.ServerOptions{OriginAuthorizer: domainService, AuthorizationBoundary: oauthService})
+	mcpServer, err := mcp.NewMCPServer(artifactBuilder, workspaceService, handlers.CurrentUser, mcp.ServerOptions{OriginAuthorizer: domainService, AuthorizationBoundary: oauthService, Now: serverNow})
 	if err != nil {
 		log.Fatalf("Failed to configure MCP control plane: %v", err)
 	}
@@ -507,6 +512,10 @@ func configuredMCPHosts(appOrigins []string) ([]string, error) {
 }
 
 func configuredArtifactBuilder() (*artifacts.Builder, error) {
+	return configuredArtifactBuilderWithClock(time.Now)
+}
+
+func configuredArtifactBuilderWithClock(now func() time.Time) (*artifacts.Builder, error) {
 	root := strings.TrimSpace(os.Getenv("TAWUN_ARTIFACT_ROOT"))
 	if root == "" {
 		root = "./data/artifacts"
@@ -527,11 +536,11 @@ func configuredArtifactBuilder() (*artifacts.Builder, error) {
 	if !ok {
 		return nil, fmt.Errorf("artifact signing key has no Ed25519 public key")
 	}
-	return artifacts.NewSignedBuilder(root, artifacts.SigningConfig{
+	return artifacts.NewSignedBuilderWithClock(root, artifacts.SigningConfig{
 		KeyID:       keyID,
 		PrivateKey:  privateKey,
 		TrustedKeys: map[string]ed25519.PublicKey{keyID: publicKey},
-	})
+	}, now)
 }
 
 func configuredShuraSigning(publicBaseURL string) (*shura.CapabilityIssuer, *shura.StaticKeyRegistry, error) {

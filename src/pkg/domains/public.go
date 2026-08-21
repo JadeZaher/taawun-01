@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"mime"
 	"net/http"
 	"net/url"
 	"path"
@@ -42,29 +41,30 @@ func (h *PublicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.fallback.ServeHTTP(w, r)
 		return
 	}
+	requestNow := h.service.now().UTC()
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", http.MethodGet+", "+http.MethodHead)
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writePublicError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 	_, host, err := NormalizeOrigin("https://" + hostHeader)
 	if err != nil {
-		http.NotFound(w, r)
+		writePublicError(w, http.StatusNotFound, "Not found")
 		return
 	}
-	publication, claim, err := h.service.activePublicationForHost(r.Context(), host)
+	publication, claim, err := h.service.activePublicationForHostAt(r.Context(), host, requestNow)
 	if errors.Is(err, sql.ErrNoRows) {
-		http.NotFound(w, r)
+		writePublicError(w, http.StatusNotFound, "Not found")
 		return
 	}
 	if err != nil {
-		http.Error(w, "Published card unavailable", http.StatusServiceUnavailable)
+		writePublicError(w, http.StatusServiceUnavailable, "Published card unavailable")
 		return
 	}
 	built, err := h.service.artifacts.Open(r.Context(), publication.ContentHash)
-	if err != nil || validateArtifactForClaim(built, claim, h.service.now().UTC()) != nil ||
-		built.ArtifactID != publication.ArtifactID || built.ContentHash != publication.ContentHash {
-		http.Error(w, "Published card unavailable", http.StatusServiceUnavailable)
+	if err != nil || validateArtifactBindingForPublication(built, claim, publication) != nil ||
+		artifacts.CheckManifestExpiry(built.Manifest, requestNow) != nil {
+		writePublicError(w, http.StatusServiceUnavailable, "Published card unavailable")
 		return
 	}
 	filePath := strings.TrimPrefix(r.URL.Path, "/")
@@ -73,19 +73,28 @@ func (h *PublicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else if filePath == "embed" {
 		filePath = "embed.html"
 	} else if cleaned := path.Clean(filePath); cleaned != filePath || cleaned == "." || strings.HasPrefix(cleaned, "../") {
-		http.NotFound(w, r)
+		writePublicError(w, http.StatusNotFound, "Not found")
 		return
 	}
-	file, err := h.service.artifacts.ReadFile(r.Context(), publication.ContentHash, filePath)
+	file, err := h.service.artifacts.ReadVerifiedFile(r.Context(), built, filePath)
 	if err != nil {
-		http.NotFound(w, r)
+		if errors.Is(err, artifacts.ErrArtifactFileNotFound) || errors.Is(err, artifacts.ErrArtifactNotFound) {
+			writePublicError(w, http.StatusNotFound, "Not found")
+		} else {
+			writePublicError(w, http.StatusServiceUnavailable, "Published card unavailable")
+		}
 		return
 	}
-	contentType := mime.TypeByExtension(path.Ext(file.Path))
-	if contentType == "" {
-		contentType = "application/octet-stream"
+	switch path.Ext(file.Path) {
+	case ".html":
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	case ".css":
+		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	case ".js":
+		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	default:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	}
-	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Length", strconv.Itoa(len(file.Contents)))
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("ETag", `"`+file.SHA256+`"`)
@@ -98,6 +107,15 @@ func (h *PublicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		_, _ = w.Write(file.Contents)
 	}
+}
+
+func writePublicError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	w.WriteHeader(status)
+	_, _ = w.Write([]byte(message + "\n"))
 }
 
 func manifestCSP(manifest artifacts.Manifest, filePath string) string {

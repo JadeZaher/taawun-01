@@ -37,6 +37,7 @@ type artifactStore interface {
 	Build(context.Context, artifacts.BuildRequest) (artifacts.BuildResult, error)
 	Open(context.Context, string) (artifacts.BuildResult, error)
 	ReadFile(context.Context, string, string) (artifacts.ArtifactFile, error)
+	ReadVerifiedFile(context.Context, artifacts.BuildResult, string) (artifacts.ArtifactFile, error)
 }
 
 // ArtifactHTTPHandler exposes scoped build and immutable artifact read operations.
@@ -44,26 +45,33 @@ type ArtifactHTTPHandler struct {
 	store            artifactStore
 	authority        ArtifactAuthorityResolver
 	maximumBodyBytes int64
+	now              func() time.Time
 }
 
 // NewArtifactHTTPHandler constructs an adapter around an injected stable-signer builder.
 func NewArtifactHTTPHandler(builder *artifacts.Builder, authority ArtifactAuthorityResolver) (*ArtifactHTTPHandler, error) {
+	return NewArtifactHTTPHandlerWithClock(builder, authority, time.Now)
+}
+
+// NewArtifactHTTPHandlerWithClock binds signed file reads to the server clock.
+func NewArtifactHTTPHandlerWithClock(builder *artifacts.Builder, authority ArtifactAuthorityResolver, now func() time.Time) (*ArtifactHTTPHandler, error) {
 	if builder == nil || !builder.ProductionReady() {
 		return nil, errors.New("production artifact builder with stable signer is required")
 	}
-	if authority == nil {
-		return nil, errors.New("artifact authority resolver is required")
+	if authority == nil || now == nil {
+		return nil, errors.New("artifact authority resolver and server clock are required")
 	}
 	return &ArtifactHTTPHandler{
 		store:            builder,
 		authority:        authority,
 		maximumBodyBytes: defaultArtifactBodyLimit,
+		now:              now,
 	}, nil
 }
 
 // ServeHTTP routes the self-contained artifact API without imposing an application router.
 func (h *ArtifactHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if h == nil || h.store == nil || h.authority == nil {
+	if h == nil || h.store == nil || h.authority == nil || h.now == nil {
 		writeArtifactError(w, http.StatusInternalServerError, "artifact_handler_unavailable", "Artifact service is unavailable.")
 		return
 	}
@@ -165,6 +173,7 @@ func (h *ArtifactHTTPHandler) build(w http.ResponseWriter, r *http.Request, auth
 }
 
 func (h *ArtifactHTTPHandler) read(w http.ResponseWriter, r *http.Request, authority ArtifactAuthority) {
+	requestNow := h.now().UTC()
 	remainder := strings.TrimPrefix(r.URL.Path, artifactAPIBase+"/")
 	segments := strings.Split(remainder, "/")
 	if len(segments) == 0 || segments[0] == "" {
@@ -188,7 +197,7 @@ func (h *ArtifactHTTPHandler) read(w http.ResponseWriter, r *http.Request, autho
 	case len(segments) == 2 && segments[1] == "manifest.json":
 		writeImmutableJSON(w, r, result.ContentHash, result.Manifest)
 	case len(segments) >= 3 && segments[1] == "files":
-		if err := artifacts.CheckManifestExpiry(result.Manifest, time.Now()); err != nil {
+		if err := artifacts.CheckManifestExpiry(result.Manifest, requestNow); err != nil {
 			h.writeStoreError(w, err)
 			return
 		}
@@ -197,7 +206,7 @@ func (h *ArtifactHTTPHandler) read(w http.ResponseWriter, r *http.Request, autho
 			writeArtifactError(w, http.StatusNotFound, "artifact_file_not_found", "Artifact file not found.")
 			return
 		}
-		file, err := h.store.ReadFile(r.Context(), contentHash, relativePath)
+		file, err := h.store.ReadVerifiedFile(r.Context(), result, relativePath)
 		if err != nil {
 			h.writeStoreError(w, err)
 			return

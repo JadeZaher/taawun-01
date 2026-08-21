@@ -9,6 +9,11 @@ The durable SQLite track store records optimistic aggregate versions and a
 hash-linked append-only event history. A signed preview bundle is not a
 publication. Publication is requested separately, then activated through the
 verified `pkg/domains` service under a fresh WorkspaceService publish check.
+Published tracks also persist the exact domain `publication_id` in a normal,
+non-unique indexed column. Shared publication links are valid. Legacy JSON is
+backfilled only when its publication/workspace/claim/artifact/hash linkage
+matches the exact domain row; no artifact, actor, time, or history heuristic is
+permitted.
 
 Compliance evidence always exposes its madhhab, reference ID, disposition, and
 qualified-review status. `pending-qualified-review` must never be rendered as a
@@ -39,3 +44,14 @@ reload to reopen and verify the immutable artifact. Resume keeps its stricter
 Build, original-creator, expected-version, and status checks; authorization and
 creator checks happen before version comparison so track IDs cannot be used as
 version oracles.
+
+Publication retry uses the domain authority's exact indexed active-row lookup
+and accepts only an exact workspace/claim/artifact/hash match. Publication
+context reverse lookup is one bounded indexed set query and returns a binding
+only when exactly one fully validated track remains; zero, multiple, malformed,
+and mismatched candidates all remain unbound.
+
+Activation does not write a pre-publication intent event. The domain transaction
+is idempotent for an already-active exact artifact, and only the final published
+track transition uses optimistic compare-and-swap; concurrent tracks may safely
+share the one committed publication.

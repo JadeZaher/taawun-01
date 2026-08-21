@@ -222,6 +222,29 @@ test('cockpit inline modules parse before they are embedded in the server binary
   assert.doesNotThrow(() => new vm.Script(modules[0][1], { filename: 'index.html:inline-module' }));
 });
 
+test('publication expiry and successor trust stay server-clock and principal bound', async () => {
+  const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const publicationClock = html.match(/function normalizePublicationContextEnvelope[\s\S]*?(?=\n\s*function resetPublicationContextUI)/u)?.[0] || '';
+  const historyLoader = html.match(/async function loadDomainPublications[\s\S]*?(?=\n\s*async function selectDomainPublication)/u)?.[0] || '';
+  const successorGuard = html.match(/function requireReplacementSuccessorBinding[\s\S]*?(?=\n\s*function startPublicationAction)/u)?.[0] || '';
+
+  assert.match(publicationClock, /value\.serverTime/u);
+  assert.match(publicationClock, /envelope\.requestStartedAt \+ Math\.max\(0, signedRemaining\)/u);
+  assert.match(publicationClock, /performance\.now\(\)/u);
+  assert.doesNotMatch(publicationClock, /Date\.now/u);
+  assert.match(publicationClock, /active\.length > 1/u);
+  assert.match(publicationClock, /append && !appendedRows\.some/u);
+  assert.match(publicationClock, /function revalidatePublicationDeadlineAfterResume/u);
+  assert.doesNotMatch(historyLoader, /clearPublicationDeadline\(/u);
+  assert.match(historyLoader, /reconcilePublicationDeadline\(publications, envelope, \{ append, appendedRows \}\)/u);
+  assert.match(html, /visibilityState === 'visible'\) revalidatePublicationDeadlineAfterResume\(\)/u);
+  assert.match(successorGuard, /Number\(newTrack\.createdBy\) !== principalID/u);
+  assert.match(successorGuard, /String\(signedSubject\.id \|\| ''\) !== subjectID/u);
+  assert.match(successorGuard, /exactOriginPolicyMatch\(newTrack\.request\.requestedOrigins, requestedPolicy\)/u);
+  assert.match(successorGuard, /exactOriginPolicyMatch\(preview\.allowedOrigins, requestedPolicy\)/u);
+  assert.match(successorGuard, /exactOriginPolicyMatch\(authorization\.allowedOrigins, requestedPolicy\)/u);
+});
+
 test('registration enforces the server password minimum', async () => {
   const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
 
@@ -455,6 +478,8 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
   const receiptVariants = [
     'active',
     'missing-attestation',
+    'missing-authorization-state',
+    'authorization-state-mismatch',
     'missing-digest',
     'digest-mismatch',
     'artifact',
@@ -493,6 +518,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
   ];
   let previewBuilds = 0;
   let activeTrackResponse = null;
+  let initialPeopleResponseBarrier = null;
   let delayPeopleResponse = false;
   let failPeopleNext = false;
   let historyFailNext = false;
@@ -522,6 +548,30 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     { id: 'claim_expired', workspaceId: 41, origin: 'https://expired.community.example', host: 'expired.community.example', status: 'revoked', revocationReason: 'expired', challengeExpiresAt: '2026-08-18T00:00:00Z', createdAt: '2026-08-18T00:30:00Z', updatedAt: '2026-08-18T00:30:00Z' },
   ];
   let domainPublications = [];
+  let replacementTrackResponse = null;
+  let delayPublicationContextResponse = false;
+  let publicationContextFailNext = false;
+  let replacementPreviewFailAfterCommit = false;
+  let replacementSuccessorVariant = '';
+  let publicationServerTime = '2026-08-18T06:02:00Z';
+  let automaticPublicationExpiry = false;
+  let automaticPublicationExactReads = 0;
+  const publicationContextRow = (publication, exact = false) => ({
+    id: publication.id,
+    workspaceId: publication.workspaceId,
+    claimId: publication.claimId,
+    origin: publication.origin,
+    contentHash: publication.contentHash,
+    artifactId: publication.artifactId,
+    ...(publication.sourcePublicationId ? { sourcePublicationId: publication.sourcePublicationId } : {}),
+    activatedAt: publication.activatedAt,
+    ...(publication.deactivatedAt ? { deactivatedAt: publication.deactivatedAt } : {}),
+    active: publication.active,
+    authorizationExpiresAt: publication.active || exact ? publication.authorizationExpiresAt : null,
+    manifestDigest: publication.active || exact ? publication.manifestDigest : null,
+    servingState: publication.active || exact ? publication.servingState : 'inactive',
+    trackBinding: publication.trackBinding || null,
+  });
   let failNextPreview = false;
   let delayTrackResponse = false;
   let incompleteCatalogNext = false;
@@ -602,9 +652,14 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       }
       return json(201, workspace);
     }
-    if (record.method === 'GET' && /^\/api\/workspaces\/\d+\/people$/u.test(record.path) && delayPeopleResponse) {
-      delayPeopleResponse = false;
-      await wait(300);
+    if (record.method === 'GET' && /^\/api\/workspaces\/\d+\/people$/u.test(record.path)) {
+      const barrier = initialPeopleResponseBarrier;
+      initialPeopleResponseBarrier = null;
+      if (barrier) await barrier;
+      if (delayPeopleResponse) {
+        delayPeopleResponse = false;
+        await wait(300);
+      }
     }
     if (record.method === 'GET' && record.path === '/api/workspaces/41/people') {
       if (failPeopleNext) {
@@ -684,7 +739,31 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(401, { error: { code: 'unauthorized', message: 'Authentication required.' } });
       return json(200, { claims: [] });
     }
-    if (record.method === 'GET' && /^\/api\/workspaces\/41\/domains\/[^/]+\/publications$/u.test(record.path)) return json(200, { publications: domainPublications });
+    if (record.method === 'GET' && /^\/api\/workspaces\/41\/domains\/[^/]+\/publications$/u.test(record.path)) {
+      if (publicationContextFailNext) {
+        publicationContextFailNext = false;
+        return json(503, { error: { code: 'publication_context_unavailable', message: 'Synthetic publication context interruption.' } });
+      }
+      if (delayPublicationContextResponse) {
+        delayPublicationContextResponse = false;
+        await wait(300);
+      }
+      const publicationID = requestURL.searchParams.get('publicationId');
+      if (publicationID) {
+        const selected = domainPublications.find((publication) => publication.id === publicationID);
+        if (selected && automaticPublicationExpiry && publicationID === 'publication_browser') {
+          automaticPublicationExactReads += 1;
+          if (automaticPublicationExactReads > 1) {
+            selected.servingState = 'expired';
+            publicationServerTime = selected.authorizationExpiresAt;
+          }
+        }
+        return json(200, { publications: selected ? [publicationContextRow(selected, true)] : [], serverTime: publicationServerTime });
+      }
+      const cursor = requestURL.searchParams.get('cursor');
+      const page = cursor ? domainPublications.slice(1) : domainPublications.slice(0, domainPublications.length > 1 ? 1 : 20);
+      return json(200, { publications: page.map((publication) => publicationContextRow(publication)), serverTime: publicationServerTime, ...(domainPublications.length > 1 && !cursor ? { nextCursor: 'publication-page-2' } : {}) });
+    }
     if (record.method === 'POST' && record.path === '/api/workspaces/41/domains') {
       const claim = { id: 'claim_rotated', workspaceId: 41, origin: record.body.origin, host: new URL(record.body.origin).host, status: 'pending', challengeExpiresAt: '2099-08-18T12:00:00Z', createdAt: '2026-08-18T01:00:00Z', updatedAt: '2026-08-18T01:00:00Z' };
       domainClaims = [claim, ...domainClaims.filter((entry) => entry.origin !== claim.origin)];
@@ -749,6 +828,9 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       }
       return json(200, result);
     }
+    if (record.method === 'GET' && record.path === '/api/conductor/tracks/track_replacement' && replacementTrackResponse) {
+      return json(200, requestURL.searchParams.get('includeVerifiedPreview') === 'true' ? replacementTrackResponse : replacementTrackResponse.track);
+    }
     if (record.method === 'GET' && /^\/api\/conductor\/tracks\/[^/]+$/u.test(record.path)) {
       const trackID = record.path.split('/').at(-1);
       const track = extraTracks.get(trackID);
@@ -791,10 +873,45 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
         trackEvents.set('track_browser', [...(trackEvents.get('track_browser') || []), { type: 'PUBLICATION_ACTIVATION_BLOCKED', toStatus: 'PUBLICATION_REQUESTED', trackVersion: activeTrackResponse.track.version, createdAt: '2026-08-18T06:01:00Z', detail: { token: 'never-render-this-token' } }]);
         return json(502, { error: { code: 'composition_dependency_unavailable', message: 'Synthetic activation interruption.' } });
       }
-      const publication = { id: 'publication_browser', workspaceId: 41, claimId: 'claim_browser', origin: 'https://app.community.example', artifactId: 'browser-signed-artifact', contentHash: 'a'.repeat(64), active: true, activatedAt: '2026-08-18T06:02:00Z' };
+      const publication = {
+        id: 'publication_browser', workspaceId: 41, claimId: 'claim_browser', origin: 'https://app.community.example', artifactId: 'browser-signed-artifact', contentHash: 'a'.repeat(64),
+        active: true, activatedAt: '2026-08-18T06:02:00Z', authorizationExpiresAt: activeTrackResponse.manifest.authorization.expiresAt,
+        manifestDigest: activeTrackResponse.verification.manifestDigest, servingState: 'serving',
+        trackBinding: { trackId: 'track_browser', status: 'PUBLISHED', version: activeTrackResponse.track.version + 1 },
+      };
       Object.assign(activeTrackResponse.track, { status: 'PUBLISHED', version: activeTrackResponse.track.version + 1, publication, updatedAt: publication.activatedAt });
       domainPublications = [publication];
       return json(201, activeTrackResponse.track);
+    }
+    if (record.method === 'POST' && record.path === '/api/conductor/tracks/track_replacement/publication' && replacementTrackResponse) {
+      Object.assign(replacementTrackResponse.track, { status: 'PUBLICATION_REQUESTED', version: replacementTrackResponse.track.version + 1, claimId: record.body.claimId, updatedAt: '2026-08-18T08:01:00Z' });
+      return json(200, replacementTrackResponse.track);
+    }
+    if (record.method === 'POST' && record.path === '/api/conductor/tracks/track_replacement/activate' && replacementTrackResponse) {
+      const predecessor = domainPublications.find((publication) => publication.active);
+      if (predecessor) Object.assign(predecessor, { active: false, deactivatedAt: '2026-08-18T08:02:00Z', servingState: 'inactive' });
+      const publication = {
+        id: 'publication_replacement', workspaceId: 41, claimId: 'claim_browser', origin: 'https://app.community.example', artifactId: 'browser-replacement-artifact', contentHash: 'c'.repeat(64),
+        sourcePublicationId: predecessor && predecessor.id, active: true, activatedAt: '2026-08-18T08:02:00Z',
+        authorizationExpiresAt: replacementTrackResponse.manifest.authorization.expiresAt, manifestDigest: replacementTrackResponse.verification.manifestDigest,
+        servingState: 'serving', trackBinding: { trackId: 'track_replacement', status: 'PUBLISHED', version: replacementTrackResponse.track.version + 1 },
+      };
+      Object.assign(replacementTrackResponse.track, { status: 'PUBLISHED', version: replacementTrackResponse.track.version + 1, publication, updatedAt: publication.activatedAt });
+      domainPublications = [publication, ...domainPublications];
+      return json(201, replacementTrackResponse.track);
+    }
+    if (record.method === 'POST' && /^\/api\/workspaces\/41\/domains\/claim_browser\/publications\/[^/]+\/activate$/u.test(record.path)) {
+      const sourceID = record.path.split('/').at(-2);
+      const source = domainPublications.find((publication) => publication.id === sourceID);
+      if (!source || source.servingState !== 'inactive') return json(422, { error: { code: 'artifact_not_publishable', message: 'Historical artifact is not currently eligible.' } });
+      const active = domainPublications.find((publication) => publication.active);
+      if (active) Object.assign(active, { active: false, deactivatedAt: '2026-08-18T09:00:00Z', servingState: 'inactive' });
+      const publication = {
+        ...structuredClone(source), id: 'publication_rollback', sourcePublicationId: source.id, active: true,
+        activatedAt: '2026-08-18T09:00:00Z', deactivatedAt: null, servingState: 'serving',
+      };
+      domainPublications = [publication, ...domainPublications];
+      return json(201, publication);
     }
     if (record.method === 'POST' && record.path === '/api/artifacts/preview') {
       if (failNextPreview) {
@@ -802,14 +919,28 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
         return json(503, { error: { code: 'composition_unavailable', message: 'Synthetic network interruption.' } });
       }
       const variant = receiptVariants[previewBuilds] || 'active';
+      const replacement = Number(record.body.ttlHours) === 2160;
+      const responseTrackID = replacement ? 'track_replacement' : 'track_browser';
+      const responseArtifactID = replacement ? 'browser-replacement-artifact' : 'browser-signed-artifact';
+      const responseContentHash = (replacement ? 'c' : 'a').repeat(64);
+      const responseCreatedAt = replacement ? '2026-08-18T08:00:00Z' : '2026-08-18T04:00:00Z';
+      const responseExpiresAt = replacement ? '2026-11-16T08:00:00Z' : '2099-08-18T04:23:28Z';
+      const responsePreviewPrefix = replacement ? '/api/conductor/tracks/track_replacement/preview/files/' : previewPrefix;
+      if (replacement) {
+        for (const descriptor of manifestFiles) {
+          const stored = previewFiles.get(`${previewPrefix}${descriptor.path}`);
+          previewFiles.set(`${responsePreviewPrefix}${descriptor.path}`, stored);
+        }
+      }
       if (delayPreviewResponse) {
         delayPreviewResponse = false;
         await wait(180);
       }
       const attestedManifest = {
         contractVersion: 'taawun.artifact/v2',
-        artifactId: 'browser-signed-artifact',
-        contentHash: 'a'.repeat(64),
+        artifactId: responseArtifactID,
+        contentHash: responseContentHash,
+        createdAt: responseCreatedAt,
         workspaceId: record.body.workspaceId,
         template: { id: record.body.templateId, version: '1.0.0' },
         modules: record.body.modules,
@@ -831,14 +962,14 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
         theme: { stylesheet: 'theme.css', tokenNames: [] },
         files: structuredClone(manifestFiles),
         authorization: {
-          subject: { id: record.authorization === `Bearer ${secondToken}` ? 'user:8' : 'user:7', userId: record.authorization === `Bearer ${secondToken}` ? 8 : 7, workspaceId: record.body.workspaceId },
+          subject: { id: record.authorization === `Bearer ${secondToken}` ? 'taawun:user:8' : 'taawun:user:7', userId: record.authorization === `Bearer ${secondToken}` ? 8 : 7, workspaceId: record.body.workspaceId },
           allowedOrigins: {
             surfaces: record.body.requestedOrigins?.surfaces?.length ? record.body.requestedOrigins.surfaces : [origin],
-            embedders: ['https://community.example'],
-            connections: ['https://relay.example'],
-            resources: ['https://assets.example'],
+            embedders: replacement ? (record.body.requestedOrigins?.embedders || []) : ['https://community.example'],
+            connections: replacement ? (record.body.requestedOrigins?.connections || []) : ['https://relay.example'],
+            resources: replacement ? (record.body.requestedOrigins?.resources || []) : ['https://assets.example'],
           },
-          expiresAt: '2099-08-18T04:23:28Z',
+          expiresAt: responseExpiresAt,
           signerKeyId: 'railway-artifact-v1',
           lifecycle: 'preview',
         },
@@ -848,6 +979,12 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
           value: 'browser-signature-value',
         },
       };
+      if (replacement && replacementSuccessorVariant === 'wrong-current-subject') {
+        attestedManifest.authorization.subject = { id: 'taawun:user:99', userId: 99, workspaceId: record.body.workspaceId };
+      }
+      if (replacement && replacementSuccessorVariant === 'wrong-origin-policy') {
+        attestedManifest.authorization.allowedOrigins = { surfaces: [origin], embedders: [], connections: [], resources: [] };
+      }
       if (variant === 'elapsed-expiry') attestedManifest.authorization.expiresAt = '2000-08-18T04:23:28Z';
       if (variant === 'subject-workspace') attestedManifest.authorization.subject.workspaceId = 42;
       if (variant === 'authorization-key') attestedManifest.authorization.signerKeyId = 'tampered-key';
@@ -870,8 +1007,10 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       const verification = {
         status: 'verified',
         verified: true,
-        artifactId: 'browser-signed-artifact',
-        contentHash: 'a'.repeat(64),
+        authorizationState: variant === 'elapsed-expiry' ? 'expired' : 'active',
+        serverTime: replacement ? '2026-08-18T08:00:00Z' : '2026-08-18T04:23:28Z',
+        artifactId: responseArtifactID,
+        contentHash: responseContentHash,
         workspaceId: record.body.workspaceId,
         signatureAlgorithm: 'Ed25519',
         signerKeyId: 'railway-artifact-v1',
@@ -879,6 +1018,8 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
         manifestDigest: createHash('sha256').update(manifestJson).digest('hex'),
         manifestJson,
       };
+      if (variant === 'missing-authorization-state') delete verification.authorizationState;
+      if (variant === 'authorization-state-mismatch') verification.authorizationState = 'expired';
       if (variant === 'missing-digest') delete verification.manifestDigest;
       if (variant === 'digest-mismatch') verification.manifestDigest = '0'.repeat(64);
       if (variant === 'artifact') verification.artifactId = 'tampered-artifact';
@@ -891,23 +1032,24 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       const result = {
         manifest: responseManifest,
         verification: variant === 'missing-attestation' ? undefined : verification,
-        previewUrl: `${previewPrefix}index.html`,
+        previewUrl: `${responsePreviewPrefix}index.html`,
         preview: {
-          documentUrl: `${previewPrefix}index.html`,
-          themeUrl: `${previewPrefix}theme.css`,
-          stylesUrl: `${previewPrefix}app.css`,
+          documentUrl: `${responsePreviewPrefix}index.html`,
+          themeUrl: `${responsePreviewPrefix}theme.css`,
+          stylesUrl: `${responsePreviewPrefix}app.css`,
         },
         track: {
-          id: 'track_browser', workspaceId: record.body.workspaceId, request: structuredClone(record.body), status: 'PREVIEW_READY', version: 6,
-          createdBy: record.authorization === `Bearer ${secondToken}` ? 8 : 7, createdAt: '2026-08-18T04:00:00Z', updatedAt: '2026-08-18T04:23:28Z',
-          artifact: { artifactId: 'browser-signed-artifact', contentHash: 'a'.repeat(64) },
+          id: responseTrackID, workspaceId: record.body.workspaceId, request: structuredClone(record.body), status: 'PREVIEW_READY', version: 6,
+          createdBy: record.authorization === `Bearer ${secondToken}` ? 8 : 7, createdAt: responseCreatedAt, updatedAt: replacement ? '2026-08-18T08:00:00Z' : '2026-08-18T04:23:28Z',
+          artifact: { artifactId: responseArtifactID, contentHash: responseContentHash },
           preview: {
-            artifactId: 'browser-signed-artifact', contentHash: 'a'.repeat(64), workspaceId: record.body.workspaceId,
+            artifactId: responseArtifactID, contentHash: responseContentHash, workspaceId: record.body.workspaceId,
             subject: { id: attestedManifest.authorization.subject.id, userId: attestedManifest.authorization.subject.userId }, allowedOrigins: structuredClone(attestedManifest.authorization.allowedOrigins),
             authorizationExpiresAt: attestedManifest.authorization.expiresAt, authenticationRequired: true,
           },
         },
       };
+      if (replacement && replacementSuccessorVariant === 'wrong-created-by') result.track.createdBy = 99;
       if (variant === 'track-missing') delete result.track;
       if (variant === 'track-id-missing') result.track.id = '';
       if (variant === 'track-workspace') result.track.workspaceId = 42;
@@ -922,11 +1064,20 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       if (variant === 'track-preview-expiry') result.track.preview.authorizationExpiresAt = '2098-08-18T04:23:28Z';
       if (variant === 'track-preview-public') result.track.preview.authenticationRequired = false;
       if (variant === 'active') {
-        activeTrackResponse = structuredClone(result);
-        trackEvents.set('track_browser', [
-          { type: 'TRACK_CREATED', toStatus: 'DRAFT', trackVersion: 1, createdAt: '2026-08-18T04:00:00Z', detail: { principal: 'never-render-this-principal' } },
-          { type: 'PREVIEW_READY', toStatus: 'PREVIEW_READY', trackVersion: 6, createdAt: '2026-08-18T04:23:28Z', detail: { raw: 'never-render-this-detail' } },
-        ]);
+        if (replacement) {
+          replacementTrackResponse = structuredClone(result);
+          trackEvents.set('track_replacement', [{ type: 'PREVIEW_READY', toStatus: 'PREVIEW_READY', trackVersion: 6, createdAt: responseCreatedAt }]);
+        } else {
+          activeTrackResponse = structuredClone(result);
+          trackEvents.set('track_browser', [
+            { type: 'TRACK_CREATED', toStatus: 'DRAFT', trackVersion: 1, createdAt: '2026-08-18T04:00:00Z', detail: { principal: 'never-render-this-principal' } },
+            { type: 'PREVIEW_READY', toStatus: 'PREVIEW_READY', trackVersion: 6, createdAt: '2026-08-18T04:23:28Z', detail: { raw: 'never-render-this-detail' } },
+          ]);
+        }
+      }
+      if (replacement && replacementPreviewFailAfterCommit) {
+        replacementPreviewFailAfterCommit = false;
+        return json(503, { error: { code: 'composition_dependency_unavailable', message: 'Synthetic committed replacement response interruption.' } });
       }
       return json(200, result);
     }
@@ -960,27 +1111,34 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     await client.send('Page.navigate', { url: origin });
     await waitFor(() => evaluate(client, `document.readyState === 'complete' && !document.querySelector('#loginForm').hidden`), 'cockpit login');
 
-    delayPeopleResponse = true;
-    await evaluate(client, `(() => {
-      const set = (id, value) => {
-        const input = document.getElementById(id);
-        input.value = value;
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-      };
-      set('loginEmail', 'qa@example.test');
-      set('loginPassword', 'correct horse battery staple');
-      document.getElementById('loginForm').requestSubmit();
-      return true;
-    })()`);
-    await waitFor(() => evaluate(client, `!document.querySelector('#signedStarterPath').hidden
-      && document.querySelector('#buildHistoryState').textContent.includes('No workspace build records yet')
-      && document.querySelector('#domainClaimSelect').value === 'claim_browser'
-      && document.querySelector('#starterPrimaryButton').disabled
-      && document.querySelector('#starterInviteButton').disabled
-      && document.querySelector('#templateSelect').disabled
-      && document.querySelector('#workspaceRole').textContent === 'Checking access'`), 'history and domain evidence independently load a role-gated starter while People is still loading');
+    let releaseInitialPeopleResponse;
+    initialPeopleResponseBarrier = new Promise((resolve) => { releaseInitialPeopleResponse = resolve; });
+    try {
+      await evaluate(client, `(() => {
+        const set = (id, value) => {
+          const input = document.getElementById(id);
+          input.value = value;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+        set('loginEmail', 'qa@example.test');
+        set('loginPassword', 'correct horse battery staple');
+        document.getElementById('loginForm').requestSubmit();
+        return true;
+      })()`);
+      await waitFor(() => evaluate(client, `!document.querySelector('#signedStarterPath').hidden
+        && document.querySelector('#buildHistoryState').textContent.includes('No workspace build records yet')
+        && document.querySelector('#domainClaimSelect').value === 'claim_browser'
+        && document.querySelector('#starterPrimaryButton').disabled
+        && document.querySelector('#starterInviteButton').disabled
+        && document.querySelector('#templateSelect').disabled
+        && document.querySelector('#workspaceRole').textContent === 'Checking access'`), 'history and domain evidence independently load a role-gated starter while People is still loading');
+    } finally {
+      releaseInitialPeopleResponse?.();
+      initialPeopleResponseBarrier = null;
+    }
     await waitFor(() => evaluate(client, `!document.querySelector('#appView').hidden
       && document.querySelector('#workspaceSelect').value === '41'
+      && document.querySelector('#workspaceRole').textContent === 'Architect'
       && document.querySelector('#templateSelect').options.length === 3
       && document.querySelector('#templateSelect').value === ''
       && document.querySelector('#previewButton').disabled`), 'workspace and explicit catalog choice');
@@ -1437,6 +1595,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     const artifactRequest = requests.filter((item) => item.method === 'POST' && item.path === '/api/artifacts/preview').at(-1);
     assert.ok(artifactRequest, 'the advanced component matrix must submit a signed preview request');
     assert.equal(artifactRequest.body.workspaceId, 41);
+    assert.equal(Object.hasOwn(artifactRequest.body, 'ttlHours'), false, 'ordinary signed preview builds retain the server default 24-hour authorization');
     assert.equal(artifactRequest.body.templateId, 'community-iftar');
     assert.deepEqual(artifactRequest.body.modules, ['iftar-registration', 'announcements', 'donation-campaign']);
     assert.deepEqual(artifactRequest.body.components.map(({ id, type }) => ({ id, type })), [
@@ -1489,15 +1648,36 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     await wait(240);
     const staleTrackBoundary = await evaluate(client, `({ srcdoc: document.querySelector('#previewFrame').getAttribute('srcdoc'), manifestHidden: document.querySelector('#manifestList').hidden, template: document.querySelector('#templateSelect').value, selected: document.querySelectorAll('#moduleList input:checked').length, history: document.querySelectorAll('#buildHistoryList li').length, recordHidden: document.querySelector('#buildRecord').hidden })`);
     assert.deepEqual(staleTrackBoundary, { srcdoc: null, manifestHidden: true, template: '', selected: 0, history: 0, recordHidden: true }, 'delayed prior-workspace track/history must not restore records, preview, or documents into another workspace');
+    const workspaceReturnRecoveryRequestStart = requests.length;
     await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '41'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '41' && document.querySelector('#templateSelect').value === 'community-iftar' && document.querySelectorAll('#moduleList input:checked').length === 3`), 'component draft workspace recovery');
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Architect' && !document.querySelector('#loadTrackButton').disabled`), 'workspace access recovery before build inspection');
-    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Verified staging ready'
-      && document.querySelector('#previewFrame').dataset.stale === 'false'
-      && document.querySelector('#starterRecoveryState').textContent.includes('Exact workspace-bound signed preview verified; durable history confirmed')
-      && document.querySelector('#buildHistoryState').textContent.includes('Exact verified preview track track_browser is confirmed')
-      && document.querySelector('#domainClaimSelect').value === 'claim_browser'
-      && !document.querySelector('#deployButton').disabled`), 'automatic selected or newest verified recovery after workspace return');
+    await waitFor(() => requests.slice(workspaceReturnRecoveryRequestStart).some((request) => request.method === 'GET'
+      && request.path === '/api/conductor/tracks/track_browser' && request.search === '?includeVerifiedPreview=true'), 'workspace return exact verified-preview recovery request');
+    try {
+      await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Verified staging ready'
+        && document.querySelector('#previewFrame').dataset.stale === 'false'
+        && document.querySelector('#starterRecoveryState').textContent.includes('Exact workspace-bound signed preview verified; durable history confirmed')
+        && document.querySelector('#buildHistoryState').textContent.includes('Exact verified preview track track_browser is confirmed')
+        && document.querySelector('#domainClaimSelect').value === 'claim_browser'
+        && !document.querySelector('#deployButton').disabled`), 'automatic selected or newest verified recovery after workspace return', 16_000);
+    } catch (error) {
+      const recoveryDiagnostic = await evaluate(client, `({
+        workspace: document.querySelector('#workspaceSelect').value,
+        role: document.querySelector('#workspaceRole').textContent,
+        previewStatus: document.querySelector('#previewStatus').textContent,
+        previewStale: document.querySelector('#previewFrame').dataset.stale || '',
+        previewLoading: !document.querySelector('#previewLoading').hidden,
+        starterRecovery: document.querySelector('#starterRecoveryState').textContent,
+        historyState: document.querySelector('#buildHistoryState').textContent,
+        historyRecords: document.querySelectorAll('#buildHistoryList li').length,
+        claim: document.querySelector('#domainClaimSelect').value,
+        deployDisabled: document.querySelector('#deployButton').disabled,
+        builderAlert: document.querySelector('#builderAlert').textContent,
+        buildRecordAlert: document.querySelector('#buildRecordAlert').textContent,
+      })`);
+      throw new Error(`${error.message} · workspace return recovery state ${JSON.stringify(recoveryDiagnostic)}`);
+    }
     const automaticRecoveryPreviewReads = requests.filter((item) => item.path === '/api/conductor/tracks/track_browser' && item.search === '?includeVerifiedPreview=true').length;
     assert.deepEqual(await evaluate(client, `({ appName: document.querySelector('#appName').value, organization: document.querySelector('#organizationName').value, city: document.querySelector('#city').value })`), { appName: 'Community app', organization: 'QA Community', city: '' }, 'workspace return restores only scoped component documents, not prior app identity or city');
     assert.equal(await evaluate(client, `document.querySelector('#trackLookup').value`), '', 'workspace return must not restore an opaque track reference');
@@ -1515,9 +1695,21 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     await waitFor(() => evaluate(client, `!document.querySelector('#deployButton').disabled`), 'publication claim reset');
 
     delayPublicationRequest = true;
+    const trustedPairBeforePublicationRace = await evaluate(client, `({
+      srcdoc: document.querySelector('#previewFrame').srcdoc,
+      raw: document.querySelector('#rawManifest').textContent,
+    })`);
     await evaluate(client, `(() => { document.querySelector('#deployButton').click(); for (const [id, value] of [['appName', 'Newer same-workspace preview'], ['organizationName', 'QA Community'], ['city', 'Salt Lake City']]) { const input = document.querySelector('#' + id); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); } document.querySelector('#builderForm').requestSubmit(); })()`);
     assert.equal(await evaluate(client, `document.querySelector('.sample-title').textContent`), 'Newer same-workspace preview', 'vanilla app-name sync remains live after a previously verified preview becomes a newer draft');
-    await waitFor(() => evaluate(client, `document.querySelector('#previewLoading').hidden && document.querySelector('#builderAlert').textContent.includes('last verified preview was retained')`), 'newer same-workspace preview generation');
+    await waitFor(() => evaluate(client, `document.querySelector('#previewLoading').hidden
+      && document.querySelector('#previewStatus').textContent === 'Verification unavailable'
+      && document.querySelector('#builderAlert').textContent.includes('returned evidence is not authorized for use')
+      && document.querySelector('#previewFrame').dataset.stale === 'true'
+      && document.querySelector('#deployButton').disabled`), 'newer same-workspace preview generation');
+    assert.deepEqual(await evaluate(client, `({
+      srcdoc: document.querySelector('#previewFrame').srcdoc,
+      raw: document.querySelector('#rawManifest').textContent,
+    })`), trustedPairBeforePublicationRace, 'unattested race response retains but does not trust the prior signed iframe and receipt');
     await wait(240);
     assert.notEqual(await evaluate(client, `document.querySelector('#buildRecordTitle').textContent`), 'community-iftar · PUBLICATION_REQUESTED', 'delayed publication request cannot overwrite a newer preview generation');
     previewBuilds = 1;
@@ -1532,8 +1724,11 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     await waitFor(() => evaluate(client, `document.querySelector('#domainStatus').textContent.includes('durably recorded') && document.querySelector('#deployButton').textContent === 'Retry activation' && document.querySelector('#buildRecordTitle').textContent.includes('PUBLICATION_REQUESTED')`), 'activation failure reconciles durable publication request');
     assert.doesNotMatch(await evaluate(client, `document.querySelector('#buildTimeline').innerText`), /never-render-this/u, 'publication event detail must remain hidden');
     await evaluate(client, `document.querySelector('#deployButton').click()`);
-    await waitFor(() => evaluate(client, `document.querySelector('#deployStateText').textContent === 'Published' && document.querySelector('#domainPublicationList').textContent.includes('publication_browser')`), 'activation retry publishes without a second publication request');
+    await waitFor(() => evaluate(client, `document.querySelector('#deployStateText').textContent === 'Serving' && document.querySelector('#domainPublicationRecordTitle').textContent.includes('Serving — activation record retained') && document.querySelector('#domainPublicationList').textContent.includes('publication_browser')`), 'activation retry confirms exact server serving truth without a second publication request');
     assert.equal(requests.filter((request) => request.path === '/api/conductor/tracks/track_browser/publication').length, publicationRequestsBeforeActivation + 1, 'activation retry must not repeat the durable publication request');
+    assert.ok(requests.some((request) => request.method === 'GET' && request.path.endsWith('/domains/claim_browser/publications') && request.search === '?limit=20'), 'ordinary publication history uses the bounded default page');
+    assert.ok(requests.some((request) => request.method === 'GET' && request.path.endsWith('/domains/claim_browser/publications') && request.search === '?publicationId=publication_browser'), 'active serving proof is read through an exact mutually exclusive publication selection');
+    assert.doesNotMatch(await evaluate(client, `document.querySelector('#domainPublicationRecord').innerText`), /\b(?:Active|Verified|healthy|live)\b/iu, 'activation fact is not presented as a health or trust label');
     const trustedReceiptBeforeNegatives = await evaluate(client, `Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent]))`);
     const trustedRawBeforeNegatives = await evaluate(client, `document.querySelector('#rawManifest').textContent`);
     const trustedSourceBeforeNegatives = await evaluate(client, `document.querySelector('#previewFrame').srcdoc`);
@@ -1589,7 +1784,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       const previewFileRequestsBefore = requests.filter((item) => previewFiles.has(item.path)).length;
       await evaluate(client, `document.querySelector('#builderForm').requestSubmit()`);
       await waitFor(async () => previewBuilds === index + 1
-        && await evaluate(client, `document.querySelector('#previewLoading').hidden && ['Verification unavailable', 'Signed authorization expired', 'Last verified preview retained'].includes(document.querySelector('#previewStatus').textContent)`), `${variant} receipt response`);
+        && await evaluate(client, `document.querySelector('#previewLoading').hidden && ['Verification unavailable', 'Authorization expired · preview unavailable', 'Last verified preview retained'].includes(document.querySelector('#previewStatus').textContent)`), `${variant} receipt response`);
       const retainedEvidence = await evaluate(client, `({
         receipt: Object.fromEntries([...document.querySelectorAll('#manifestList .manifest-row')].map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent])),
         raw: document.querySelector('#rawManifest').textContent,
@@ -1598,17 +1793,448 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
         publishDisabled: document.querySelector('#deployButton').disabled,
         alert: document.querySelector('#builderAlert').textContent,
       })`);
-      assert.deepEqual(retainedEvidence.receipt, trustedReceiptBeforeNegatives, `${variant} must not replace the last trusted receipt with untrusted fields`);
-      assert.equal(retainedEvidence.raw, trustedRawBeforeNegatives, `${variant} must retain the trusted raw manifest`);
-      assert.equal(retainedEvidence.srcdoc, trustedSourceBeforeNegatives, `${variant} must retain the last verified iframe bytes`);
+      if (variant === 'elapsed-expiry') {
+        assert.deepEqual(retainedEvidence.receipt, {}, 'expired evidence removes prior healthy manifest labels');
+        assert.equal(retainedEvidence.raw, '', 'expired evidence removes the raw receipt from the current trust surface');
+        assert.equal(retainedEvidence.srcdoc, '', 'expired evidence removes staging iframe bytes');
+      } else {
+        assert.deepEqual(retainedEvidence.receipt, trustedReceiptBeforeNegatives, `${variant} must not replace the last trusted receipt with untrusted fields`);
+        assert.equal(retainedEvidence.raw, trustedRawBeforeNegatives, `${variant} must retain the trusted raw manifest`);
+        assert.equal(retainedEvidence.srcdoc, trustedSourceBeforeNegatives, `${variant} must retain the last verified iframe bytes`);
+      }
       assert.equal(retainedEvidence.stale, 'true');
       assert.equal(retainedEvidence.publishDisabled, true);
-      assert.match(retainedEvidence.alert, /returned evidence is not actively verified|last verified preview (?:was retained|were not replaced)/iu);
+      assert.match(retainedEvidence.alert, /returned evidence is not authorized for use|last verified preview (?:was retained|were not replaced)/iu);
       if (variant.startsWith('track-')) {
         assert.equal(requests.filter((item) => previewFiles.has(item.path)).length, previewFileRequestsBefore, `${variant} must fail before fetching or committing preview files`);
         assert.match(retainedEvidence.alert, /track does not exactly bind/iu, `${variant} must explain the track binding failure without trusting it`);
       }
+      if (variant === 'elapsed-expiry') {
+        await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
+        await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Verified staging ready' && document.querySelector('#previewFrame').dataset.stale === 'false'`), 'post-expiry exact signed preview recovery for subsequent negative cases');
+      }
     }
+
+    const originalPublicationExpiry = domainPublications[0].authorizationExpiresAt;
+    publicationServerTime = '2026-08-18T07:00:00.000Z';
+    Object.assign(domainPublications[0], { servingState: 'serving', authorizationExpiresAt: '2026-08-18T07:00:01.500Z' });
+    automaticPublicationExpiry = true;
+    automaticPublicationExactReads = 0;
+    Object.assign(activeTrackResponse.verification, { authorizationState: 'expired', serverTime: '2100-01-01T00:00:00Z' });
+    const exactReadsBeforeAutomaticExpiry = requests.filter((request) => request.method === 'GET' && request.path.endsWith('/domains/claim_browser/publications') && request.search === '?publicationId=publication_browser').length;
+    await evaluate(client, `(() => {
+      const select = document.querySelector('#domainClaimSelect');
+      select.value = '';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      select.value = 'claim_browser';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationList').textContent.includes('Serving — activation record retained')
+      && document.querySelector('#domainPublicationRecord').hidden`), 'ordinary history load arms the active publication without exact selection');
+    assert.equal(automaticPublicationExactReads, 0, 'ordinary active history does not need an eager exact read to own its deadline');
+    delayPublicationContextResponse = true;
+    const resumeSnapshot = await evaluate(client, `(() => {
+      window.dispatchEvent(new Event('focus'));
+      return {
+        list: document.querySelector('#domainPublicationList').textContent,
+        record: document.querySelector('#domainPublicationRecordTitle').textContent,
+        replaceHidden: document.querySelector('#replaceDomainPublication').hidden,
+        rollbackHidden: document.querySelector('#rollbackDomainPublication').hidden,
+      };
+    })()`);
+    assert.doesNotMatch(`${resumeSnapshot.list} ${resumeSnapshot.record}`, /Serving —/u, 'focus after possible sleep removes serving truth before the exact response arrives');
+    assert.match(resumeSnapshot.record, /Authorization expired · not serving — activation record retained/u);
+    assert.deepEqual({ replaceHidden: resumeSnapshot.replaceHidden, rollbackHidden: resumeSnapshot.rollbackHidden }, { replaceHidden: true, rollbackHidden: true }, 'conservative resume recheck grants no publication action');
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationRecordTitle').textContent.startsWith('Serving — activation record retained')`), 'authoritative exact resume response may restore serving truth');
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationRecordTitle').textContent.startsWith('Authorization expired · not serving — activation record retained')
+      && document.querySelector('#deployStateText').textContent === 'Activated · not serving'
+      && !document.querySelector('#replaceDomainPublication').hidden
+      && document.querySelector('#previewEmptyTitle').textContent === 'Signed preview unavailable'
+      && document.querySelector('#previewEmptyCopy').textContent.includes('Authorization expired · not serving')
+      && document.querySelector('#manifestEmpty').textContent.includes('Authorization expired · not serving')
+      && document.querySelector('#previewStatus').textContent === 'Authorization expired · preview unavailable'
+      && document.querySelector('#manifestList').hidden
+      && document.querySelector('#rawManifest').textContent === ''
+      && document.querySelector('#buildRecordAlert').textContent.includes('Authorization expired · not serving')
+      && !document.querySelector('#previewFrame').getAttribute('srcdoc')`), 'automatic exact server-clock expiry presentation');
+    automaticPublicationExpiry = false;
+    assert.ok(requests.filter((request) => request.method === 'GET' && request.path.endsWith('/domains/claim_browser/publications') && request.search === '?publicationId=publication_browser').length >= exactReadsBeforeAutomaticExpiry + 2, 'monotonic deadline triggers its own exact authoritative re-read without a manual Recheck action');
+    const expiredPresentation = await evaluate(client, `[
+      document.querySelector('#previewTitle').innerText,
+      document.querySelector('#domainPublicationRecord').innerText,
+      document.querySelector('#deployTitle').innerText,
+      document.querySelector('#deployStateHelp').innerText,
+      document.querySelector('#previewStatus').innerText,
+      document.querySelector('#previewEmpty').innerText,
+      document.querySelector('#manifestEmpty').innerText,
+      document.querySelector('#buildStateText').innerText,
+      document.querySelector('#buildRecordAlert').innerText,
+      document.querySelector('#builderAlert').innerText,
+      document.querySelector('#starterRecoveryState').innerText,
+      document.querySelector('#buildHistoryState').innerText,
+    ].join(' ')`);
+    assert.match(expiredPresentation, /Authorization expired · not serving — activation record retained/u);
+    assert.doesNotMatch(expiredPresentation, /\b(?:Active|Verified|healthy|live)\b/iu, 'expired context exposes no active, verified, healthy, or live affordance');
+    const expiredAccessibleLabels = await evaluate(client, `[
+      document.querySelector('#previewFrame').title,
+      ...[...document.querySelectorAll('#domainPublicationRecord button, #previewStatus, #previewEmpty, #manifestEmpty, #buildRecordAlert, #builderAlert, #deployStateText, #deployStateHelp')]
+        .filter((node) => !node.hidden && !node.closest('[hidden]'))
+        .map((node) => node.getAttribute('aria-label') || node.textContent),
+    ].join(' ')`);
+    assert.doesNotMatch(expiredAccessibleLabels, /\b(?:Active|Verified|healthy|live)\b/iu, 'expired accessible names expose no healthy or current-serving label');
+
+    const publicationActionHeights = await evaluate(client, `[...document.querySelectorAll('#domainPublicationRecord button, #loadMoreDomainPublications')]
+      .filter((button) => !button.hidden && !button.closest('[hidden]'))
+      .map((button) => button.getBoundingClientRect().height)`);
+    assert.ok(publicationActionHeights.every((height) => height >= 44), `publication action targets must be at least 44px: ${publicationActionHeights.join(', ')}`);
+    const replacementPreviewCountBeforeCancel = requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview' && request.body?.ttlHours === 2160).length;
+    await client.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+    await client.send('Page.bringToFront');
+    await waitFor(() => evaluate(client, `document.hasFocus()`), 'publication action page foreground');
+    const replacementActionPreconditions = await evaluate(client, `(() => {
+      const replacement = document.querySelector('#replaceDomainPublication');
+      const confirmation = document.querySelector('#domainPublicationConfirm');
+      const disclosure = replacement.closest('details');
+      if (disclosure) disclosure.open = true;
+      const replacementRect = replacement.getBoundingClientRect();
+      window.__taawunReplacementKeyCapture = null;
+      replacement.addEventListener('keydown', (event) => {
+        window.__taawunReplacementKeyCapture = {
+          key: event.key,
+          code: event.code,
+          isTrusted: event.isTrusted,
+          activeElement: document.activeElement?.id || document.activeElement?.tagName || '',
+        };
+      }, { once: true });
+      return {
+        replacementHidden: replacement.hidden || Boolean(replacement.closest('[hidden]')),
+        replacementDisabled: replacement.disabled,
+        disclosureOpen: Boolean(disclosure && disclosure.open),
+        replacementRects: replacement.getClientRects().length,
+        replacementWidth: replacementRect.width,
+        replacementHeight: replacementRect.height,
+        confirmationHidden: confirmation.hidden,
+        activeElementBeforeDOMFocus: document.activeElement?.id || document.activeElement?.tagName || '',
+        documentHasFocus: document.hasFocus(),
+      };
+    })()`);
+    assert.deepEqual({
+      replacementHidden: replacementActionPreconditions.replacementHidden,
+      replacementDisabled: replacementActionPreconditions.replacementDisabled,
+      disclosureOpen: replacementActionPreconditions.disclosureOpen,
+      confirmationHidden: replacementActionPreconditions.confirmationHidden,
+      documentHasFocus: replacementActionPreconditions.documentHasFocus,
+    }, {
+      replacementHidden: false,
+      replacementDisabled: false,
+      disclosureOpen: true,
+      confirmationHidden: true,
+      documentHasFocus: true,
+    }, `replacement keyboard preconditions must be actionable: ${JSON.stringify(replacementActionPreconditions)}`);
+    assert.ok(replacementActionPreconditions.replacementRects > 0
+      && replacementActionPreconditions.replacementWidth > 0 && replacementActionPreconditions.replacementHeight >= 44,
+    `replacement control must have focusable rendered geometry: ${JSON.stringify(replacementActionPreconditions)}`);
+    await client.send('DOM.enable');
+    const publicationDocument = await client.send('DOM.getDocument', { depth: 0 });
+    const replacementNode = await client.send('DOM.querySelector', { nodeId: publicationDocument.root.nodeId, selector: '#replaceDomainPublication' });
+    assert.ok(replacementNode.nodeId > 0, `replacement control must be addressable through Chromium DOM focus: ${JSON.stringify(replacementActionPreconditions)}`);
+    await client.send('DOM.focus', { nodeId: replacementNode.nodeId });
+    const replacementEnter = { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 };
+    await client.send('Input.dispatchKeyEvent', { type: 'keyDown', text: '\r', unmodifiedText: '\r', ...replacementEnter });
+    await client.send('Input.dispatchKeyEvent', { type: 'keyUp', ...replacementEnter });
+    let replacementConfirmationFocus;
+    try {
+      replacementConfirmationFocus = await waitFor(() => evaluate(client, `(() => {
+        const captured = window.__taawunReplacementKeyCapture;
+        const confirmation = document.querySelector('#domainPublicationConfirm');
+        const confirm = document.querySelector('#confirmDomainPublicationAction');
+        if (!captured || confirmation.hidden || confirm.disabled || document.activeElement?.id !== 'confirmDomainPublicationAction') return null;
+        delete window.__taawunReplacementKeyCapture;
+        return {
+          captured,
+          confirmationHidden: confirmation.hidden,
+          confirmDisabled: confirm.disabled,
+          confirmConnected: confirm.isConnected,
+          confirmRects: confirm.getClientRects().length,
+          activeElement: document.activeElement?.id || document.activeElement?.tagName || '',
+          confirmationCopy: document.querySelector('#domainPublicationConfirmCopy').textContent,
+        };
+      })()`), `replacement keyboard activation and confirmation focus: ${JSON.stringify(replacementActionPreconditions)}`);
+    } catch (error) {
+      const diagnostic = await evaluate(client, `(() => {
+        const replacement = document.querySelector('#replaceDomainPublication');
+        const confirmation = document.querySelector('#domainPublicationConfirm');
+        const confirm = document.querySelector('#confirmDomainPublicationAction');
+        const confirmRect = confirm.getBoundingClientRect();
+        return {
+          captured: window.__taawunReplacementKeyCapture,
+          confirmationHidden: confirmation.hidden,
+          confirmDisabled: confirm.disabled,
+          confirmConnected: confirm.isConnected,
+          confirmRects: confirm.getClientRects().length,
+          confirmWidth: confirmRect.width,
+          confirmHeight: confirmRect.height,
+          activeElement: document.activeElement?.id || document.activeElement?.tagName || '',
+          replacementHidden: replacement.hidden || Boolean(replacement.closest('[hidden]')),
+          replacementDisabled: replacement.disabled,
+          replacementDisclosureOpen: Boolean(replacement.closest('details')?.open),
+          recordTitle: document.querySelector('#domainPublicationRecordTitle').textContent,
+          confirmationCopy: document.querySelector('#domainPublicationConfirmCopy').textContent,
+          publicationAlert: document.querySelector('#domainPublicationAlert').textContent,
+          workspaceAnnouncer: document.querySelector('#workspaceAnnouncer').textContent,
+        };
+      })()`);
+      error.message = `${error.message}; replacement confirmation diagnostic: ${JSON.stringify(diagnostic)}`;
+      throw error;
+    }
+    assert.deepEqual(replacementConfirmationFocus.captured, {
+      key: 'Enter', code: 'Enter', isTrusted: true, activeElement: 'replaceDomainPublication',
+    }, `replacement must be activated by a trusted Enter event on its focused initiator: ${JSON.stringify(replacementConfirmationFocus)}`);
+    assert.deepEqual({
+      confirmationHidden: replacementConfirmationFocus.confirmationHidden,
+      confirmDisabled: replacementConfirmationFocus.confirmDisabled,
+      confirmConnected: replacementConfirmationFocus.confirmConnected,
+      activeElement: replacementConfirmationFocus.activeElement,
+    }, { confirmationHidden: false, confirmDisabled: false, confirmConnected: true, activeElement: 'confirmDomainPublicationAction' }, `replacement confirmation must open with keyboard focus: ${JSON.stringify(replacementConfirmationFocus)}`);
+    assert.ok(replacementConfirmationFocus.confirmRects > 0, `replacement confirmation must be rendered: ${JSON.stringify(replacementConfirmationFocus)}`);
+    assert.match(replacementConfirmationFocus.confirmationCopy, /new immutable 90-day signed replacement/u);
+    await evaluate(client, `document.querySelector('#cancelDomainPublicationAction').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationConfirm').hidden && document.activeElement?.id === 'replaceDomainPublication' && document.querySelector('#workspaceAnnouncer').textContent.includes('cancelled')`), 'replacement cancellation focus and live feedback');
+    assert.equal(requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview' && request.body?.ttlHours === 2160).length, replacementPreviewCountBeforeCancel, 'cancelling replacement sends no mutation');
+
+    await evaluate(client, `document.querySelector('#replaceDomainPublication').click()`);
+    Object.assign(domainPublications[0], { servingState: 'inactive' });
+    await evaluate(client, `document.querySelector('#confirmDomainPublicationAction').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationAlert').textContent.includes('Inactive publication proof is inconsistent') && document.activeElement?.id === 'domainPublicationRecord'`), 'stale publication confirmation fails closed and restores record focus');
+    assert.equal(requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview' && request.body?.ttlHours === 2160).length, replacementPreviewCountBeforeCancel, 'changed exact publication context blocks mutation before successor creation');
+
+    publicationServerTime = '2026-08-18T06:02:00Z';
+    Object.assign(domainPublications[0], { servingState: 'serving', authorizationExpiresAt: originalPublicationExpiry });
+    Object.assign(activeTrackResponse.verification, { authorizationState: 'active', serverTime: '2026-08-18T04:23:28Z' });
+    await evaluate(client, `document.querySelector('#refreshDomainPublication').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationRecordTitle').textContent.startsWith('Serving — activation record retained') && !document.querySelector('#replaceDomainPublication').hidden`), 'proactive replacement source exact recheck');
+
+    publicationContextFailNext = true;
+    await evaluate(client, `document.querySelector('#refreshDomainPublication').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationAlert').textContent.includes('Synthetic publication context interruption')`), 'serving publication exact reread failure');
+    const unavailablePublicationPresentation = await evaluate(client, `({
+      copy: [
+        document.querySelector('#domainPublicationRecord').innerText,
+        document.querySelector('#deployStateText').innerText,
+        document.querySelector('#deployStateHelp').innerText,
+        document.querySelector('#deployButton').innerText,
+      ].join(' '),
+      recordTitle: document.querySelector('#domainPublicationRecordTitle').textContent,
+      deployState: document.querySelector('#deployStateText').textContent,
+      replaceHidden: document.querySelector('#replaceDomainPublication').hidden,
+      rollbackHidden: document.querySelector('#rollbackDomainPublication').hidden,
+      confirmHidden: document.querySelector('#domainPublicationConfirm').hidden,
+    })`);
+    assert.match(unavailablePublicationPresentation.recordTitle, /Public delivery truth unavailable · not serving — activation record retained/u);
+    assert.equal(unavailablePublicationPresentation.deployState, 'Activated · not serving');
+    assert.doesNotMatch(unavailablePublicationPresentation.copy, /\b(?:Active|Verified|healthy|live)\b/iu, 'failed exact reread neutralizes both record and deployment affordances');
+    assert.deepEqual({
+      replaceHidden: unavailablePublicationPresentation.replaceHidden,
+      rollbackHidden: unavailablePublicationPresentation.rollbackHidden,
+      confirmHidden: unavailablePublicationPresentation.confirmHidden,
+    }, { replaceHidden: true, rollbackHidden: true, confirmHidden: true }, 'failed exact reread exposes no replacement, rollback, or confirmation action');
+    await evaluate(client, `document.querySelector('#refreshDomainPublication').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationRecordTitle').textContent.startsWith('Serving — activation record retained') && !document.querySelector('#replaceDomainPublication').hidden`), 'publication truth recovers only after a successful exact reread');
+
+    const successorNegativeVariants = ['wrong-created-by', 'wrong-current-subject', 'wrong-origin-policy'];
+    for (const successorVariant of successorNegativeVariants) {
+      replacementSuccessorVariant = successorVariant;
+      const publicationMutationsBefore = requests.filter((request) => request.method === 'POST' && request.path === '/api/conductor/tracks/track_replacement/publication').length;
+      const activationMutationsBefore = requests.filter((request) => request.method === 'POST' && request.path === '/api/conductor/tracks/track_replacement/activate').length;
+      await evaluate(client, `document.querySelector('#replaceDomainPublication').click(); document.querySelector('#confirmDomainPublicationAction').click()`);
+      try {
+        await waitFor(() => evaluate(client, `(() => {
+          const record = document.querySelector('#domainPublicationRecord');
+          const replacement = document.querySelector('#replaceDomainPublication');
+          const replacementRect = replacement.getBoundingClientRect();
+          return document.querySelector('#domainPublicationAlert').textContent === 'The replacement preview did not retain the current principal, claim, and exact requested origin authority. The same idempotency key is retained for a bounded retry; serving truth was not changed in the cockpit.'
+            && document.activeElement === record && !record.hidden && record.tabIndex === -1 && record.getClientRects().length > 0
+            && document.querySelector('#domainPublicationConfirm').hidden
+            && !replacement.hidden && !replacement.disabled && replacement.getClientRects().length > 0
+            && replacementRect.width > 0 && replacementRect.height >= 44 && Boolean(replacement.closest('details')?.open);
+        })()`), `replacement successor ${successorVariant} rejection, cleanup, and record focus restoration`);
+      } catch (error) {
+        const cockpitDiagnostic = await evaluate(client, `(() => {
+          const replacement = document.querySelector('#replaceDomainPublication');
+          const replacementRect = replacement.getBoundingClientRect();
+          const record = document.querySelector('#domainPublicationRecord');
+          const confirmation = document.querySelector('#domainPublicationConfirm');
+          const confirm = document.querySelector('#confirmDomainPublicationAction');
+          return {
+            alert: document.querySelector('#domainPublicationAlert').textContent,
+            activeElement: document.activeElement?.id || document.activeElement?.tagName || '',
+            replacementHidden: replacement.hidden || Boolean(replacement.closest('[hidden]')),
+            replacementDisabled: replacement.disabled,
+            replacementRects: replacement.getClientRects().length,
+            replacementWidth: replacementRect.width,
+            replacementHeight: replacementRect.height,
+            replacementDisclosureOpen: Boolean(replacement.closest('details')?.open),
+            recordHidden: record.hidden,
+            recordTabIndex: record.tabIndex,
+            recordRects: record.getClientRects().length,
+            confirmationHidden: confirmation.hidden,
+            confirmDisabled: confirm.disabled,
+            confirmConnected: confirm.isConnected,
+            confirmRects: confirm.getClientRects().length,
+            confirmationCopy: document.querySelector('#domainPublicationConfirmCopy').textContent,
+          };
+        })()`);
+        const relevantRequests = requests.filter((request) => request.method === 'POST' && (
+          request.path === '/api/artifacts/preview'
+          || request.path === '/api/conductor/tracks/track_replacement/publication'
+          || request.path === '/api/conductor/tracks/track_replacement/activate'
+        ));
+        const lastRelevantRequest = relevantRequests.at(-1);
+        const requestDiagnostic = {
+          variant: successorVariant,
+          publicationMutationsBefore,
+          publicationMutationsAfter: requests.filter((request) => request.method === 'POST' && request.path === '/api/conductor/tracks/track_replacement/publication').length,
+          activationMutationsBefore,
+          activationMutationsAfter: requests.filter((request) => request.method === 'POST' && request.path === '/api/conductor/tracks/track_replacement/activate').length,
+          lastRelevantRequest: lastRelevantRequest ? {
+            method: lastRelevantRequest.method,
+            path: lastRelevantRequest.path,
+            search: lastRelevantRequest.search,
+            body: lastRelevantRequest.body,
+          } : null,
+        };
+        error.message = `${error.message}; cockpit diagnostic: ${JSON.stringify(cockpitDiagnostic)}; request diagnostic: ${JSON.stringify(requestDiagnostic)}`;
+        throw error;
+      }
+      assert.equal(requests.filter((request) => request.method === 'POST' && request.path === '/api/conductor/tracks/track_replacement/publication').length, publicationMutationsBefore, `${successorVariant} sends no publication mutation`);
+      assert.equal(requests.filter((request) => request.method === 'POST' && request.path === '/api/conductor/tracks/track_replacement/activate').length, activationMutationsBefore, `${successorVariant} sends no activation mutation`);
+    }
+    replacementSuccessorVariant = '';
+
+    replacementPreviewFailAfterCommit = true;
+    await evaluate(client, `document.querySelector('#replaceDomainPublication').click(); document.querySelector('#confirmDomainPublicationAction').click()`);
+    await waitFor(() => evaluate(client, `(() => {
+      const record = document.querySelector('#domainPublicationRecord');
+      const replacement = document.querySelector('#replaceDomainPublication');
+      const replacementRect = replacement.getBoundingClientRect();
+      return document.querySelector('#domainPublicationAlert').textContent === 'Synthetic committed replacement response interruption. The same idempotency key is retained for a bounded retry; serving truth was not changed in the cockpit.'
+        && document.activeElement === record && !record.hidden && record.tabIndex === -1 && record.getClientRects().length > 0
+        && document.querySelector('#domainPublicationConfirm').hidden
+        && !replacement.hidden && !replacement.disabled && replacement.getClientRects().length > 0
+        && replacementRect.width > 0 && replacementRect.height >= 44 && Boolean(replacement.closest('details')?.open);
+    })()`), 'uncertain replacement response retains bounded retry key, completes cleanup, and restores record focus');
+    const firstReplacementAttempt = requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview' && request.body?.ttlHours === 2160).at(-1);
+    assert.ok(firstReplacementAttempt?.body?.idempotencyKey, 'replacement attempt carries an idempotency key');
+    await evaluate(client, `document.querySelector('#replaceDomainPublication').click(); document.querySelector('#confirmDomainPublicationAction').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationRecordTitle').textContent.includes('publication_replacement')
+      && document.querySelector('#deployStateText').textContent === 'Serving'
+      && !document.querySelector('#loadMoreDomainPublications').hidden`), 'immutable replacement activation and bounded history');
+    const replacementAttempts = requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview' && request.body?.ttlHours === 2160);
+    assert.equal(replacementAttempts.length, replacementPreviewCountBeforeCancel + successorNegativeVariants.length + 2, 'invalid successors are rejected before mutation and one uncertain valid response is retried once');
+    assert.equal(replacementAttempts.at(-1).body.idempotencyKey, firstReplacementAttempt.body.idempotencyKey, 'uncertain replacement retry retains the exact idempotency key');
+    assert.match(firstReplacementAttempt.body.idempotencyKey, /^replacement-/u);
+    assert.equal(firstReplacementAttempt.body.ttlHours, 2160, 'manual replacement requests the immutable 90-day authorization cap');
+    assert.deepEqual(firstReplacementAttempt.body.modules, activeTrackResponse.track.request.modules, 'replacement copies the exact curated module request');
+    for (const forbidden of ['trackId', 'artifactId', 'contentHash', 'publicationId', 'createdBy', 'signerKeyId', 'lifecycle']) {
+      assert.equal(Object.hasOwn(firstReplacementAttempt.body, forbidden), false, `replacement request must not copy ${forbidden}`);
+    }
+    assert.ok(requests.some((request) => request.method === 'POST' && request.path === '/api/conductor/tracks/track_replacement/publication' && Number.isInteger(request.body?.expectedVersion)), 'replacement publication uses the exact optimistic track version');
+    assert.ok(requests.some((request) => request.method === 'POST' && request.path === '/api/conductor/tracks/track_replacement/activate' && Number.isInteger(request.body?.expectedVersion)), 'replacement activation uses the exact optimistic track version');
+    assert.ok(requests.some((request) => request.method === 'GET' && request.path.endsWith('/domains/claim_browser/publications') && request.search === '?publicationId=publication_replacement'), 'replacement success requires exact bounded publication readback');
+    assert.equal(domainPublications[0].sourcePublicationId, 'publication_browser', 'replacement activation records immutable predecessor lineage');
+
+    await evaluate(client, `document.querySelector('#loadMoreDomainPublications').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationList').textContent.includes('publication_browser') && document.querySelectorAll('#domainPublicationList li').length >= 2`), 'older lightweight publication page');
+    assert.match(requests.find((request) => request.method === 'GET' && request.path.endsWith('/domains/claim_browser/publications') && request.search.includes('cursor=publication-page-2'))?.search || '', /^\?limit=20&cursor=publication-page-2$/u, 'opaque cursor is used only with the bounded page size');
+    await evaluate(client, `document.querySelector('[data-publication-id="publication_browser"]').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationRecordTitle').textContent.includes('publication_browser') && !document.querySelector('#rollbackDomainPublication').hidden && document.querySelector('#domainPublicationRecordDigest').textContent.includes('Exact stored manifest SHA-256')`), 'exact historical proof enables rollback');
+    const rollbackMutationsBeforeStaleConfirm = requests.filter((request) => request.method === 'POST' && request.path.endsWith('/domains/claim_browser/publications/publication_browser/activate')).length;
+    await evaluate(client, `document.querySelector('#rollbackDomainPublication').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#domainPublicationConfirm').hidden && document.activeElement?.id === 'confirmDomainPublicationAction'`), 'rollback inline confirmation focus');
+    const rollbackSource = domainPublications.find((publication) => publication.id === 'publication_browser');
+    const rollbackSourceProof = { authorizationExpiresAt: rollbackSource.authorizationExpiresAt, manifestDigest: rollbackSource.manifestDigest };
+    Object.assign(rollbackSource, { servingState: 'artifact_invalid', authorizationExpiresAt: null, manifestDigest: null });
+    await evaluate(client, `document.querySelector('#confirmDomainPublicationAction').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationAlert').textContent.includes('Publication context changed after confirmation opened') && document.activeElement?.id === 'domainPublicationRecord'`), 'stale rollback target fails closed and restores exact record focus');
+    assert.equal(requests.filter((request) => request.method === 'POST' && request.path.endsWith('/domains/claim_browser/publications/publication_browser/activate')).length, rollbackMutationsBeforeStaleConfirm, 'changed rollback proof blocks activation before mutation');
+    Object.assign(rollbackSource, { servingState: 'inactive', ...rollbackSourceProof });
+    await evaluate(client, `document.querySelector('#loadMoreDomainPublications').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('[data-publication-id="publication_browser"]') !== null`), 'rollback source history recovery');
+    await evaluate(client, `document.querySelector('[data-publication-id="publication_browser"]').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#rollbackDomainPublication').hidden`), 'rollback source exact proof recovery');
+    await evaluate(client, `document.querySelector('#rollbackDomainPublication').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#domainPublicationConfirm').hidden && document.activeElement?.id === 'confirmDomainPublicationAction'`), 'rollback reconfirmation after exact recovery');
+    await evaluate(client, `document.querySelector('#confirmDomainPublicationAction').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationRecordTitle').textContent.includes('publication_rollback') && document.querySelector('#deployStateText').textContent === 'Serving'`), 'rollback creates and confirms a source-linked immutable activation');
+    assert.equal(domainPublications[0].sourcePublicationId, 'publication_browser');
+    assert.ok(requests.some((request) => request.method === 'POST' && request.path.endsWith('/domains/claim_browser/publications/publication_browser/activate')), 'rollback uses the exact prior-publication activation route');
+    assert.ok(requests.some((request) => request.method === 'GET' && request.path.endsWith('/domains/claim_browser/publications') && request.search === '?publicationId=publication_rollback'), 'rollback success requires exact bounded publication readback');
+
+    publicationServerTime = '2027-01-01T00:00:00Z';
+    Object.assign(domainPublications.find((publication) => publication.id === 'publication_replacement'), { servingState: 'expired', trackBinding: null });
+    await evaluate(client, `document.querySelector('#loadMoreDomainPublications').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('[data-publication-id="publication_replacement"]') !== null`), 'replacement retained after rollback');
+    await evaluate(client, `document.querySelector('[data-publication-id="publication_replacement"]').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationRecordTitle').textContent.startsWith('Authorization expired · not serving — activation record retained')
+      && document.querySelector('#domainPublicationRecordBinding').textContent.includes('No unique stored build binding')`), 'expired null-binding history is honest and non-oracular');
+    assert.equal(await evaluate(client, `document.querySelector('#rollbackDomainPublication').hidden`), true, 'expired historical artifact is never offered as a usable rollback');
+    assert.doesNotMatch(await evaluate(client, `document.querySelector('#domainPublicationRecord').innerText`), /\b(?:Active|Verified|healthy|live)\b/iu);
+
+    delayPublicationContextResponse = true;
+    await evaluate(client, `(() => {
+      document.querySelector('[data-publication-id="publication_rollback"]').click();
+      const select = document.querySelector('#domainClaimSelect');
+      select.value = 'claim_pending';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await wait(380);
+    assert.deepEqual(await evaluate(client, `({ claim: document.querySelector('#domainClaimSelect').value, recordHidden: document.querySelector('#domainPublicationRecord').hidden, list: document.querySelector('#domainPublicationList').textContent, replaceHidden: document.querySelector('#replaceDomainPublication').hidden, rollbackHidden: document.querySelector('#rollbackDomainPublication').hidden })`), { claim: 'claim_pending', recordHidden: true, list: '', replaceHidden: true, rollbackHidden: true }, 'late exact publication response cannot cross the claim boundary or restore actions');
+    await evaluate(client, `(() => { const select = document.querySelector('#domainClaimSelect'); select.value = 'claim_browser'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationList').textContent.includes('publication_rollback')`), 'publication context recovers after stale claim response');
+    await evaluate(client, `document.querySelector('[data-publication-id="publication_rollback"]').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationRecordTitle').textContent.includes('publication_rollback')`), 'active rollback exact context before reflow');
+    for (const publicationWidth of [160, 200, 320, 400]) {
+      await client.send('Emulation.setDeviceMetricsOverride', { width: publicationWidth, height: 1_000, deviceScaleFactor: 1, mobile: false });
+      await waitFor(() => evaluate(client, `window.innerWidth === ${publicationWidth}`), `${publicationWidth}px publication context`);
+      const layout = await evaluate(client, `(() => {
+        const root = document.documentElement;
+        const viewport = root.clientWidth;
+        const offenders = [root, document.body, ...document.querySelectorAll('body *')].flatMap((node) => {
+          const style = getComputedStyle(node);
+          const rect = node.getBoundingClientRect();
+          if (style.display === 'none' || style.visibility === 'hidden' || rect.width <= 0 || rect.height <= 0) return [];
+          const severity = Math.max(0, -rect.left, rect.right - viewport, node.scrollWidth - viewport);
+          if (severity <= 0.5) return [];
+          return [{
+            tag: node.tagName,
+            id: node.id || '',
+            classes: typeof node.className === 'string' ? node.className : (node.getAttribute('class') || ''),
+            rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height },
+            scrollWidth: node.scrollWidth,
+            clientWidth: node.clientWidth,
+            overflowX: style.overflowX,
+            severity,
+          }];
+        }).sort((left, right) => right.severity - left.severity).slice(0, 16);
+        return {
+          overflow: root.scrollWidth > root.clientWidth,
+          scrollWidth: root.scrollWidth,
+          clientWidth: root.clientWidth,
+          record: document.querySelector('#domainPublicationRecord').getBoundingClientRect().width,
+          viewport,
+          offenders,
+        };
+      })()`);
+      assert.equal(layout.overflow, false, `${publicationWidth}px publication context must not create horizontal overflow: ${JSON.stringify(layout)}`);
+      assert.ok(layout.record <= layout.viewport, `${publicationWidth}px exact publication record stays within the viewport`);
+    }
+    await client.send('Emulation.setDeviceMetricsOverride', { width: 1_280, height: 1_000, deviceScaleFactor: 1, mobile: false });
+    await waitFor(() => evaluate(client, `window.innerWidth === 1280`), 'publication context desktop reset');
+
+    await evaluate(client, `(() => { document.querySelector('#trackLookup').value = 'track_browser'; document.querySelector('#loadTrackButton').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTrackID').value === 'track_browser'`), 'original signed build selected after publication lifetime journey');
+    await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Verified staging ready' && document.querySelector('#previewFrame').dataset.stale === 'false'`), 'original trusted preview restored after publication lifetime journey');
 
     const delayedBuildRequests = requests.filter((item) => item.path === '/api/artifacts/preview').length;
     delayPreviewResponse = true;
@@ -1979,6 +2605,8 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
       authorizationExpiresAt: '2099-08-18T03:10:00Z', allowedOrigins: { surfaces: [], embedders: [], connections: [], resources: [] }, authenticationRequired: true,
     },
   };
+  const roleClaim = { id: 'claim_role', workspaceId: 41, origin: 'https://role.community.example', host: 'role.community.example', status: 'verified', challengeExpiresAt: '2099-08-18T00:00:00Z', verifiedAt: '2026-08-18T00:00:00Z', verificationExpiresAt: '2099-08-18T00:00:00Z', createdAt: '2026-08-18T00:00:00Z', updatedAt: '2026-08-18T00:00:00Z' };
+  const rolePublication = { id: 'publication_role', workspaceId: 41, claimId: roleClaim.id, origin: roleClaim.origin, contentHash: 'c'.repeat(64), artifactId: 'artifact_role_handoff', activatedAt: '2026-08-18T03:20:00Z', deactivatedAt: null, active: true, authorizationExpiresAt: '2099-08-18T03:10:00Z', manifestDigest: 'd'.repeat(64), servingState: 'serving', trackBinding: { trackId: roleTrack.id, status: 'PUBLISHED', version: 7 } };
 
   const server = createServer(async (request, response) => {
     const chunks = [];
@@ -2043,8 +2671,12 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     if (request.method === 'GET' && pathName === `/api/conductor/tracks/${roleTrack.id}/events` && actor) return json(200, { events: [{ type: 'PREVIEW_READY', toStatus: 'PREVIEW_READY', trackVersion: 6, createdAt: roleTrack.updatedAt, detail: { email: 'never-render-role-detail@example.test' } }] });
     if (request.method === 'GET' && pathName === '/api/workspaces/41/domains' && actor) {
       return bearer === 'architect-token'
-        ? json(200, { claims: [] })
+        ? json(200, { claims: [roleClaim] })
         : json(403, { error: { code: 'domain_forbidden', message: 'Domain evidence is unavailable for this membership.' } });
+    }
+    if (request.method === 'GET' && pathName === '/api/workspaces/41/domains/claim_role/publications' && bearer === 'architect-token') {
+      const exact = requestURL.searchParams.get('publicationId');
+      return json(200, { publications: exact && exact !== rolePublication.id ? [] : [rolePublication], serverTime: '2026-08-18T03:20:00Z' });
     }
     if (request.method === 'POST' && pathName === '/api/artifacts/preview' && bearer === 'maintainer-token') return json(422, { error: { code: 'invalid_composition', message: 'Synthetic stop after new-track request capture.' } });
     if (request.method === 'GET' && pathName === '/api/financial/flows' && actor) return json(200, { flows });
@@ -2158,6 +2790,7 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
 
     await login(client, 'architect@example.test');
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Architect' && document.querySelector('#templateCatalogCount').textContent.includes('3 real templates · 11 real modules')`), 'architect workspace and catalog');
+    await waitFor(() => evaluate(client, `document.querySelector('#domainPublicationList').textContent.includes('publication_role') && document.querySelector('#domainClaimSelect').value === 'claim_role'`), 'Architect-only bounded publication context');
     await waitFor(() => evaluate(client, `!document.querySelector('#signedStarterPath').hidden && !document.querySelector('#starterInviteButton').disabled && document.querySelector('#starterInviteButton').textContent === 'Invite a Viewer'`), 'Architect exact-empty starter invitation action');
     await evaluate(client, `document.querySelector('#starterInviteButton').click()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#peopleSurface').hidden && document.activeElement?.id === 'invitee' && document.querySelector('#inviteRole').value === 'Viewer' && document.querySelector('#workspaceAnnouncer').textContent.includes('session-only')`), 'starter Viewer invitation focus and live announcement');
@@ -2354,6 +2987,7 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     const viewerBuildControls = await evaluate(client, `({ draft: document.querySelector('#restoreBuildDraftButton').disabled, resumeHidden: document.querySelector('#resumeBuildButton').hidden, domain: document.querySelector('#domainOrigin').disabled, issue: document.querySelector('#claimDomainButton').disabled })`);
     assert.deepEqual(viewerBuildControls, { draft: true, resumeHidden: true, domain: true, issue: true }, 'Viewer history is inspect-only and domain mutation remains unavailable');
     assert.match(await evaluate(client, `document.querySelector('#domainClaimsState').textContent`), /Domain evidence is unavailable.*no mutation controls are enabled/isu, 'Viewer domain authorization failure is honest while history remains independently inspectable');
+    assert.deepEqual(await evaluate(client, `({ refresh: document.querySelector('#refreshDomainPublication').disabled, replace: document.querySelector('#replaceDomainPublication').hidden, rollback: document.querySelector('#rollbackDomainPublication').hidden, records: document.querySelectorAll('#domainPublicationList li').length })`), { refresh: true, replace: true, rollback: true, records: 0 }, 'Viewer receives no publication-history action or retained Architect context');
     assert.doesNotMatch(await evaluate(client, `document.querySelector('#buildTimeline').innerText`), /never-render-role-detail/u, 'Viewer timeline excludes event detail');
     await evaluate(client, `(() => { const select = document.querySelector('#templateSelect'); select.value = 'community-workspace'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelectorAll('#moduleList input[name="selectedModule"]').length === 11`), 'Viewer component catalog');
@@ -2375,6 +3009,7 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     await waitFor(() => evaluate(client, `!document.querySelector('#signedStarterPath').hidden && !document.querySelector('#starterPrimaryButton').disabled && document.querySelector('#starterInviteButton').disabled && document.querySelector('#starterInviteButton').textContent.includes('Ask an Architect')`), 'Maintainer starter can build but delegates Viewer invitation authority');
     assert.match(await evaluate(client, `document.querySelector('#starterInviteButton').title`), /existing member/iu);
     assert.match(await evaluate(client, `document.querySelector('#domainClaimsState').textContent`), /Domain evidence is unavailable.*no mutation controls are enabled/isu, 'Maintainer domain authorization failure does not block the independently authorized starter');
+    assert.deepEqual(await evaluate(client, `({ refresh: document.querySelector('#refreshDomainPublication').disabled, replace: document.querySelector('#replaceDomainPublication').hidden, rollback: document.querySelector('#rollbackDomainPublication').hidden, records: document.querySelectorAll('#domainPublicationList li').length })`), { refresh: true, replace: true, rollback: true, records: 0 }, 'Maintainer receives no publication-history action or retained Architect context');
     roleHistoryEmpty = false;
     await evaluate(client, `document.querySelector('#retryBuildHistory').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#buildHistoryList').textContent.includes('track_role_handoff')`), 'Maintainer authorized build-history read');
@@ -2391,6 +3026,7 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     assert.equal(Object.hasOwn(maintainerBuild.body, 'createdBy'), false, 'history handoff never transfers creator authority');
     const domainReadsByRole = new Set(requests.filter((request) => request.method === 'GET' && request.path === '/api/workspaces/41/domains').map((request) => request.bearer));
     assert.deepEqual([...domainReadsByRole].sort(), ['architect-token', 'maintainer-token', 'viewer-token'], 'People, history, and domain evidence load independently while the server remains authoritative for each role');
+    assert.deepEqual([...new Set(requests.filter((request) => request.method === 'GET' && request.path === '/api/workspaces/41/domains/claim_role/publications').map((request) => request.bearer))], ['architect-token'], 'only an Architect with resolved People authority requests publication context');
     assert.equal(requests.some((request) => request.method !== 'GET' && request.path.startsWith('/api/workspaces/41/domains') && request.bearer !== 'architect-token'), false, 'Viewer and Maintainer never attempt domain mutation');
     await evaluate(client, `document.querySelector('#shuraTab').click(); (() => { document.querySelector('#proposalTitle').value = 'Schedule the pantry rota'; document.querySelector('#proposalBody').value = 'Approve the volunteer rota for one month.'; document.querySelector('#createProposalButton').click(); })()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#proposalRecord').hidden && document.querySelector('#proposalLookup').value === 'proposal_maintainer'`), 'Maintainer proposal create');

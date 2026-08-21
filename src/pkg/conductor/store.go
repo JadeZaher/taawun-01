@@ -20,6 +20,7 @@ import (
 	"gorm.io/gorm/logger"
 
 	"taawun/pkg/database"
+	"taawun/pkg/domains"
 )
 
 type Repository struct {
@@ -95,6 +96,7 @@ CREATE TABLE IF NOT EXISTS conductor_tracks (
     preview_json TEXT NOT NULL DEFAULT '',
     claim_id TEXT NOT NULL DEFAULT '',
     publication_json TEXT NOT NULL DEFAULT '',
+	publication_id TEXT NOT NULL DEFAULT '',
     failure_code TEXT NOT NULL DEFAULT '',
     created_by INTEGER NOT NULL,
     created_at INTEGER NOT NULL,
@@ -121,6 +123,143 @@ CREATE TRIGGER IF NOT EXISTS conductor_events_no_update BEFORE UPDATE ON conduct
 CREATE TRIGGER IF NOT EXISTS conductor_events_no_delete BEFORE DELETE ON conductor_track_events BEGIN SELECT RAISE(ABORT, 'Conductor events are append-only'); END;`
 	if _, err := r.db.Exec(schema); err != nil {
 		return fmt.Errorf("migrate Conductor database: %w", err)
+	}
+	if err := r.ensureColumn("conductor_tracks", "publication_id", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := r.backfillPublicationLinks(); err != nil {
+		return err
+	}
+	if _, err := r.db.Exec(`CREATE INDEX IF NOT EXISTS idx_conductor_tracks_publication_id
+		ON conductor_tracks(publication_id) WHERE publication_id <> ''`); err != nil {
+		return fmt.Errorf("index Conductor publication linkage: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) ensureColumn(table, column, definition string) error {
+	rows, err := r.db.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return fmt.Errorf("inspect Conductor table %s: %w", table, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var position, notNull, primaryKey int
+		var name, typeName string
+		var defaultValue sql.NullString
+		if err := rows.Scan(&position, &name, &typeName, &notNull, &defaultValue, &primaryKey); err != nil {
+			return fmt.Errorf("scan Conductor table %s: %w", table, err)
+		}
+		if name == column {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("read Conductor table %s: %w", table, err)
+	}
+	if _, err := r.db.Exec(`ALTER TABLE ` + table + ` ADD COLUMN ` + column + ` ` + definition); err != nil {
+		return fmt.Errorf("add Conductor column %s.%s: %w", table, column, err)
+	}
+	return nil
+}
+
+type publicationBackfill struct {
+	trackID     string
+	publication domains.Publication
+}
+
+func scanDomainPublicationSnapshot(scanner interface{ Scan(...any) error }) (domains.Publication, error) {
+	var publication domains.Publication
+	var source sql.NullString
+	var activatedAt int64
+	var deactivatedAt sql.NullInt64
+	err := scanner.Scan(&publication.ID, &publication.WorkspaceID, &publication.ClaimID, &publication.Origin, &publication.Host,
+		&publication.ContentHash, &publication.ArtifactID, &source, &publication.ActivatedBy, &activatedAt, &deactivatedAt)
+	if err != nil {
+		return domains.Publication{}, err
+	}
+	publication.SourcePublicationID = source.String
+	publication.ActivatedAt = time.Unix(activatedAt, 0).UTC()
+	if deactivatedAt.Valid {
+		value := time.Unix(deactivatedAt.Int64, 0).UTC()
+		publication.DeactivatedAt = &value
+	}
+	publication.Active = !deactivatedAt.Valid
+	return publication, nil
+}
+
+func sameDomainPublicationSnapshot(left, right domains.Publication) bool {
+	if left.ID != right.ID || left.WorkspaceID != right.WorkspaceID || left.ClaimID != right.ClaimID ||
+		left.Origin != right.Origin || left.Host != right.Host || left.ContentHash != right.ContentHash ||
+		left.ArtifactID != right.ArtifactID || left.SourcePublicationID != right.SourcePublicationID ||
+		left.ActivatedBy != right.ActivatedBy || !left.ActivatedAt.Equal(right.ActivatedAt) {
+		return false
+	}
+	return true
+}
+
+func (r *Repository) backfillPublicationLinks() error {
+	var domainTable string
+	if err := r.db.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'workspace_domain_publications'`).Scan(&domainTable); errors.Is(err, sql.ErrNoRows) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("inspect domain publication schema: %w", err)
+	}
+	rows, err := r.db.Query(`SELECT id, workspace_id, status, claim_id, artifact_json, publication_json
+		FROM conductor_tracks WHERE publication_id = '' AND publication_json <> ''`)
+	if err != nil {
+		return fmt.Errorf("scan legacy Conductor publication linkage: %w", err)
+	}
+	var candidates []publicationBackfill
+	for rows.Next() {
+		var trackID, status, claimID string
+		var workspaceID int
+		var artifactJSON, publicationJSON []byte
+		if err := rows.Scan(&trackID, &workspaceID, &status, &claimID, &artifactJSON, &publicationJSON); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan legacy Conductor publication row: %w", err)
+		}
+		var artifact ArtifactReference
+		var publication domains.Publication
+		if status != string(TrackPublished) || json.Unmarshal(artifactJSON, &artifact) != nil || json.Unmarshal(publicationJSON, &publication) != nil ||
+			!validIdentifier(publication.ID) || publication.WorkspaceID != workspaceID || publication.ClaimID != claimID ||
+			!validTrackArtifactPublicationLink(artifact, publication) {
+			continue
+		}
+		candidates = append(candidates, publicationBackfill{trackID: trackID, publication: publication})
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("close legacy Conductor publication scan: %w", err)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("read legacy Conductor publication linkage: %w", err)
+	}
+	for _, candidate := range candidates {
+		durablePublication, err := scanDomainPublicationSnapshot(r.db.QueryRow(`SELECT id, workspace_id, claim_id, origin, host,
+			content_hash, artifact_id, source_publication_id, activated_by, activated_at, deactivated_at
+			FROM workspace_domain_publications WHERE id = ?`, candidate.publication.ID))
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("load exact domain publication linkage: %w", err)
+		}
+		var trackWorkspace int
+		var trackClaim string
+		var artifactJSON []byte
+		if err := r.db.QueryRow(`SELECT workspace_id, claim_id, artifact_json FROM conductor_tracks WHERE id = ?`, candidate.trackID).
+			Scan(&trackWorkspace, &trackClaim, &artifactJSON); err != nil {
+			return fmt.Errorf("reload legacy Conductor publication candidate: %w", err)
+		}
+		var artifact ArtifactReference
+		if json.Unmarshal(artifactJSON, &artifact) != nil || durablePublication.WorkspaceID != trackWorkspace || durablePublication.ClaimID != trackClaim ||
+			!sameDomainPublicationSnapshot(candidate.publication, durablePublication) ||
+			!validTrackArtifactPublicationLink(artifact, durablePublication) {
+			continue
+		}
+		if _, err := r.db.Exec(`UPDATE conductor_tracks SET publication_id = ? WHERE id = ? AND publication_id = ''`, candidate.publication.ID, candidate.trackID); err != nil {
+			return fmt.Errorf("backfill exact Conductor publication linkage: %w", err)
+		}
 	}
 	return nil
 }
@@ -200,10 +339,10 @@ func (r *Repository) transition(ctx context.Context, current, updated *Track, to
 	}
 	result, err := tx.ExecContext(ctx, `UPDATE conductor_tracks SET
         build_request_json = ?, status = ?, version = ?, compliance_json = ?, artifact_json = ?, preview_json = ?,
-        claim_id = ?, publication_json = ?, failure_code = ?, updated_at = ?
+		claim_id = ?, publication_json = ?, publication_id = ?, failure_code = ?, updated_at = ?
         WHERE id = ? AND status = ? AND version = ?`,
 		buildJSON, updated.Status, updated.Version, complianceJSON, artifactJSON, previewJSON,
-		updated.ClaimID, publicationJSON, updated.FailureCode, updated.UpdatedAt.UnixMilli(), current.ID, current.Status, current.Version)
+		updated.ClaimID, publicationJSON, updated.PublicationID, updated.FailureCode, updated.UpdatedAt.UnixMilli(), current.ID, current.Status, current.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +363,7 @@ func (r *Repository) transition(ctx context.Context, current, updated *Track, to
 }
 
 const trackSelect = `SELECT id, workspace_id, request_json, build_request_json, status, version,
-    compliance_json, artifact_json, preview_json, claim_id, publication_json, failure_code,
+    compliance_json, artifact_json, preview_json, claim_id, publication_json, publication_id, failure_code,
     created_by, created_at, updated_at FROM conductor_tracks`
 
 func (r *Repository) getTrack(ctx context.Context, trackID string) (*Track, error) {
@@ -300,7 +439,7 @@ func scanTrack(row interface{ Scan(...any) error }) (*Track, error) {
 	var status string
 	var createdAt, updatedAt int64
 	err := row.Scan(&track.ID, &track.WorkspaceID, &requestJSON, &buildJSON, &status, &track.Version,
-		&complianceJSON, &artifactJSON, &previewJSON, &track.ClaimID, &publicationJSON, &track.FailureCode,
+		&complianceJSON, &artifactJSON, &previewJSON, &track.ClaimID, &publicationJSON, &track.PublicationID, &track.FailureCode,
 		&track.CreatedBy, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrTrackNotFound

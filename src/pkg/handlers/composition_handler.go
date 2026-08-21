@@ -18,6 +18,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 
@@ -43,6 +44,7 @@ type CompositionService interface {
 type compositionArtifactReader interface {
 	Open(context.Context, string) (artifacts.BuildResult, error)
 	ReadFile(context.Context, string, string) (artifacts.ArtifactFile, error)
+	ReadVerifiedFile(context.Context, artifacts.BuildResult, string) (artifacts.ArtifactFile, error)
 }
 
 type currentPrincipal func(context.Context) (*models.User, bool)
@@ -54,16 +56,22 @@ type CompositionHTTPHandler struct {
 	currentUser    currentPrincipal
 	previewOrigins []string
 	logger         *slog.Logger
+	now            func() time.Time
 }
 
 // NewCompositionHTTPHandler requires a service that independently enforces workspace authority.
 func NewCompositionHTTPHandler(service CompositionService, store compositionArtifactReader, currentUser func(context.Context) (*models.User, bool), previewOrigins []string) (*CompositionHTTPHandler, error) {
-	if service == nil || store == nil || currentUser == nil || len(previewOrigins) == 0 {
+	return NewCompositionHTTPHandlerWithClock(service, store, currentUser, previewOrigins, time.Now)
+}
+
+// NewCompositionHTTPHandlerWithClock derives every response from the server clock.
+func NewCompositionHTTPHandlerWithClock(service CompositionService, store compositionArtifactReader, currentUser func(context.Context) (*models.User, bool), previewOrigins []string, now func() time.Time) (*CompositionHTTPHandler, error) {
+	if service == nil || store == nil || currentUser == nil || len(previewOrigins) == 0 || now == nil {
 		return nil, errors.New("composition service, artifact store, current-user resolver, and preview origins are required")
 	}
 	return &CompositionHTTPHandler{
 		service: service, artifacts: store, currentUser: currentUser,
-		previewOrigins: append([]string(nil), previewOrigins...), logger: slog.Default(),
+		previewOrigins: append([]string(nil), previewOrigins...), logger: slog.Default(), now: now,
 	}, nil
 }
 
@@ -119,6 +127,7 @@ type previewCompositionInput struct {
 
 // Preview composes a signed preview under the authenticated actor and workspace capability.
 func (h *CompositionHTTPHandler) Preview(w http.ResponseWriter, r *http.Request) {
+	requestNow := h.now().UTC()
 	requestID := compositionRequestID(r)
 	w.Header().Set("X-Request-ID", requestID)
 	actor, ok := h.actor(w, r)
@@ -169,7 +178,7 @@ func (h *CompositionHTTPHandler) Preview(w http.ResponseWriter, r *http.Request)
 		writeCompositionError(w, http.StatusConflict, "preview_integrity_error", "The signed preview could not be verified.")
 		return
 	}
-	response, err := verifiedCompositionResponse(result.Track, result.Created, opened)
+	response, err := verifiedCompositionResponse(result.Track, result.Created, opened, requestNow)
 	if err != nil {
 		writeCompositionError(w, http.StatusInternalServerError, "composition_unavailable", "The signed preview receipt could not be prepared.")
 		return
@@ -279,6 +288,7 @@ func positiveDecimal(value string) (int, bool) {
 
 // GetTrack returns a workspace-authorized composition track.
 func (h *CompositionHTTPHandler) GetTrack(w http.ResponseWriter, r *http.Request) {
+	requestNow := h.now().UTC()
 	actor, ok := h.actor(w, r)
 	if !ok {
 		return
@@ -301,7 +311,7 @@ func (h *CompositionHTTPHandler) GetTrack(w http.ResponseWriter, r *http.Request
 		writeCompositionError(w, http.StatusConflict, "preview_integrity_error", "The signed preview could not be verified.")
 		return
 	}
-	response, err := verifiedCompositionResponse(track, false, opened)
+	response, err := verifiedCompositionResponse(track, false, opened, requestNow)
 	if err != nil {
 		writeCompositionError(w, http.StatusInternalServerError, "composition_unavailable", "The signed preview receipt could not be prepared.")
 		return
@@ -386,6 +396,7 @@ func (h *CompositionHTTPHandler) ActivatePublication(w http.ResponseWriter, r *h
 
 // PreviewFile provides an authenticated, track-scoped read of a manifest-listed preview file.
 func (h *CompositionHTTPHandler) PreviewFile(w http.ResponseWriter, r *http.Request) {
+	requestNow := h.now().UTC()
 	actor, ok := h.actor(w, r)
 	if !ok {
 		return
@@ -395,7 +406,7 @@ func (h *CompositionHTTPHandler) PreviewFile(w http.ResponseWriter, r *http.Requ
 		writeCompositionServiceError(w, err)
 		return
 	}
-	if track.Preview == nil || track.Preview.ContentHash == "" {
+	if track.Preview == nil || track.Preview.ContentHash == "" || track.Artifact == nil {
 		writeCompositionError(w, http.StatusNotFound, "preview_not_found", "Preview files are not available for this track.")
 		return
 	}
@@ -404,7 +415,18 @@ func (h *CompositionHTTPHandler) PreviewFile(w http.ResponseWriter, r *http.Requ
 		writeCompositionError(w, http.StatusNotFound, "preview_file_not_found", "Preview file was not found.")
 		return
 	}
-	file, err := h.artifacts.ReadFile(r.Context(), track.Preview.ContentHash, filePath)
+	opened, err := h.artifacts.Open(r.Context(), track.Preview.ContentHash)
+	if err != nil || opened.ArtifactID != track.Artifact.ArtifactID || opened.ContentHash != track.Artifact.ContentHash ||
+		opened.Manifest.WorkspaceID != track.WorkspaceID || track.Preview.ContentHash != opened.ContentHash ||
+		!verifiedTrackComponentBinding(track, opened) {
+		writeCompositionError(w, http.StatusConflict, "preview_integrity_error", "Preview file integrity could not be verified.")
+		return
+	}
+	if errors.Is(artifacts.CheckManifestExpiry(opened.Manifest, requestNow), artifacts.ErrArtifactExpired) {
+		writeCompositionError(w, http.StatusGone, "preview_authorization_expired", "Preview authorization has expired; signed runtime files are not available.")
+		return
+	}
+	file, err := h.artifacts.ReadVerifiedFile(r.Context(), opened, filePath)
 	if err != nil {
 		if errors.Is(err, artifacts.ErrArtifactFileNotFound) || errors.Is(err, artifacts.ErrArtifactNotFound) {
 			writeCompositionError(w, http.StatusNotFound, "preview_file_not_found", "Preview file was not found.")
@@ -521,12 +543,15 @@ func cloneComponentInputs(components []artifacts.ComponentInstance) []artifacts.
 	return cloned
 }
 
-func verifiedCompositionResponse(track *conductor.Track, created bool, opened artifacts.BuildResult) (map[string]any, error) {
-	manifestJSON, err := json.Marshal(opened.Manifest)
-	if err != nil {
-		return nil, err
+func verifiedCompositionResponse(track *conductor.Track, created bool, opened artifacts.BuildResult, serverTime time.Time) (map[string]any, error) {
+	if len(opened.ManifestJSON) == 0 {
+		return nil, errors.New("exact manifest bytes are unavailable")
 	}
-	manifestDigest := sha256.Sum256(manifestJSON)
+	manifestDigest := sha256.Sum256(opened.ManifestJSON)
+	authorizationState := "active"
+	if errors.Is(artifacts.CheckManifestExpiry(opened.Manifest, serverTime), artifacts.ErrArtifactExpired) {
+		authorizationState = "expired"
+	}
 	preview := compositionPreviewURLs(track)
 	return map[string]any{
 		"track": track, "created": created, "manifest": opened.Manifest,
@@ -534,7 +559,8 @@ func verifiedCompositionResponse(track *conductor.Track, created bool, opened ar
 			"status": "verified", "verified": true,
 			"artifactId": opened.Manifest.ArtifactID, "contentHash": opened.Manifest.ContentHash, "workspaceId": opened.Manifest.WorkspaceID,
 			"signatureAlgorithm": opened.Manifest.Signature.Algorithm, "signerKeyId": opened.Manifest.Signature.KeyID, "signatureValue": opened.Manifest.Signature.Value,
-			"manifestDigest": hex.EncodeToString(manifestDigest[:]), "manifestJson": string(manifestJSON),
+			"manifestDigest": hex.EncodeToString(manifestDigest[:]), "manifestJson": string(opened.ManifestJSON),
+			"authorizationState": authorizationState, "serverTime": serverTime.UTC(),
 		},
 		"preview": preview, "previewUrl": preview.DocumentURL,
 	}, nil

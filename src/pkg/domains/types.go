@@ -20,17 +20,23 @@ const (
 )
 
 var (
-	ErrForbidden          = errors.New("domain management forbidden")
-	ErrInvalidOrigin      = errors.New("invalid HTTPS origin")
-	ErrOriginClaimed      = errors.New("origin already has an active claim")
-	ErrAlreadyVerified    = errors.New("origin is already verified")
-	ErrClaimNotFound      = errors.New("domain claim not found")
-	ErrInvalidState       = errors.New("domain claim is not pending")
-	ErrChallengeExpired   = errors.New("domain challenge expired")
-	ErrDNSProofNotFound   = errors.New("DNS TXT proof not found")
-	ErrOriginNotVerified  = errors.New("origin is not verified for workspace")
-	ErrArtifactInvalid    = errors.New("artifact is not publishable for domain")
-	ErrPublicationMissing = errors.New("publication not found")
+	ErrForbidden               = errors.New("domain management forbidden")
+	ErrInvalidOrigin           = errors.New("invalid HTTPS origin")
+	ErrOriginClaimed           = errors.New("origin already has an active claim")
+	ErrAlreadyVerified         = errors.New("origin is already verified")
+	ErrClaimNotFound           = errors.New("domain claim not found")
+	ErrInvalidState            = errors.New("domain claim is not pending")
+	ErrChallengeExpired        = errors.New("domain challenge expired")
+	ErrDNSProofNotFound        = errors.New("DNS TXT proof not found")
+	ErrOriginNotVerified       = errors.New("origin is not verified for workspace")
+	ErrArtifactInvalid         = errors.New("artifact is not publishable for domain")
+	ErrPublicationMissing      = errors.New("publication not found")
+	ErrInvalidPublicationQuery = errors.New("publication context query is invalid")
+)
+
+const (
+	DefaultPublicationContextLimit = 20
+	MaximumPublicationContextLimit = 50
 )
 
 type Claim struct {
@@ -74,6 +80,7 @@ type WorkspaceAuthorizer interface {
 type ArtifactStore interface {
 	Open(context.Context, string) (artifacts.BuildResult, error)
 	ReadFile(context.Context, string, string) (artifacts.ArtifactFile, error)
+	ReadVerifiedFile(context.Context, artifacts.BuildResult, string) (artifacts.ArtifactFile, error)
 }
 
 type Publication struct {
@@ -89,6 +96,56 @@ type Publication struct {
 	ActivatedAt         time.Time  `json:"activatedAt"`
 	DeactivatedAt       *time.Time `json:"deactivatedAt,omitempty"`
 	Active              bool       `json:"active"`
+}
+
+type ServingState string
+
+const (
+	ServingStateServing          ServingState = "serving"
+	ServingStateInactive         ServingState = "inactive"
+	ServingStateExpired          ServingState = "expired"
+	ServingStateClaimUnavailable ServingState = "claim_unavailable"
+	ServingStateArtifactInvalid  ServingState = "artifact_invalid"
+)
+
+type PublicationTrackBinding struct {
+	TrackID string `json:"trackId"`
+	Status  string `json:"status"`
+	Version int64  `json:"version"`
+}
+
+// PublicationContext is the redacted audit DTO; it is not a mutation response.
+type PublicationContext struct {
+	ID                     string                   `json:"id"`
+	WorkspaceID            int                      `json:"workspaceId"`
+	ClaimID                string                   `json:"claimId"`
+	Origin                 string                   `json:"origin"`
+	ContentHash            string                   `json:"contentHash"`
+	ArtifactID             string                   `json:"artifactId"`
+	SourcePublicationID    string                   `json:"sourcePublicationId,omitempty"`
+	ActivatedAt            time.Time                `json:"activatedAt"`
+	DeactivatedAt          *time.Time               `json:"deactivatedAt"`
+	Active                 bool                     `json:"active"`
+	AuthorizationExpiresAt *time.Time               `json:"authorizationExpiresAt"`
+	ManifestDigest         *string                  `json:"manifestDigest"`
+	ServingState           ServingState             `json:"servingState"`
+	TrackBinding           *PublicationTrackBinding `json:"trackBinding"`
+}
+
+type PublicationContextPage struct {
+	Publications []PublicationContext `json:"publications"`
+	NextCursor   string               `json:"nextCursor,omitempty"`
+	ServerTime   time.Time            `json:"serverTime"`
+}
+
+type PublicationContextQuery struct {
+	Limit         int
+	Cursor        string
+	PublicationID string
+}
+
+type PublicationTrackResolver interface {
+	ResolvePublicationTrackBindings(context.Context, int, string, []Publication) (map[string][]PublicationTrackBinding, error)
 }
 
 type Options struct {

@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -21,6 +22,7 @@ type CurrentUserFunc func(context.Context) (*models.User, bool)
 
 type HTTPHandler struct {
 	service     *Service
+	contexts    *PublicationContextService
 	currentUser CurrentUserFunc
 }
 
@@ -29,6 +31,14 @@ func NewHTTPHandler(service *Service, currentUser CurrentUserFunc) (*HTTPHandler
 		return nil, errors.New("domain service and current-user resolver are required")
 	}
 	return &HTTPHandler{service: service, currentUser: currentUser}, nil
+}
+
+// NewHTTPHandlerWithPublicationContext exposes the bounded publication audit view.
+func NewHTTPHandlerWithPublicationContext(service *Service, contexts *PublicationContextService, currentUser CurrentUserFunc) (*HTTPHandler, error) {
+	if service == nil || contexts == nil || currentUser == nil {
+		return nil, errors.New("domain service, publication context service, and current-user resolver are required")
+	}
+	return &HTTPHandler{service: service, contexts: contexts, currentUser: currentUser}, nil
 }
 
 func (h *HTTPHandler) Claim(w http.ResponseWriter, r *http.Request) {
@@ -134,12 +144,49 @@ func (h *HTTPHandler) PublicationHistory(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
-	publications, err := h.service.PublicationHistory(r.Context(), actor, workspaceID, mux.Vars(r)["claim_id"])
+	if h.contexts == nil {
+		writeError(w, http.StatusInternalServerError, "domain_service_error", "Domain operation failed.")
+		return
+	}
+	query, err := publicationContextQuery(r)
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"publications": publications})
+	page, err := h.contexts.Page(r.Context(), actor, workspaceID, mux.Vars(r)["claim_id"], query)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, page)
+}
+
+func publicationContextQuery(r *http.Request) (PublicationContextQuery, error) {
+	values, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		return PublicationContextQuery{}, ErrInvalidPublicationQuery
+	}
+	for key, entries := range values {
+		if key != "limit" && key != "cursor" && key != "publicationId" || len(entries) != 1 || entries[0] == "" {
+			return PublicationContextQuery{}, ErrInvalidPublicationQuery
+		}
+	}
+	publicationID := values.Get("publicationId")
+	if publicationID != "" {
+		if values.Has("limit") || values.Has("cursor") {
+			return PublicationContextQuery{}, ErrInvalidPublicationQuery
+		}
+		return PublicationContextQuery{PublicationID: publicationID}, nil
+	}
+	limit := DefaultPublicationContextLimit
+	if values.Has("limit") {
+		parsed, err := strconv.Atoi(values.Get("limit"))
+		if err != nil || parsed < 1 || parsed > MaximumPublicationContextLimit {
+			return PublicationContextQuery{}, ErrInvalidPublicationQuery
+		}
+		limit = parsed
+	}
+	return PublicationContextQuery{Limit: limit, Cursor: values.Get("cursor")}, nil
 }
 
 func (h *HTTPHandler) Activate(w http.ResponseWriter, r *http.Request) {
@@ -209,6 +256,8 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusUnprocessableEntity, "artifact_not_publishable", "The signed artifact is invalid, expired, or not bound to this workspace and domain.")
 	case errors.Is(err, ErrPublicationMissing):
 		writeError(w, http.StatusNotFound, "publication_not_found", "Publication was not found.")
+	case errors.Is(err, ErrInvalidPublicationQuery):
+		writeError(w, http.StatusBadRequest, "invalid_publication_query", "Use a bounded history cursor or one exact publicationId selection.")
 	default:
 		writeError(w, http.StatusInternalServerError, "domain_service_error", "Domain operation failed.")
 	}
@@ -221,6 +270,7 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
 }

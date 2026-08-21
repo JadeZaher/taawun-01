@@ -71,10 +71,34 @@ func TestCompositionCreatesDurableSignedPreviewBeforeExplicitPublication(t *test
 	}
 
 	events, err := harness.service.Events(ctx, harness.owner, track.ID)
-	if err != nil || len(events) != 9 {
+	if err != nil {
 		t.Fatalf("track events: len=%d err=%v", len(events), err)
 	}
+	expectedEvents := []struct {
+		eventType  string
+		fromStatus TrackStatus
+		toStatus   TrackStatus
+	}{
+		{eventType: "TRACK_DRAFTED", toStatus: TrackDraft},
+		{eventType: "COMPOSITION_STAGED", fromStatus: TrackDraft, toStatus: TrackStaged},
+		{eventType: "COMPOSITION_VALIDATED", fromStatus: TrackStaged, toStatus: TrackValidated},
+		{eventType: "COMPLIANCE_AUDITED", fromStatus: TrackValidated, toStatus: TrackComplianceAudited},
+		{eventType: "ARTIFACT_SIGNED", fromStatus: TrackComplianceAudited, toStatus: TrackArtifactSigned},
+		{eventType: "PREVIEW_READY", fromStatus: TrackArtifactSigned, toStatus: TrackPreviewReady},
+		{eventType: "PUBLICATION_REQUESTED", fromStatus: TrackPreviewReady, toStatus: TrackPublicationRequested},
+		{eventType: "PUBLICATION_ACTIVATED", fromStatus: TrackPublicationRequested, toStatus: TrackPublished},
+	}
+	if len(events) != len(expectedEvents) {
+		t.Fatalf("track event sequence length=%d, want %d: %+v", len(events), len(expectedEvents), events)
+	}
 	for index, event := range events {
+		expected := expectedEvents[index]
+		if event.Type != expected.eventType || event.TrackVersion != int64(index+1) ||
+			event.FromStatus != expected.fromStatus || event.ToStatus != expected.toStatus {
+			t.Fatalf("track event %d = type:%s version:%d %s->%s, want type:%s version:%d %s->%s",
+				index, event.Type, event.TrackVersion, event.FromStatus, event.ToStatus,
+				expected.eventType, index+1, expected.fromStatus, expected.toStatus)
+		}
 		if event.Hash == "" || (index == 0 && event.PreviousHash != "") || (index > 0 && event.PreviousHash != events[index-1].Hash) {
 			t.Fatalf("broken event chain at %d: %+v", index, event)
 		}

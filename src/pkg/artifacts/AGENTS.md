@@ -23,6 +23,13 @@ visible through one atomic directory rename. Artifact identifiers are generated
 with `crypto/rand`; content hashes use SHA-256. Never derive a filesystem path
 from request content and never overwrite an existing artifact directory.
 
+Production construction injects the server clock used to mint signed creation
+and authorization expiry timestamps. `BuildResult.ManifestJSON` preserves the
+exact stored `manifest.json` bytes after verification; audit digests must hash
+those bytes and must never reserialize `Manifest`. A caller that already holds a
+verified `BuildResult` uses `ReadVerifiedFile` so one request does not reopen the
+bundle before checking the manifest-listed file digest.
+
 Theme foregrounds are selected from the Swiss ink/light palette by measured
 WCAG contrast. A pure-black fallback covers the narrow mid-luminance range
 where neither palette foreground reaches 4.5:1 for normal text. Text placed over

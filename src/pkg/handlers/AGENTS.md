@@ -18,6 +18,10 @@ artifact store reopens and verifies the complete signed bundle. The receipt
 attests to the exact serialized manifest with a SHA-256 digest; the browser
 recomputes the digest and compares the complete payload before checking expiry.
 Signature-shaped client data alone is never evidence of active verification.
+The receipt hashes the exact stored manifest bytes and includes the captured
+server time plus `authorizationState=active|expired`. An expired verified track
+may still supply curated copy evidence, but preview-file GET/HEAD must reject it
+at the exact boundary and never load signed runtime or file bytes.
 
 Composition outcome logs contain only a bounded correlation ID, outcome,
 reason class, and HTTP status. Railway's request ID is accepted only from the

@@ -137,6 +137,10 @@ func (s *fakeArtifacts) ReadFile(_ context.Context, contentHash, filePath string
 	return file, nil
 }
 
+func (s *fakeArtifacts) ReadVerifiedFile(ctx context.Context, result artifacts.BuildResult, filePath string) (artifacts.ArtifactFile, error) {
+	return s.ReadFile(ctx, result.ContentHash, filePath)
+}
+
 func TestDomainLifecycleAuthorizationAndPublicRollback(t *testing.T) {
 	db := openDomainTestDB(t)
 	clock := time.Date(2026, 8, 17, 4, 0, 0, 0, time.UTC)
