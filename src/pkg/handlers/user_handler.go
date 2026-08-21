@@ -78,6 +78,8 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -87,10 +89,13 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	if !requireSelfOrAdmin(w, r, id) {
 		return
 	}
-
-	if err := h.service.DeleteUser(id); err != nil {
+	if err := h.service.DeleteUserContext(r.Context(), id); err != nil {
 		if errors.Is(err, services.ErrUserNotFound) {
 			writeUserError(w, http.StatusNotFound, "user_not_found", "User not found.")
+			return
+		}
+		if errors.Is(err, services.ErrOwnedWorkspacesRemaining) {
+			writeUserError(w, http.StatusConflict, "owned_workspaces_remaining", "Owned workspaces must be deleted before this account can be deleted.")
 			return
 		}
 		writeUserError(w, http.StatusInternalServerError, "account_deletion_failed", "Account deletion could not be completed.")

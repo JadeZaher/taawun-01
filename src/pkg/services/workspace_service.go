@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	ErrWorkspaceForbidden = errors.New("workspace access forbidden")
-	ErrWorkspaceNotFound  = errors.New("workspace not found")
+	ErrWorkspaceForbidden      = errors.New("workspace access forbidden")
+	ErrWorkspaceNotFound       = errors.New("workspace not found")
+	ErrWorkspaceMutationFailed = errors.New("workspace operation failed")
 )
 
 type WorkspaceService struct {
@@ -27,6 +28,10 @@ func NewWorkspaceService(workspaceRepo *repositories.WorkspaceRepository, userRe
 }
 
 func (s *WorkspaceService) CreateWorkspace(actor *models.User, req *models.CreateWorkspaceRequest) (*models.Workspace, error) {
+	return s.CreateWorkspaceContext(context.Background(), actor, req)
+}
+
+func (s *WorkspaceService) CreateWorkspaceContext(ctx context.Context, actor *models.User, req *models.CreateWorkspaceRequest) (*models.Workspace, error) {
 	if actor == nil || actor.ID <= 0 {
 		return nil, ErrWorkspaceForbidden
 	}
@@ -41,13 +46,11 @@ func (s *WorkspaceService) CreateWorkspace(actor *models.User, req *models.Creat
 		Status:      models.WorkspaceStatusActive,
 	}
 
-	if err := s.workspaceRepo.Create(workspace); err != nil {
-		return nil, fmt.Errorf("failed to create workspace: %v", err)
-	}
-
-	// Add owner as member with owner role
-	if err := s.workspaceRepo.AddUser(workspace.ID, actor.ID, models.WorkspaceRoleOwner); err != nil {
-		return nil, fmt.Errorf("failed to add owner to workspace: %v", err)
+	if err := s.workspaceRepo.CreateWithOwnerMembership(ctx, workspace, actor.SessionVersion); err != nil {
+		if errors.Is(err, repositories.ErrWorkspaceOwnerInactive) {
+			return nil, ErrWorkspaceForbidden
+		}
+		return nil, fmt.Errorf("%w: create workspace", ErrWorkspaceMutationFailed)
 	}
 
 	return workspace, nil

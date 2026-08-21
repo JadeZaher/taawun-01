@@ -74,4 +74,5 @@ func insertSecurityTestUser(t *testing.T, db *sql.DB, user *models.User) {
 		t.Fatal(err)
 	}
 	user.ID = int(id)
+	user.SessionVersion = 1
 }

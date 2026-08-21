@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -10,7 +11,10 @@ import (
 	"taawun/pkg/models"
 )
 
-var ErrUserNotFound = errors.New("user not found")
+var (
+	ErrUserNotFound             = errors.New("user not found")
+	ErrOwnedWorkspacesRemaining = errors.New("owned workspaces remaining")
+)
 
 type UserRepository struct {
 	db *gorm.DB
@@ -95,8 +99,16 @@ func (r *UserRepository) update(user *models.User, rotateSessions bool) error {
 
 // DeactivateAndAnonymize revokes account authority while retaining referenced audit records.
 func (r *UserRepository) DeactivateAndAnonymize(id int, username, email, password string, deletedAt time.Time) error {
+	return r.DeactivateAndAnonymizeContext(context.Background(), id, username, email, password, deletedAt)
+}
+
+// DeactivateAndAnonymizeContext serializes the ownership guard with the complete lifecycle mutation.
+func (r *UserRepository) DeactivateAndAnonymizeContext(ctx context.Context, id int, username, email, password string, deletedAt time.Time) error {
 	if id <= 0 || username == "" || email == "" || password == "" {
 		return fmt.Errorf("invalid account deletion request")
+	}
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
 	hasTable := func(name string) bool { return r.db.Migrator().HasTable(name) }
@@ -110,7 +122,7 @@ func (r *UserRepository) DeactivateAndAnonymize(id int, username, email, passwor
 		"oauth_refresh_tokens":      hasTable("oauth_refresh_tokens"),
 	}
 
-	return r.db.Transaction(func(tx *gorm.DB) error {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var account models.User
 		if err := tx.Select("id", "status").First(&account, id).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -120,6 +132,15 @@ func (r *UserRepository) DeactivateAndAnonymize(id int, username, email, passwor
 		}
 		if account.Status == models.StatusDeleted {
 			return nil
+		}
+
+		var ownedWorkspace int
+		ownership := tx.Raw(`SELECT 1 FROM workspaces WHERE owner_id = ? LIMIT 1`, id).Scan(&ownedWorkspace)
+		if ownership.Error != nil {
+			return fmt.Errorf("check owned workspaces: %w", ownership.Error)
+		}
+		if ownership.RowsAffected != 0 {
+			return ErrOwnedWorkspacesRemaining
 		}
 
 		result := tx.Model(&models.User{}).Where("id = ?", id).Updates(map[string]any{
@@ -164,6 +185,7 @@ func (r *UserRepository) DeactivateAndAnonymize(id int, username, email, passwor
 		}
 		return nil
 	})
+	return normalizeLifecycleTransactionError(ctx, err)
 }
 
 func (r *UserRepository) UpdateRole(id int, role string) error {

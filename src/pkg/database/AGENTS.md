@@ -27,3 +27,7 @@ lifecycle transaction replaces identity and credential material, marks the user
 deleted, rotates the first-party session version, revokes OAuth credentials and
 consents, and removes non-audit membership/notification rows. Do not restore a
 hard delete or weaken those audit foreign keys.
+
+Workspace creation and account deletion serialize on SQLite's database write
+lock through `BEGIN IMMEDIATE`. Both recheck persisted lifecycle/session state
+inside that transaction; portable backends need equivalent per-user locking.

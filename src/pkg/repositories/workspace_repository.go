@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -9,6 +10,8 @@ import (
 
 	"taawun/pkg/models"
 )
+
+var ErrWorkspaceOwnerInactive = errors.New("workspace owner authority changed")
 
 type WorkspaceRepository struct {
 	db *gorm.DB
@@ -23,6 +26,37 @@ func (r *WorkspaceRepository) Create(workspace *models.Workspace) error {
 		return fmt.Errorf("failed to create workspace: %v", err)
 	}
 	return nil
+}
+
+// CreateWithOwnerMembership serializes lifecycle validation with both workspace ownership rows.
+func (r *WorkspaceRepository) CreateWithOwnerMembership(ctx context.Context, workspace *models.Workspace, expectedSessionVersion int64) error {
+	if workspace == nil || workspace.OwnerID <= 0 || expectedSessionVersion <= 0 {
+		return ErrWorkspaceOwnerInactive
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var owner models.User
+		if err := tx.Select("id", "status", "session_version").First(&owner, workspace.OwnerID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrWorkspaceOwnerInactive
+			}
+			return fmt.Errorf("load workspace owner lifecycle state: %w", err)
+		}
+		if owner.Status != models.StatusActive || owner.SessionVersion != expectedSessionVersion {
+			return ErrWorkspaceOwnerInactive
+		}
+		if err := tx.Create(workspace).Error; err != nil {
+			return fmt.Errorf("create workspace: %w", err)
+		}
+		membership := &models.WorkspaceUser{WorkspaceID: workspace.ID, UserID: workspace.OwnerID, Role: models.WorkspaceRoleOwner}
+		if err := tx.Create(membership).Error; err != nil {
+			return fmt.Errorf("create workspace owner membership: %w", err)
+		}
+		return nil
+	})
+	return normalizeLifecycleTransactionError(ctx, err)
 }
 
 func (r *WorkspaceRepository) GetByID(id int) (*models.Workspace, error) {

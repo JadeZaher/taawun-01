@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -102,5 +103,57 @@ func TestWorkspacePeopleIsScopedAndNonSensitive(t *testing.T) {
 	}
 	if response.Body.String() != "{\"error\":{\"code\":\"workspace_people_unavailable\",\"message\":\"Workspace people could not be loaded.\"}}\n" {
 		t.Fatalf("failed people response exposed internal detail: %s", response.Body.String())
+	}
+}
+
+func TestCreateWorkspacePropagatesCancellationWithoutRowsOrRawCause(t *testing.T) {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = db.Close() })
+	for _, statement := range []string{
+		`CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL, role TEXT NOT NULL, status TEXT NOT NULL, session_version INTEGER NOT NULL DEFAULT 1, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)`,
+		`CREATE TABLE workspaces (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT, owner_id INTEGER NOT NULL, status TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)`,
+		`CREATE TABLE workspace_users (workspace_id INTEGER NOT NULL, user_id INTEGER NOT NULL, role TEXT NOT NULL, joined_at DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (workspace_id, user_id))`,
+	} {
+		if _, err := db.Exec(statement); err != nil {
+			t.Fatal(err)
+		}
+	}
+	orm, err := gorm.Open(sqlite.Dialector{Conn: db}, &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	userRepo := repositories.NewUserRepository(orm)
+	workspaceRepo := repositories.NewWorkspaceRepository(orm)
+	owner := &models.User{Username: "cancelled-owner", Email: "cancelled-owner@example.com", Password: "x", Role: models.RoleUser, Status: models.StatusActive, SessionVersion: 1}
+	if err := userRepo.Create(owner); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewWorkspaceHandler(services.NewWorkspaceService(workspaceRepo, userRepo))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	request := httptest.NewRequest(http.MethodPost, "/api/workspaces", strings.NewReader(`{"name":"Cancelled workspace"}`)).WithContext(ctx)
+	request = request.WithContext(WithCurrentUser(request.Context(), owner))
+	response := httptest.NewRecorder()
+	handler.CreateWorkspace(response, request)
+
+	if response.Code != http.StatusInternalServerError || strings.TrimSpace(response.Body.String()) != "Workspace operation could not be completed" {
+		t.Fatalf("cancelled create response = %d %q", response.Code, response.Body.String())
+	}
+	if strings.Contains(strings.ToLower(response.Body.String()), "context canceled") || strings.Contains(strings.ToLower(response.Body.String()), "database is locked") {
+		t.Fatalf("cancelled create leaked raw cause: %s", response.Body.String())
+	}
+	var workspaceCount, membershipCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM workspaces`).Scan(&workspaceCount); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM workspace_users`).Scan(&membershipCount); err != nil {
+		t.Fatal(err)
+	}
+	if workspaceCount != 0 || membershipCount != 0 {
+		t.Fatalf("cancelled create persisted workspace/member rows = %d/%d", workspaceCount, membershipCount)
 	}
 }

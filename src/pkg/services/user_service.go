@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -15,8 +16,9 @@ import (
 )
 
 var (
-	ErrUserNotFound          = errors.New("user not found")
-	ErrAccountDeletionFailed = errors.New("account deletion failed")
+	ErrUserNotFound             = errors.New("user not found")
+	ErrOwnedWorkspacesRemaining = errors.New("owned workspaces remaining")
+	ErrAccountDeletionFailed    = errors.New("account deletion failed")
 )
 
 type UserService struct {
@@ -143,6 +145,16 @@ func (s *UserService) UpdateUser(id int, req *models.UpdateUserRequest) (*models
 }
 
 func (s *UserService) DeleteUser(id int) error {
+	return s.DeleteUserContext(context.Background(), id)
+}
+
+func (s *UserService) DeleteUserContext(ctx context.Context, id int) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if ctx.Err() != nil {
+		return fmt.Errorf("%w: lifecycle transaction unavailable", ErrAccountDeletionFailed)
+	}
 	random := make([]byte, 24)
 	if _, err := rand.Read(random); err != nil {
 		return fmt.Errorf("%w: prepare account tombstone", ErrAccountDeletionFailed)
@@ -152,9 +164,15 @@ func (s *UserService) DeleteUser(id int) error {
 	if err != nil {
 		return fmt.Errorf("%w: prepare account credentials", ErrAccountDeletionFailed)
 	}
-	if err := s.repo.DeactivateAndAnonymize(id, "deleted-"+suffix, "deleted-"+suffix+"@deleted.invalid", string(hashedPassword), time.Now().UTC()); err != nil {
+	if err := s.repo.DeactivateAndAnonymizeContext(ctx, id, "deleted-"+suffix, "deleted-"+suffix+"@deleted.invalid", string(hashedPassword), time.Now().UTC()); err != nil {
 		if errors.Is(err, repositories.ErrUserNotFound) {
 			return ErrUserNotFound
+		}
+		if errors.Is(err, repositories.ErrOwnedWorkspacesRemaining) {
+			return ErrOwnedWorkspacesRemaining
+		}
+		if errors.Is(err, repositories.ErrLifecycleUnavailable) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return fmt.Errorf("%w: lifecycle transaction unavailable", ErrAccountDeletionFailed)
 		}
 		return fmt.Errorf("%w: %v", ErrAccountDeletionFailed, err)
 	}

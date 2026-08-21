@@ -32,7 +32,7 @@ func (h *WorkspaceHandler) CreateWorkspace(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	workspace, err := h.service.CreateWorkspace(user, &req)
+	workspace, err := h.service.CreateWorkspaceContext(r.Context(), user, &req)
 	if err != nil {
 		writeWorkspaceError(w, err)
 		return
@@ -241,6 +241,8 @@ func writeWorkspaceError(w http.ResponseWriter, err error) {
 		http.Error(w, "Workspace access forbidden", http.StatusForbidden)
 	case errors.Is(err, services.ErrWorkspaceNotFound):
 		http.Error(w, "Workspace not found", http.StatusNotFound)
+	case errors.Is(err, services.ErrWorkspaceMutationFailed):
+		http.Error(w, "Workspace operation could not be completed", http.StatusInternalServerError)
 	default:
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
