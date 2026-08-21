@@ -568,3 +568,69 @@ denial, Maintainer actor-bound clone, stale loader recovery, and non-empty
 workspace regression on this deployment. Rollback remains application
 `cedacb0` / Railway `d446f826-bb48-4005-afc4-98e7fac8e046`; use its supported
 redeploy path only for a confirmed application-caused regression.
+
+## 2026-08-21 workspace-scoped starter-state P1 handoff
+
+Application commit `6c7a973` makes workspace activation one synchronous scope
+boundary for direct selection, the preferred workspace returned by cockpit
+creation, and server-list fallback after deletion. The boundary clears template
+milestones, broader builder identity, trusted preview/receipt, track selection,
+history confirmation, domain/publication state, session-only invitation tokens,
+pending mutation controls, retry notices, and live-region announcements before
+restoring only the exact principal/workspace component draft. A restored local
+draft remains editable but reports `0/5` until its template, component selection,
+and customization are explicitly reconfirmed; signed completion still derives
+only from an authorized verified history reopen.
+
+Workspace creation and invitation acceptance now bind the initiating session,
+Bearer, workspace selection, and scope generation. People, history, domain,
+track, claim, invitation, acceptance, publication, and preview operations retain
+independent generations. A delayed response or finalizer from workspace A cannot
+select workspace B, repopulate its evidence, append invitation state, relabel its
+controls, or restore an announcement. The patch does not add persistence,
+authority, endpoints, analytics, DNS behavior, or publication bypasses, and it
+does not change the accepted signed-runtime/manifest verification boundary.
+
+The release gate passed every Go package/command test, both production binary
+builds, `git diff --check`, and all 13 Node tests. The promoted Chromium matrix
+uses the cockpit workspace-creation UI, deterministically launches delayed A
+People/history/domain loaders plus track/domain/invitation/acceptance/publication
+mutations, then proves B starts with a blank template, zero components and exact
+`0/5` copy, no draft/receipt/track/domain/invitation/retry/announcement state,
+and normalized controls. It also covers rapid return, deletion fallback,
+same-principal and cross-principal delayed creation, exact scoped document
+restoration without milestones, verified server-history recovery, and nonempty
+workspace behavior. Independent UI and security reviews approved the final
+scope, stale-response, role, publication, signed-evidence, and regression
+boundaries.
+
+Railway deployment `bb2b3f31-7ebe-43f2-9b21-db553bc4e581` reached terminal
+`SUCCESS` with image digest
+`sha256:c9961684da740845e1d0202fdc083c54eb81956fe1f0b727e621b67d453c9fd5`.
+Eight low-rate health/root pairs returned 16/16 `200`; observed latency was
+207–593 ms. Bounded runtime output showed one volume mount, successful database
+initialization, one container start, and the `:8080` bind. Railway classified
+the two Go startup lines as level `error`, but their messages are informational;
+the bounded HTTP `500..599` readback was empty.
+
+The in-app Browser 26.818.21641 bridge was healthy for a read-only promotion
+check. The production root opened as `Taawun Builder`, rendered the account
+surface, and contained the deployed `workspaceScopeId`, restored-template
+confirmation, and signed-file runtime-binding code. No synthetic credentials or
+workspace were created by implementation, so authenticated live P1 acceptance
+remains QA's fresh-fixture pass rather than an implementation claim.
+
+QA's baseline fixtures were already removed through supported routes:
+workspaces `45` and `46`, organizer `72`, Viewer `73`, Maintainer `74`, and both
+memberships returned `204`; pending claim `E96p6TYJP0bGEMk7KawVJch5` was revoked
+with `200`; all three old JWTs returned `401`. Cancelled quest
+`quest_vr4LDIfc4pLRkrXPCNjl7Veo` is retained only as immutable audit evidence.
+No Bazaar or DNS mutation was performed.
+
+The accepted pre-fix baseline remains application `c1e4aa5` / Railway
+`431bc9b3-21b2-4e12-a4e1-c2a4a1fbfc39`. The clean rollback remains application
+`cedacb0` / Railway `d446f826-bb48-4005-afc4-98e7fac8e046`, to be used through
+the supported Railway path only for a confirmed application-caused regression.
+The separate post-P1 audit/backend lane must treat `src/web/index.html`,
+`src/web/index.test.mjs`, and `src/web/AGENTS.md` as overlap-sensitive and align
+to app commit `6c7a973`; this handoff does not absorb that lane's scope.
