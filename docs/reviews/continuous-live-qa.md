@@ -1335,3 +1335,141 @@ The five-person study remains `not-started`; no participant, consent, demand or
 willingness-to-pay evidence is claimed. Continuous acceptance remains in progress
 through the separately authorized UI-safety sequence and final one-time Fable
 adversarial review; neither is claimed by this publication-lifetime gate.
+
+### UI-safety and landing deployment retest — ACCEPT
+
+The exact application and PR commit
+`4a9b1c68044e0324105fddccfaf72810d502626c` is live on Railway deployment
+`f8e86558-b90a-43a1-8599-245a8c30684d` (`SUCCESS`) with runtime image
+`sha256:85726c4a1411319f10be0420db3b1f96237f3082012d9ab98accc9bef13a1eb8`.
+The accepted parent and rollback source is
+`928c8f274460f00b4ac2059a0e7c43fb221d5791`. The pre-release ledger was
+independently read back at SHA-256
+`52630F4C56CF0CDAFBD43C5874C32FD59ADB658DC7D528496244E567BA64F25F`
+before this section was appended. Source attribution showed that the candidate
+changed the accepted web client and its tests/documentation only; no backend
+contract changed. The integrated handoff reported every Go package, both
+production binaries, 15/15 Node tests including promoted real Chromium, and
+separate security and UI/accessibility reviews green.
+
+Fresh in-app Browser evidence started logged out. The landing page exposed one
+visible H1, `Build a clear home for your community.`, a working skip target,
+unambiguous Create account and Sign in actions, and plain-language statements
+about preview-before-publication, local-first community records, encrypted relay,
+central identity/signed-artifact/audit retention, purpose-based retention after
+account deletion, and zero custody/settlement. Account tabs responded to keyboard
+Arrow and Home navigation. At 400 px and 320 px the live document had no horizontal
+overflow and retained the value, trust and custody copy. The same was true for the
+authenticated cockpit at 640/400/320 px. All ordinary interactive controls sampled
+at the required paths were at least 44 px. The focused skip link computed to 43 px
+because of live pixel rounding; this is recorded as a non-blocking P2 measurement,
+not a comprehension or completion failure, and the promoted accessibility gate is
+green.
+
+Synthetic Architect `86`, Viewer `87`, Maintainer `88`, zero-workspace principal
+`89`, and workspace `52` exercised the authenticated matrix. People resolved the
+Architect role before mutation controls enabled. Viewer saw only inspect controls:
+template/build, invite, member removal, domain revocation and grant controls were
+disabled or absent. Maintainer could build but could not invite, remove members,
+revoke a domain claim, publish or perform Architect-only workspace cleanup. Direct
+API probes agreed: authorized People returned `200`, `no-store` and `nosniff`;
+Viewer member-removal and domain-revocation attempts returned generic `403` with
+no count, version or authority oracle.
+
+The Architect created a current-session Viewer invitation. Its result explicitly
+said the secret existed only in that session. The revoke confirmation was a named
+alert dialog; Cancel returned focus to the invoking control, and Confirm produced
+an exact revoked-version readback, removed the displayed secret and revoke action,
+and returned focus to the invite section. A separate invitation was accepted and
+then revoked at its stale expected version; the server returned deterministic
+`409` without disclosing the token. No invitation secret entered the ledger,
+screenshots, logs or another principal's state.
+
+Member removal used the same confirmation/focus discipline. Cancel returned focus
+to the exact Viewer removal control. Confirm removed Viewer `87`, refreshed the
+People count to three and focused the members heading. The removed principal's JWT
+still read its own profile but immediately lost workspace `52`: its workspace list
+no longer contained the workspace and its People request returned `403`.
+
+A single synthetic `.example.invalid` domain claim was created and left pending;
+no DNS proof was altered or verified. A fresh authoritative cockpit reload
+rediscovered it as pending. The revoke alert dialog had correct accessible naming,
+Cancel restored focus, and Confirm returned the exact revoked option, hid and
+cleared proof, disabled verify/publish/replace/rollback, retained the staging-only
+preview warning, and focused the claim selector. Live deletion returned `200` for
+the Architect and generic `403` for the Viewer. Verified-active Host shutoff,
+expiry and immutable activation history continue to rely on the accepted
+controlled-clock/service/Host and promoted-browser evidence; no external DNS,
+reviewer or Bazaar authority was fabricated.
+
+Maintainer `88` selected `community-iftar` from the real three-template catalog
+and selected `iftar-registration` plus `announcements`. Invalid advanced JSON
+showed a bounded error and retained the last valid document and Apply-button focus.
+Switching to an incompatible template opened a confirmation; Cancel returned focus
+to the template control and kept the document. The final exact document changed the
+title to `Open Iftar Registration — QA 🌙` and added a synthetic custom scalar,
+array and object. Preview creation returned `201` at
+`2026-08-21T19:36:30.232Z` in 64 ms and created
+`track_wGtGqkai8WkP652_bezYAaU9` /
+`art_05254ddc803010d61a151c8835397e42`.
+
+The browser showed `Verified staging ready` only after the complete signed receipt
+and separately confirmed one Build History track. The styled frame started with
+the customized Unicode card, not raw JavaScript; sandbox was exactly
+`allow-scripts allow-forms`, with one intact inline runtime and no external script.
+The registration control was interactive and reported a tab-local preview save.
+Receipt facts matched the exact raw manifest: Ed25519 key
+`railway-artifact-v1`, workspace `52`, template v2, both modules, component-file
+digests, configured production surface, lifecycle/expiry and reference-only review
+values. The exact manifest included the custom scalar/array/object and recomputed to
+SHA-256 `7e1264cecb989e599f9647ec5c9b78775d8e1e2ae92a6b6d62b4f445a860853c`.
+Its authenticated immutable Datastar runtime was 34,083 bytes and recomputed to
+`2837d87acf6ee0ba8e4e63765926c25a98d63883b02f88be194a86b81d3fd24a`,
+exactly matching the signed descriptor. Authenticated runtime and index reads were
+`200`; anonymous reads were `401`. Publication stayed disabled.
+
+The account surface truthfully stated the 12-character password minimum, session
+invalidation behavior, purpose-based retention, and supported workspace-first
+account deletion path. Inputs carried `minlength=12`, `autocomplete=new-password`
+and associated guidance/live-status semantics. Browser policy reserved final
+password submission for human handoff, so the authorized synthetic rotation used
+the same supported HTTP route: it returned `200`; the old password and old token
+returned `401`, and the new password authenticated. A browser request made with the
+now-stale session immediately returned the logged-out account view with `Your
+session expired. Please sign in again.` and cleared workspace, preview and invite
+state.
+
+Owned-workspace self-delete returned bounded, non-destructive `409`; the same
+Architect token still read its profile and workspace. The account and workspace
+delete confirmations were correctly named alert dialogs and Cancel returned focus
+to their invokers. Browser policy similarly reserved the final destructive clicks,
+so the authorized synthetic cleanup used the supported lifecycle endpoints and
+then reloaded the browser for authoritative recovery: workspace `52` returned
+`204`; a fresh owner login showed an empty workspace selector, Waiting preview,
+hidden build action, no invite grant and history guidance to select a workspace.
+Zero-owned principal `89` self-deleted `204`, and its old profile and workspace
+creation returned `401`. Viewer `87`, Maintainer `88` and Architect `86` then
+self-deleted `204`. All current, pre-rotation and owner tokens returned `401`.
+The final in-app Browser reload showed the logged-out landing, and all synthetic
+credentials and cached manifest/runtime values were cleared from the browser-control
+kernel.
+
+Final direct probes returned `/api/health` `200`, root `200 text/html`, and the
+landing body. Railway showed deployment `f8e86558` as the sole current `SUCCESS`,
+zero deployment-scoped HTTP `500..599`, one-hour CPU average `0.0004` vCPU/max
+`0.0069`, and memory average `0.0268` GB/max `0.0482`. Exact request correlation
+included the preview `201` above, owner self-delete `409`, password rotation `200`,
+domain deletion `200`, Viewer domain denial `403`, workspace cleanup `204`, and all
+supported user cleanup. No panic, restart, upstream failure or unexplained `5xx`
+was observed.
+
+**Verdict:** ACCEPT application commit
+`4a9b1c68044e0324105fddccfaf72810d502626c` / Railway deployment
+`f8e86558-b90a-43a1-8599-245a8c30684d`. Fresh live Browser, low-rate API,
+signed-byte, role, confirmation/focus, stale-session and cleanup boundaries are
+green, and no P0/P1 application finding remains. No fixture from this gate
+remains: workspace `52` and users `86`–`89` were removed only through supported
+routes and all old authorities are `401`. Historical workspace `47` remains the
+explicit operator-authority cleanup blocker and was not touched. External
+DNS/reviewer/Bazaar proof and the five-person human study remain separately
+blocked/not-started and are not claimed by this gate.
