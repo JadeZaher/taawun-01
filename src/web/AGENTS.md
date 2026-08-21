@@ -25,6 +25,24 @@ state. It appears only after an authorized Build History request independently
 proves that the selected workspace has zero tracks; loading, errors, nonempty
 history, and no workspace remain distinct states.
 
+`activateWorkspaceScope` is the single boundary for direct selection, a newly
+created preferred workspace, and server-list fallback after deletion. Its
+`workspaceScopeId` comparison invalidates prior principal/workspace requests and
+clears builder, receipt, track, domain, invitation-token, retry, and live-region
+state before restoring only that principal/workspace's validated component
+draft. A restored local draft remains editable but does not recreate starter
+milestones automatically; separate intentional controls may reconfirm its
+template, component choices, and exact customization without rewriting them.
+Signed completion is derived from authorized verified history. The
+workspace-creation POST is also session- and scope-guarded so a response after a
+workspace or principal switch cannot select or mutate the newer cockpit. Scope
+activation resets workspace mutation controls, while their stale finalizers are
+generation-guarded so they cannot relabel controls owned by the new scope. This
+includes invitation acceptance and publication: an intentional successful
+acceptance may select its returned workspace, but a user-selected newer scope
+invalidates the pending response; publication never carries busy or retry state
+across a scope change.
+
 On a later login, a nonempty summary never counts as signed progress. The
 cockpit verifies only the selected track when it is in the loaded page, otherwise
 the newest applicable summary that reports both preview and artifact presence,

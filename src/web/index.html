@@ -869,6 +869,7 @@
       catalogHealthy: false,
       workspacesReady: false,
       workspaces: [],
+      workspaceScopeId: 0,
       templates: [],
       modules: [],
       componentPolicy: null,
@@ -901,6 +902,8 @@
       buildHistoryEpoch: 0,
       starterRecoveryEpoch: 0,
       trackRecordEpoch: 0,
+      invitationEpoch: 0,
+      acceptanceEpoch: 0,
       domainEpoch: 0,
       domainPublicationEpoch: 0,
       publicationEpoch: 0,
@@ -914,6 +917,10 @@
       starterRecoveryState: 'idle',
       starterRecoveryTrackId: '',
       starterRecoveryCustomized: false,
+      starterTemplateInteracted: false,
+      starterComponentsInteracted: false,
+      starterCustomizationInteracted: false,
+      announcementEpoch: 0,
       selectedTrack: null,
       trackEvents: [],
       domainClaims: [],
@@ -1007,6 +1014,8 @@
       state.buildHistoryEpoch += 1;
       state.starterRecoveryEpoch += 1;
       state.trackRecordEpoch += 1;
+      state.invitationEpoch += 1;
+      state.acceptanceEpoch += 1;
       state.domainEpoch += 1;
       state.domainPublicationEpoch += 1;
       state.publicationEpoch += 1;
@@ -1019,6 +1028,7 @@
       state.catalogHealthy = false;
       state.workspacesReady = false;
       state.workspaces = [];
+      state.workspaceScopeId = 0;
       state.templates = [];
       state.modules = [];
       state.componentPolicy = null;
@@ -1051,6 +1061,9 @@
       state.starterRecoveryState = 'idle';
       state.starterRecoveryTrackId = '';
       state.starterRecoveryCustomized = false;
+      state.starterTemplateInteracted = false;
+      state.starterComponentsInteracted = false;
+      state.starterCustomizationInteracted = false;
       state.selectedTrack = null;
       state.trackEvents = [];
       state.domainClaims = [];
@@ -1066,6 +1079,11 @@
       element('previewLoading').hidden = true;
       setBusy(element('loadTrackButton'), false, 'Inspecting…', 'Inspect build');
       setBusy(element('openNewestBuildButton'), false, 'Opening…', 'Open selected or newest');
+      setBusy(element('createWorkspaceButton'), false, 'Creating…', 'Create workspace');
+      setBusy(element('claimDomainButton'), false, 'Creating…', 'Issue DNS proof');
+      setBusy(element('verifyDomainButton'), false, 'Verifying…', 'Verify DNS proof');
+      setBusy(element('createInviteButton'), false, 'Creating…', 'Create invitation');
+      setBusy(element('acceptInviteButton'), false, 'Joining…', 'Accept and join');
       element('manifestList').replaceChildren();
       element('manifestList').hidden = true;
       element('manifestEmpty').hidden = false;
@@ -1091,6 +1109,8 @@
       element('openNewestBuildButton').hidden = true;
       element('starterRecoveryState').hidden = true;
       element('starterRecoveryState').textContent = '';
+      element('starterPathStatus').textContent = '';
+      delete element('starterPathStatus').dataset.summary;
       element('recoveryInviteButton').hidden = true;
       setNotice(element('buildRecordAlert'), '');
       element('peopleList').replaceChildren();
@@ -1115,7 +1135,9 @@
       element('questLookup').value = '';
       element('questRecord').hidden = true;
       for (const id of ['inviteResult', 'acceptInviteResult', 'proposalAlert', 'questAlert', 'bazaarAlert']) setNotice(element(id), '');
+      setNotice(element('createWorkspaceAlert'), '');
       switchWorkspaceTab('build');
+      clearWorkspaceAnnouncement();
       renderWorkspaceAccess();
       element('previewButton').textContent = 'Create staging preview';
       element('domainOrigin').value = '';
@@ -1219,9 +1241,17 @@
       return state.productRole === 'Architect';
     }
 
-    function announce(message) {
+    function clearWorkspaceAnnouncement() {
+      state.announcementEpoch += 1;
       element('workspaceAnnouncer').textContent = '';
-      requestAnimationFrame(() => { element('workspaceAnnouncer').textContent = message; });
+    }
+
+    function announce(message) {
+      const epoch = ++state.announcementEpoch;
+      element('workspaceAnnouncer').textContent = '';
+      requestAnimationFrame(() => {
+        if (epoch === state.announcementEpoch) element('workspaceAnnouncer').textContent = message;
+      });
     }
 
     function switchWorkspaceTab(tab, { focusTab = false, focusPanel = false } = {}) {
@@ -1266,15 +1296,18 @@
       recoveryInvite.title = recoveryInviteAllowed ? 'Creates a Viewer invitation whose acceptance token is shown only in this browser session.' : '';
       if (!historySucceededEmpty) return;
 
-      const templateChosen = state.catalogHealthy && Boolean(selectedTemplate());
-      const componentCount = state.catalogHealthy ? selectedModules().length : 0;
-      const customized = currentDraftDiffersFromCatalogDefaults();
+      const selected = selectedTemplate();
+      const selectedCount = state.catalogHealthy ? selectedModules().length : 0;
+      const draftCustomized = currentDraftDiffersFromCatalogDefaults();
+      const templateChosen = state.starterTemplateInteracted && state.catalogHealthy && Boolean(selected);
+      const componentCount = state.starterComponentsInteracted ? selectedCount : 0;
+      const customized = state.starterCustomizationInteracted && draftCustomized;
       const previewVerified = starterVerifiedPreview() && customized;
       const historyConfirmed = previewVerified && starterHistoryConfirmed();
       const steps = [
-        ['starterTemplateStep', templateChosen, 'starterTemplateStatus', templateChosen ? `${selectedTemplate().title} selected explicitly.` : 'Choose one real catalog template.'],
-        ['starterComponentsStep', componentCount > 0, 'starterComponentsStatus', componentCount ? `${componentCount} allowed component${componentCount === 1 ? '' : 's'} selected.` : 'Choose at least one allowed component.'],
-        ['starterCustomizationStep', customized, 'starterCustomizationStatus', customized ? 'At least one selected component differs from its validated catalog default.' : 'Change at least one declared component field from its catalog default.'],
+        ['starterTemplateStep', templateChosen, 'starterTemplateStatus', templateChosen ? `${selected.title} selected explicitly.` : (selected ? 'A workspace-scoped local template draft is restored; no starter milestone is inferred.' : 'Choose one real catalog template.')],
+        ['starterComponentsStep', componentCount > 0, 'starterComponentsStatus', componentCount ? `${componentCount} allowed component${componentCount === 1 ? '' : 's'} selected.` : (selectedCount ? 'Workspace-scoped local component choices are restored; no starter milestone is inferred.' : 'Choose at least one allowed component.')],
+        ['starterCustomizationStep', customized, 'starterCustomizationStatus', customized ? 'At least one selected component differs from its validated catalog default.' : (draftCustomized ? 'A validated workspace-scoped edit is restored; no starter milestone is inferred.' : 'Change at least one declared component field from its catalog default.')],
         ['starterPreviewStep', previewVerified, 'starterPreviewStatus', previewVerified ? `Verified preview ${state.track.id} is retained.` : 'Create and verify the exact signed preview.'],
         ['starterHistoryStep', historyConfirmed, 'starterHistoryStatus', historyConfirmed ? `Exact track ${state.track.id} is confirmed in history.` : (previewVerified ? 'Verified evidence is separate; refresh history to confirm the exact track.' : 'Confirm the exact track independently in Build history.')],
       ];
@@ -1306,20 +1339,26 @@
         primary.textContent = 'Waiting for approved catalog';
         copy.textContent = 'Retry the real catalog. The starter never substitutes a template or component.';
       } else if (!templateChosen) {
-        primary.textContent = 'Choose a template';
+        primary.textContent = selected ? 'Confirm restored template' : 'Choose a template';
         primary.dataset.action = 'template';
         primary.disabled = false;
-        copy.textContent = 'Template and component choices remain explicit; the starter never selects either for you.';
+        copy.textContent = selected
+          ? 'Confirm this workspace-scoped local template through an intentional control before it counts as current starter progress.'
+          : 'Template and component choices remain explicit; the starter never selects either for you.';
       } else if (!componentCount) {
-        primary.textContent = 'Choose components';
+        primary.textContent = selectedCount ? 'Confirm restored components' : 'Choose components';
         primary.dataset.action = 'components';
         primary.disabled = false;
-        copy.textContent = 'Choose at least one component allowed by the selected real template.';
+        copy.textContent = selectedCount
+          ? 'Confirm these validated workspace-scoped component choices without copying them into another workspace.'
+          : 'Choose at least one component allowed by the selected real template.';
       } else if (!customized) {
-        primary.textContent = 'Customize component content';
+        primary.textContent = draftCustomized ? 'Confirm restored customization' : 'Customize component content';
         primary.dataset.action = 'customize';
         primary.disabled = false;
-        copy.textContent = 'Change at least one declared plain-content field. Catalog defaults alone do not complete the customized starter step.';
+        copy.textContent = draftCustomized
+          ? 'Confirm the validated workspace-scoped document edit without changing or reinterpreting its exact JSON.'
+          : 'Change at least one declared plain-content field. Catalog defaults alone do not complete the customized starter step.';
       } else if (![element('appName'), element('organizationName'), element('city')].every((control) => control.value.trim())) {
         primary.textContent = 'Complete app details';
         primary.dataset.action = 'details';
@@ -1365,13 +1404,31 @@
       if (button.disabled || element('signedStarterPath').hidden) return;
       const action = button.dataset.action;
       if (action === 'template') {
+        if (selectedTemplate() && !state.starterTemplateInteracted) {
+          state.starterTemplateInteracted = true;
+          renderSignedStarterPath();
+          announce('Restored template confirmed for this workspace view. No signed completion is inferred.');
+          return;
+        }
         element('templateSelect').focus();
         announce('Choose one approved template. No template is selected automatically.');
       } else if (action === 'components') {
+        if (selectedModules().length && !state.starterComponentsInteracted) {
+          state.starterComponentsInteracted = true;
+          renderSignedStarterPath();
+          announce('Restored component choices confirmed for this workspace view.');
+          return;
+        }
         const checkbox = element('moduleList').querySelector('input[type="checkbox"]:not(:checked)');
         checkbox?.focus();
         announce('Choose at least one component allowed by this template.');
       } else if (action === 'customize') {
+        if (currentDraftDiffersFromCatalogDefaults() && !state.starterCustomizationInteracted) {
+          state.starterCustomizationInteracted = true;
+          renderSignedStarterPath();
+          announce('Restored exact component customization confirmed for this workspace view.');
+          return;
+        }
         const control = [...element('moduleList').querySelectorAll('.component-editor')]
           .filter((card) => card.querySelector('input[type="checkbox"]:checked'))
           .map((card) => card.querySelector('.component-fields .field input, .component-fields .field textarea'))
@@ -1841,9 +1898,68 @@
       }
     }
 
+    function activateWorkspaceScope() {
+      const workspaceID = currentWorkspaceID();
+      if (workspaceID === state.workspaceScopeId) return false;
+      state.workspaceScopeId = workspaceID;
+      state.starterTemplateInteracted = false;
+      state.starterComponentsInteracted = false;
+      state.starterCustomizationInteracted = false;
+      state.selectedTemplateId = '';
+      state.selectedComponentIds = [];
+      state.componentDocuments = {};
+      state.pendingTemplateId = '';
+      const selectedWorkspace = element('workspaceSelect').value;
+      element('builderForm').reset();
+      element('workspaceSelect').value = selectedWorkspace;
+      element('accentHex').value = '#57A68E';
+      ['appName', 'organizationName', 'city', 'madhhab', 'accentColor', 'buildBrief'].forEach((id) => {
+        element(id)?.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      element('templateSelect').value = '';
+      element('templateReconcile').hidden = true;
+      element('trackLookup').value = '';
+      element('starterPathStatus').textContent = '';
+      delete element('starterPathStatus').dataset.summary;
+      clearWorkspaceAnnouncement();
+      setNotice(element('builderAlert'), '');
+      setNotice(element('createWorkspaceAlert'), '');
+      setNotice(element('inviteResult'), '');
+      element('invitee').value = '';
+      element('acceptInviteToken').value = '';
+      setNotice(element('acceptInviteResult'), '');
+      element('inviteTokenOutput').value = '';
+      element('inviteGrant').hidden = true;
+      setBusy(element('createWorkspaceButton'), false, 'Creating…', 'Create workspace');
+      setBusy(element('claimDomainButton'), false, 'Creating…', 'Issue DNS proof');
+      setBusy(element('verifyDomainButton'), false, 'Verifying…', 'Verify DNS proof');
+      setBusy(element('createInviteButton'), false, 'Creating…', 'Create invitation');
+      setBusy(element('acceptInviteButton'), false, 'Joining…', 'Accept and join');
+      setBusy(element('deployButton'), false, 'Publishing…', 'Publish verified domain');
+      element('deployButton').disabled = true;
+      element('previewButton').textContent = 'Create staging preview';
+
+      state.domainEpoch += 1;
+      state.domainPublicationEpoch += 1;
+      state.invitationEpoch += 1;
+      state.acceptanceEpoch += 1;
+      state.publicationEpoch += 1;
+      state.publishing = false;
+      state.domainClaims = [];
+      state.domainPublications = [];
+      renderDomainClaims();
+      renderDomainPublications();
+      resetDomainClaim(true);
+      clearVerifiedPreviewForScope();
+      restoreDraftForCurrentScope();
+      renderSignedStarterPath();
+      return true;
+    }
+
     async function loadWorkspaces(preferredId = '') {
       const sessionEpoch = state.sessionEpoch;
       const requestEpoch = ++state.workspacesEpoch;
+      const priorWorkspaceID = state.workspaceScopeId;
       element('workspaceLoading').hidden = false;
       element('workspaceError').hidden = true;
       element('workspaceReady').hidden = true;
@@ -1866,14 +1982,14 @@
             option.textContent = String(workspace.name || `Workspace ${workspace.id}`);
             select.append(option);
           }
-          const preferred = String(preferredId || '');
+          const preferred = String(preferredId || priorWorkspaceID || '');
           if (preferred && workspaces.some((workspace) => String(workspace.id) === preferred)) select.value = preferred;
           element('workspaceReady').hidden = false;
-          seedOrganizationFromWorkspace();
         }
         state.workspacesReady = true;
+        activateWorkspaceScope();
+        seedOrganizationFromWorkspace();
         await loadWorkspaceContext();
-        if (currentSession(sessionEpoch) && requestEpoch === state.workspacesEpoch && state.templates.length) restoreDraftForCurrentScope();
       } catch (error) {
         if (!currentSession(sessionEpoch) || requestEpoch !== state.workspacesEpoch) return;
         setNotice(element('workspaceError'), error.message || 'Could not load workspaces.', 'error');
@@ -1904,19 +2020,31 @@
         element('workspaceName').focus();
         return;
       }
+      const sessionEpoch = state.sessionEpoch;
+      const bearer = state.token;
+      const startWorkspaceScopeId = state.workspaceScopeId;
+      const startWorkspaceID = currentWorkspaceID();
+      const sessionCurrent = () => currentSession(sessionEpoch) && state.token === bearer;
+      const operationCurrent = () => sessionCurrent()
+        && state.workspaceScopeId === startWorkspaceScopeId
+        && currentWorkspaceID() === startWorkspaceID;
       const button = element('createWorkspaceButton');
       setBusy(button, true, 'Creating…', 'Create workspace');
       setNotice(element('createWorkspaceAlert'), '');
       try {
         const workspace = await api('/workspaces', { method: 'POST', body: { name, description } });
+        if (!operationCurrent()) return;
         element('workspaceName').value = '';
         element('workspaceDescription').value = '';
+        const createdID = workspace && workspace.id ? String(workspace.id) : '';
+        await loadWorkspaces(createdID);
+        if (!sessionCurrent() || !createdID || String(currentWorkspaceID()) !== createdID) return;
         setNotice(element('createWorkspaceAlert'), 'Workspace created.', 'success');
-        await loadWorkspaces(workspace && workspace.id ? workspace.id : '');
       } catch (error) {
+        if (!operationCurrent()) return;
         setNotice(element('createWorkspaceAlert'), error.message || 'Could not create the workspace.', 'error');
       } finally {
-        setBusy(button, false, 'Creating…', 'Create workspace');
+        if (operationCurrent()) setBusy(button, false, 'Creating…', 'Create workspace');
       }
     }
 
@@ -2073,6 +2201,7 @@
     function setComponentDocument(componentID, candidate, errorTarget) {
       try {
         state.componentDocuments[componentID] = validateComponentDocument(componentID, candidate);
+        state.starterCustomizationInteracted = true;
         if (errorTarget) {
           errorTarget.textContent = '';
           errorTarget.hidden = true;
@@ -2394,6 +2523,7 @@
       });
       advanced.append(summary, jsonInput, applyJSON);
       checkbox.addEventListener('change', () => {
+        state.starterComponentsInteracted = true;
         if (checkbox.checked) {
           if (!state.selectedComponentIds.includes(id)) state.selectedComponentIds.push(id);
         } else state.selectedComponentIds = state.selectedComponentIds.filter((entry) => entry !== id);
@@ -2444,6 +2574,7 @@
       const priorDocuments = cloneDocument(state.componentDocuments);
       if (priorTemplateID) saveComponentDraft();
       state.selectedTemplateId = templateID;
+      if (markDirty) state.starterTemplateInteracted = true;
       const template = selectedTemplate();
       const allowed = new Set(Array.isArray(template && template.allowedModules) ? template.allowedModules : []);
       const saved = readComponentDraft(templateID);
@@ -2745,6 +2876,10 @@
       const requestEpoch = ++state.domainEpoch;
       const previousID = String(state.domainClaim && state.domainClaim.id || '');
       state.domainLoadState = 'loading';
+      setBusy(element('claimDomainButton'), false, 'Creating…', 'Issue DNS proof');
+      setBusy(element('verifyDomainButton'), false, 'Verifying…', 'Verify DNS proof');
+      element('claimDomainButton').disabled = true;
+      element('verifyDomainButton').disabled = true;
       element('domainClaimsState').textContent = 'Loading real domain claims for this workspace…';
       element('domainClaimsState').hidden = false;
       element('retryDomainClaims').disabled = true;
@@ -2796,8 +2931,10 @@
       renderDomainPublications();
       element('domainProof').textContent = '';
       element('domainProof').hidden = true;
+      setBusy(element('claimDomainButton'), false, 'Creating…', 'Issue DNS proof');
+      element('claimDomainButton').disabled = !canPublishWorkspace();
+      setBusy(element('verifyDomainButton'), false, 'Verifying…', 'Verify DNS proof');
       element('verifyDomainButton').disabled = true;
-      element('claimDomainButton').textContent = 'Issue DNS proof';
       if (canPublishWorkspace()) element('domainClaimsState').textContent = 'Enter a new exact origin, or choose an existing claim above.';
       setNotice(element('domainStatus'), '');
       updateDeploymentAvailability();
@@ -3580,8 +3717,8 @@
         if (!operationCurrent()) return;
         setNotice(element('domainStatus'), error.message || 'Could not create the DNS proof.', 'error');
       } finally {
-        setBusy(button, false, 'Creating…', state.domainClaim && domainClaimLabel(state.domainClaim) === 'pending' ? 'Rotate DNS proof' : 'Issue DNS proof');
-        if (currentWorkspace(marker)) {
+        if (operationCurrent()) {
+          setBusy(button, false, 'Creating…', state.domainClaim && domainClaimLabel(state.domainClaim) === 'pending' ? 'Rotate DNS proof' : 'Issue DNS proof');
           renderWorkspaceAccess();
         }
       }
@@ -3631,8 +3768,8 @@
         if (!operationCurrent()) return;
         setNotice(element('domainStatus'), error.message || 'The DNS proof could not be verified yet.', 'error');
       } finally {
-        setBusy(button, false, 'Verifying…', 'Verify DNS proof');
-        if (currentWorkspace(marker)) {
+        if (operationCurrent()) {
+          setBusy(button, false, 'Verifying…', 'Verify DNS proof');
           renderWorkspaceAccess();
         }
       }
@@ -3779,6 +3916,7 @@
         return;
       }
       const marker = workspaceMarker();
+      const operationEpoch = ++state.invitationEpoch;
       const button = element('createInviteButton');
       setBusy(button, true, 'Creating…', 'Create invitation');
       try {
@@ -3795,7 +3933,7 @@
         if (!currentWorkspace(marker)) return;
         setNotice(element('inviteResult'), error.message || 'Invitation could not be created.', 'error');
       } finally {
-        if (currentWorkspace(marker)) {
+        if (operationEpoch === state.invitationEpoch && currentSession(marker.sessionEpoch) && marker.workspaceID === currentWorkspaceID()) {
           setBusy(button, false, 'Creating…', 'Create invitation');
           renderWorkspaceAccess();
         }
@@ -3809,23 +3947,32 @@
         return;
       }
       const sessionEpoch = state.sessionEpoch;
+      const bearer = state.token;
+      const startWorkspaceScopeId = state.workspaceScopeId;
+      const startWorkspaceID = currentWorkspaceID();
+      const operationEpoch = ++state.acceptanceEpoch;
+      const sessionCurrent = () => currentSession(sessionEpoch) && state.token === bearer;
+      const operationCurrent = () => sessionCurrent()
+        && operationEpoch === state.acceptanceEpoch
+        && state.workspaceScopeId === startWorkspaceScopeId
+        && currentWorkspaceID() === startWorkspaceID;
       const button = element('acceptInviteButton');
       setBusy(button, true, 'Joining…', 'Accept and join');
       try {
         const invitation = await api('/shura/v1/invitations/accept', { method: 'POST', body: { token } });
-        if (!currentSession(sessionEpoch)) return;
+        if (!operationCurrent()) return;
         state.invitations.unshift(invitation);
         element('acceptInviteToken').value = '';
         renderInvitations();
         setNotice(element('acceptInviteResult'), `Invitation accepted as ${invitation.role}. Loading workspace ${invitation.workspace_id}.`, 'success');
         await loadWorkspaces(invitation.workspace_id);
-        if (!currentSession(sessionEpoch)) return;
+        if (!sessionCurrent() || Number(invitation.workspace_id) !== currentWorkspaceID()) return;
         announce(`Joined workspace ${invitation.workspace_id} as ${invitation.role}.`);
       } catch (error) {
-        if (!currentSession(sessionEpoch)) return;
+        if (!operationCurrent()) return;
         setNotice(element('acceptInviteResult'), error.message || 'Invitation could not be accepted.', 'error');
       } finally {
-        if (currentSession(sessionEpoch)) setBusy(button, false, 'Joining…', 'Accept and join');
+        if (operationCurrent()) setBusy(button, false, 'Joining…', 'Accept and join');
       }
     }
 
@@ -4373,20 +4520,8 @@
     });
     element('createWorkspaceButton').addEventListener('click', createWorkspace);
     element('workspaceSelect').addEventListener('change', async () => {
+      activateWorkspaceScope();
       seedOrganizationFromWorkspace();
-      state.domainEpoch += 1;
-      state.domainPublicationEpoch += 1;
-      state.domainClaims = [];
-      state.domainPublications = [];
-      renderDomainClaims();
-      renderDomainPublications();
-      resetDomainClaim();
-      clearVerifiedPreviewForScope();
-      state.selectedTemplateId = '';
-      state.selectedComponentIds = [];
-      state.componentDocuments = {};
-      element('templateSelect').value = '';
-      restoreDraftForCurrentScope();
       await loadWorkspaceContext();
     });
     element('builderForm').addEventListener('submit', createPreview);

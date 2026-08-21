@@ -497,6 +497,12 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
   let failPeopleNext = false;
   let historyFailNext = false;
   let domainFailNext = false;
+  let delayDomainResponse = false;
+  let delayWorkspaceCreateResponse = false;
+  let delayScopeClaimResponse = false;
+  let delayInvitationResponse = false;
+  let delayAcceptanceResponse = false;
+  let delayScopePublicationResponse = false;
   let includeInapplicableNewest = false;
   let delayHistoryResponse = false;
   let delaySecondPrincipalHistory = false;
@@ -507,6 +513,8 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
   let delayPublicationRequest = false;
   const trackEvents = new Map();
   const extraTracks = new Map();
+  let workspaces = [{ id: 41, name: 'QA Community' }, { id: 42, name: 'QA Other Workspace' }];
+  let nextWorkspaceID = 43;
   let domainClaims = [
     { id: 'claim_browser', workspaceId: 41, origin: 'https://app.community.example', host: 'app.community.example', status: 'verified', challengeExpiresAt: '2099-08-17T00:00:00Z', verifiedAt: '2026-08-18T00:00:00Z', verificationExpiresAt: '2099-08-18T00:00:00Z', createdAt: '2026-08-18T00:00:00Z', updatedAt: '2026-08-18T00:00:00Z' },
     { id: 'claim_pending', workspaceId: 41, origin: 'https://pending.community.example', host: 'pending.community.example', status: 'pending', challengeExpiresAt: '2099-08-18T12:00:00Z', createdAt: '2026-08-18T00:10:00Z', updatedAt: '2026-08-18T00:10:00Z' },
@@ -583,13 +591,22 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       return json(200, { id: second ? 8 : 7, username: second ? 'Second Architect' : 'QA Architect', email: second ? 'second@example.test' : 'qa@example.test' });
     }
     if (record.method === 'GET' && record.path === '/api/workspaces') {
-      return json(200, { workspaces: [{ id: 41, name: 'QA Community' }, { id: 42, name: 'QA Other Workspace' }] });
+      return json(200, { workspaces });
     }
-    if (record.method === 'GET' && record.path === '/api/workspaces/41/people') {
-      if (delayPeopleResponse) {
-        delayPeopleResponse = false;
+    if (record.method === 'POST' && record.path === '/api/workspaces') {
+      const workspace = { id: nextWorkspaceID++, name: String(record.body?.name || 'Created workspace') };
+      workspaces = [...workspaces, workspace];
+      if (delayWorkspaceCreateResponse) {
+        delayWorkspaceCreateResponse = false;
         await wait(300);
       }
+      return json(201, workspace);
+    }
+    if (record.method === 'GET' && /^\/api\/workspaces\/\d+\/people$/u.test(record.path) && delayPeopleResponse) {
+      delayPeopleResponse = false;
+      await wait(300);
+    }
+    if (record.method === 'GET' && record.path === '/api/workspaces/41/people') {
       if (failPeopleNext) {
         failPeopleNext = false;
         return json(503, { error: { code: 'people_unavailable', message: 'Synthetic People interruption.' } });
@@ -603,6 +620,13 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       return json(200, { members: [
         { user_id: 7, username: 'QA Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
         { user_id: 8, username: 'Second Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
+      ] });
+    }
+    if (record.method === 'GET' && /^\/api\/workspaces\/\d+\/people$/u.test(record.path)) {
+      if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(401, { error: { code: 'unauthorized', message: 'Authentication required.' } });
+      const second = record.authorization === `Bearer ${secondToken}`;
+      return json(200, { members: [
+        { user_id: second ? 8 : 7, username: second ? 'Second Architect' : 'QA Architect', role: 'owner', joined_at: '2026-08-18T00:00:00Z' },
       ] });
     }
     if (record.method === 'GET' && record.path === '/api/templates') {
@@ -644,6 +668,10 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       const tracks = all.map((track) => ({ id: track.id, templateId: track.request?.templateId || '', status: track.status, version: track.version, updatedAt: track.updatedAt, previewPresent: Boolean(track.preview), artifactPresent: Boolean(track.artifact), publicationPresent: Boolean(track.publication), authorizationExpiresAt: track.preview?.authorizationExpiresAt }));
       return json(200, { tracks });
     }
+    if (record.method === 'GET' && /^\/api\/workspaces\/\d+\/domains$/u.test(record.path) && delayDomainResponse) {
+      delayDomainResponse = false;
+      await wait(300);
+    }
     if (record.method === 'GET' && record.path === '/api/workspaces/41/domains') {
       if (domainFailNext) {
         domainFailNext = false;
@@ -652,15 +680,39 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       return json(200, { claims: domainClaims });
     }
     if (record.method === 'GET' && record.path === '/api/workspaces/42/domains') return json(200, { claims: [] });
+    if (record.method === 'GET' && /^\/api\/workspaces\/\d+\/domains$/u.test(record.path)) {
+      if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(401, { error: { code: 'unauthorized', message: 'Authentication required.' } });
+      return json(200, { claims: [] });
+    }
     if (record.method === 'GET' && /^\/api\/workspaces\/41\/domains\/[^/]+\/publications$/u.test(record.path)) return json(200, { publications: domainPublications });
     if (record.method === 'POST' && record.path === '/api/workspaces/41/domains') {
       const claim = { id: 'claim_rotated', workspaceId: 41, origin: record.body.origin, host: new URL(record.body.origin).host, status: 'pending', challengeExpiresAt: '2099-08-18T12:00:00Z', createdAt: '2026-08-18T01:00:00Z', updatedAt: '2026-08-18T01:00:00Z' };
       domainClaims = [claim, ...domainClaims.filter((entry) => entry.origin !== claim.origin)];
-      if (delayClaimResponse) {
+      if (delayScopeClaimResponse) {
+        delayScopeClaimResponse = false;
+        await wait(800);
+      } else if (delayClaimResponse) {
         delayClaimResponse = false;
         await wait(180);
       }
       return json(201, { claim, verification: { recordType: 'TXT', recordName: `_taawun.${claim.host}`, value: 'taawun-verify=synthetic-new-proof', expiresAt: claim.challengeExpiresAt } });
+    }
+    if (record.method === 'POST' && record.path === '/api/shura/v1/invitations') {
+      if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(401, { error: { code: 'unauthorized', message: 'Authentication required.' } });
+      const invitation = { id: 'invitation_scope_race', workspace_id: Number(record.body?.workspace_id), invitee: String(record.body?.invitee || ''), role: String(record.body?.role || 'Viewer'), status: 'PENDING' };
+      if (delayInvitationResponse) {
+        delayInvitationResponse = false;
+        await wait(800);
+      }
+      return json(201, { invitation, token: 'session-only-scope-race-token' });
+    }
+    if (record.method === 'POST' && record.path === '/api/shura/v1/invitations/accept') {
+      if (![token, secondToken].some((value) => record.authorization === `Bearer ${value}`)) return json(401, { error: { code: 'unauthorized', message: 'Authentication required.' } });
+      if (delayAcceptanceResponse) {
+        delayAcceptanceResponse = false;
+        await wait(800);
+      }
+      return json(200, { id: 'invitation_accept_scope_race', workspace_id: 42, role: 'Viewer', status: 'ACCEPTED' });
     }
     if (record.method === 'GET' && /^\/api\/workspaces\/41\/domains\/[^/]+$/u.test(record.path)) {
       const claimID = record.path.split('/').at(-1);
@@ -722,7 +774,10 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     if (record.method === 'POST' && record.path === '/api/conductor/tracks/track_browser/publication' && activeTrackResponse) {
       Object.assign(activeTrackResponse.track, { status: 'PUBLICATION_REQUESTED', version: activeTrackResponse.track.version + 1, claimId: record.body.claimId, updatedAt: '2026-08-18T06:00:00Z' });
       trackEvents.set('track_browser', [...(trackEvents.get('track_browser') || []), { type: 'PUBLICATION_REQUESTED', toStatus: 'PUBLICATION_REQUESTED', trackVersion: activeTrackResponse.track.version, createdAt: '2026-08-18T06:00:00Z', detail: { secret: 'never-render-this-detail' } }]);
-      if (delayPublicationRequest) {
+      if (delayScopePublicationResponse) {
+        delayScopePublicationResponse = false;
+        await wait(800);
+      } else if (delayPublicationRequest) {
         delayPublicationRequest = false;
         await wait(180);
       }
@@ -1436,10 +1491,19 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.deepEqual(staleTrackBoundary, { srcdoc: null, manifestHidden: true, template: '', selected: 0, history: 0, recordHidden: true }, 'delayed prior-workspace track/history must not restore records, preview, or documents into another workspace');
     await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '41'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '41' && document.querySelector('#templateSelect').value === 'community-iftar' && document.querySelectorAll('#moduleList input:checked').length === 3`), 'component draft workspace recovery');
-    await evaluate(client, `document.querySelector('#loadTrackButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Architect' && !document.querySelector('#loadTrackButton').disabled`), 'workspace access recovery before build inspection');
+    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Verified staging ready'
+      && document.querySelector('#previewFrame').dataset.stale === 'false'
+      && document.querySelector('#starterRecoveryState').textContent.includes('Exact workspace-bound signed preview verified; durable history confirmed')
+      && document.querySelector('#buildHistoryState').textContent.includes('Exact verified preview track track_browser is confirmed')
+      && document.querySelector('#domainClaimSelect').value === 'claim_browser'
+      && !document.querySelector('#deployButton').disabled`), 'automatic selected or newest verified recovery after workspace return');
+    const automaticRecoveryPreviewReads = requests.filter((item) => item.path === '/api/conductor/tracks/track_browser' && item.search === '?includeVerifiedPreview=true').length;
+    assert.deepEqual(await evaluate(client, `({ appName: document.querySelector('#appName').value, organization: document.querySelector('#organizationName').value, city: document.querySelector('#city').value })`), { appName: 'Community app', organization: 'QA Community', city: '' }, 'workspace return restores only scoped component documents, not prior app identity or city');
+    assert.equal(await evaluate(client, `document.querySelector('#trackLookup').value`), '', 'workspace return must not restore an opaque track reference');
+    await evaluate(client, `(() => { document.querySelector('#trackLookup').value = 'track_browser'; document.querySelector('#loadTrackButton').click(); })()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#buildRecord').hidden && document.querySelector('#buildRecordTrackID').value === 'track_browser'`), 'build inspect after workspace return');
-    await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
-    await waitFor(() => evaluate(client, `document.querySelector('#previewFrame').dataset.stale === 'false'`), 'verified track after workspace return');
+    assert.equal(requests.filter((item) => item.path === '/api/conductor/tracks/track_browser' && item.search === '?includeVerifiedPreview=true').length, automaticRecoveryPreviewReads, 'plain build inspection must not issue a redundant verified-preview read after automatic recovery');
     await waitFor(() => evaluate(client, `document.querySelector('#domainClaimSelect').value === 'claim_browser' && !document.querySelector('#deployButton').disabled`), 'reloaded domain claim is ready for the exact signed origin');
 
     delayPublicationRequest = true;
@@ -1451,7 +1515,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     await waitFor(() => evaluate(client, `!document.querySelector('#deployButton').disabled`), 'publication claim reset');
 
     delayPublicationRequest = true;
-    await evaluate(client, `(() => { document.querySelector('#deployButton').click(); const input = document.querySelector('#appName'); input.value = 'Newer same-workspace preview'; input.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#builderForm').requestSubmit(); })()`);
+    await evaluate(client, `(() => { document.querySelector('#deployButton').click(); for (const [id, value] of [['appName', 'Newer same-workspace preview'], ['organizationName', 'QA Community'], ['city', 'Salt Lake City']]) { const input = document.querySelector('#' + id); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); } document.querySelector('#builderForm').requestSubmit(); })()`);
     assert.equal(await evaluate(client, `document.querySelector('.sample-title').textContent`), 'Newer same-workspace preview', 'vanilla app-name sync remains live after a previously verified preview becomes a newer draft');
     await waitFor(() => evaluate(client, `document.querySelector('#previewLoading').hidden && document.querySelector('#builderAlert').textContent.includes('last verified preview was retained')`), 'newer same-workspace preview generation');
     await wait(240);
@@ -1582,10 +1646,13 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
 
     await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '41'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '41' && document.querySelector('#templateSelect').value === 'bazaar-cooperative' && document.querySelectorAll('#moduleList input:checked').length === 2 && document.querySelector('#domainClaimSelect').value === 'claim_browser'`), 'second template scoped draft and domain recovery');
-    const secondTemplateRequestIndex = requests.filter((item) => item.path === '/api/artifacts/preview').length;
+    assert.deepEqual(await evaluate(client, `({ appName: document.querySelector('#appName').value, organization: document.querySelector('#organizationName').value, city: document.querySelector('#city').value })`), { appName: 'Community app', organization: 'QA Community', city: '' }, 'second template return does not restore broader app identity or city');
+    await evaluate(client, `(() => { for (const [id, value] of [['appName', 'Bazaar cooperative app'], ['organizationName', 'QA Community'], ['city', 'Salt Lake City']]) { const input = document.querySelector('#' + id); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); } })()`);
+    const secondTemplateRequestIndex = requests.filter((item) => item.method === 'POST' && item.path === '/api/artifacts/preview').length;
     await evaluate(client, `document.querySelector('#builderForm').requestSubmit()`);
-    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Verified staging ready' && document.querySelector('#previewFrame').dataset.stale === 'false'`), 'second real template signed build');
-    const secondTemplateRequest = requests.filter((item) => item.path === '/api/artifacts/preview')[secondTemplateRequestIndex];
+    await waitFor(() => requests.filter((item) => item.method === 'POST' && item.path === '/api/artifacts/preview').length === secondTemplateRequestIndex + 1, 'second real template preview request');
+    await waitFor(() => evaluate(client, `document.querySelector('#previewLoading').hidden && document.querySelector('#previewStatus').textContent === 'Verified staging ready' && document.querySelector('#previewFrame').dataset.stale === 'false' && document.querySelector('#builderAlert').textContent.includes('Exact workspace-bound signed preview verified')`), 'second real template signed build');
+    const secondTemplateRequest = requests.filter((item) => item.method === 'POST' && item.path === '/api/artifacts/preview')[secondTemplateRequestIndex];
     assert.equal(secondTemplateRequest.body.templateId, 'bazaar-cooperative');
     assert.deepEqual(secondTemplateRequest.body.modules, ['announcements', 'donation-campaign']);
     assert.equal(await evaluate(client, `[...document.querySelectorAll('#manifestList .manifest-row')].find((row) => row.querySelector('dt').textContent === 'Template').querySelector('dd').textContent`), 'bazaar-cooperative · v1.0.0', 'the receipt must bind the second real template');
@@ -1613,7 +1680,235 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       && document.querySelector('#starterRecoveryState').textContent.includes('Exact workspace-bound signed preview verified; durable history confirmed')`), 'second principal authorized signed-history recovery');
     const secondPrincipalRequests = requests.slice(secondPrincipalRequestStart);
     assert.equal(secondPrincipalRequests.filter((item) => item.method === 'GET' && item.path === '/api/conductor/tracks/track_browser' && item.search === '?includeVerifiedPreview=true' && item.authorization === `Bearer ${secondToken}`).length, 1, 'the new principal performs one independently authorized verified-track reopen');
-    assert.deepEqual(await evaluate(client, `({ manifestHidden: document.querySelector('#manifestList').hidden, template: document.querySelector('#templateSelect').value, selected: document.querySelectorAll('#moduleList input:checked').length })`), { manifestHidden: false, template: '', selected: 0 }, 'authorized recovery restores trusted evidence without copying another principal\'s local component draft');
+    assert.deepEqual(await evaluate(client, `({ manifestHidden: document.querySelector('#manifestList').hidden, template: document.querySelector('#templateSelect').value, selected: document.querySelectorAll('#moduleList input:checked').length, starterSummary: document.querySelector('#starterPathStatus').textContent, announcement: document.querySelector('#workspaceAnnouncer').textContent })`), { manifestHidden: false, template: '', selected: 0, starterSummary: '', announcement: '' }, 'authorized recovery restores trusted evidence without copying another principal\'s local draft, starter milestone, or announcement');
+
+    Object.assign(activeTrackResponse.track, { status: 'PREVIEW_READY', version: 6, claimId: '', publication: undefined, updatedAt: '2026-08-18T07:00:00Z' });
+    await evaluate(client, `document.querySelector('#openNewestBuildButton').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#previewStatus').textContent === 'Verified staging ready' && !document.querySelector('#deployButton').disabled`), 'scope-race publication precondition');
+    delayTrackResponse = true;
+    delayScopeClaimResponse = true;
+    delayInvitationResponse = true;
+    delayAcceptanceResponse = true;
+    delayScopePublicationResponse = true;
+    const delayedCreateBoundaryStart = requests.length;
+    await evaluate(client, `(() => {
+      document.querySelector('#deployButton').click();
+      document.querySelector('#openNewestBuildButton').click();
+      const origin = document.querySelector('#domainOrigin');
+      origin.value = 'https://scope-race.community.example';
+      origin.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector('#claimDomainButton').click();
+      document.querySelector('#invitee').value = 'scope-race@example.test';
+      document.querySelector('#createInviteButton').click();
+      document.querySelector('#acceptInviteToken').value = 'pending-scope-acceptance-token';
+      document.querySelector('#acceptInviteButton').click();
+    })()`);
+    await waitFor(() => requests.slice(delayedCreateBoundaryStart).some((item) => item.path === '/api/conductor/tracks/track_browser')
+      && requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'POST' && item.path === '/api/workspaces/41/domains')
+      && requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'POST' && item.path === '/api/shura/v1/invitations')
+      && requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'POST' && item.path === '/api/shura/v1/invitations/accept')
+      && requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'POST' && item.path === '/api/conductor/tracks/track_browser/publication'), 'delayed track, domain, invitation, acceptance, and publication operations before workspace creation');
+    delayPeopleResponse = true;
+    delayHistoryResponse = true;
+    delayDomainResponse = true;
+    await evaluate(client, `(() => {
+      document.querySelector('#retryPeople').click();
+      document.querySelector('#retryBuildHistory').click();
+      document.querySelector('#retryDomainClaims').click();
+    })()`);
+    await waitFor(() => requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'GET' && item.path === '/api/workspaces/41/people')
+      && requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'GET' && item.path === '/api/conductor/tracks' && item.search.includes('workspaceId=41'))
+      && requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'GET' && item.path === '/api/workspaces/41/domains'), 'all three delayed workspace A evidence loaders were launched before creation');
+    await evaluate(client, `(() => {
+      document.querySelector('#inviteTokenOutput').value = 'old-workspace-session-token';
+      document.querySelector('#inviteGrant').hidden = false;
+      document.querySelector('#acceptInviteToken').value = 'old-workspace-acceptance-token';
+      document.querySelector('#acceptInviteResult').textContent = 'Old workspace acceptance pending retry.';
+      document.querySelector('#acceptInviteResult').hidden = false;
+      document.querySelector('#inviteResult').textContent = 'Old workspace invitation pending retry.';
+      document.querySelector('#inviteResult').hidden = false;
+      document.querySelector('#builderAlert').textContent = 'Old workspace build retry pending.';
+      document.querySelector('#builderAlert').hidden = false;
+      document.querySelector('#workspaceAnnouncer').textContent = 'Old workspace announcement.';
+      document.querySelector('#workspaceName').value = 'Fresh Scope B';
+      document.querySelector('#workspaceDescription').value = 'Created through the cockpit.';
+      document.querySelector('#createWorkspaceButton').click();
+    })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '43'
+      && document.querySelector('#workspaceRole').textContent === 'Architect'
+      && document.querySelector('#buildHistoryState').textContent.includes('No workspace build records yet')`), 'create-workspace selects its exact new authorized scope');
+    await wait(380);
+    assert.deepEqual(await evaluate(client, `({
+      workspace: document.querySelector('#workspaceSelect').value,
+      template: document.querySelector('#templateSelect').value,
+      selected: document.querySelectorAll('#moduleList input:checked').length,
+      componentEditors: document.querySelectorAll('#moduleList .component-editor').length,
+      starter: document.querySelector('#starterPathStatus').textContent,
+      appName: document.querySelector('#appName').value,
+      organization: document.querySelector('#organizationName').value,
+      city: document.querySelector('#city').value,
+      madhhab: document.querySelector('#madhhab').value,
+      accent: document.querySelector('#accentColor').value.toUpperCase(),
+      accentHex: document.querySelector('#accentHex').value,
+      brief: document.querySelector('#buildBrief').value,
+      srcdoc: document.querySelector('#previewFrame').getAttribute('srcdoc'),
+      manifestHidden: document.querySelector('#manifestList').hidden,
+      trackLookup: document.querySelector('#trackLookup').value,
+      recordHidden: document.querySelector('#buildRecord').hidden,
+      historyRecords: document.querySelectorAll('#buildHistoryList li').length,
+      domainSelection: document.querySelector('#domainClaimSelect').value,
+      domainOrigin: document.querySelector('#domainOrigin').value,
+      inviteToken: document.querySelector('#inviteTokenOutput').value,
+      inviteHidden: document.querySelector('#inviteGrant').hidden,
+      acceptToken: document.querySelector('#acceptInviteToken').value,
+      acceptResult: document.querySelector('#acceptInviteResult').textContent,
+      inviteRecords: document.querySelectorAll('#invitationList li').length,
+      builderAlert: document.querySelector('#builderAlert').textContent,
+      announcement: document.querySelector('#workspaceAnnouncer').textContent,
+      previewLabel: document.querySelector('#previewButton').textContent,
+      previewStatus: document.querySelector('#previewStatus').textContent,
+      claimLabel: document.querySelector('#claimDomainButton').textContent,
+      claimBusy: document.querySelector('#claimDomainButton').getAttribute('aria-busy'),
+      verifyLabel: document.querySelector('#verifyDomainButton').textContent,
+      verifyBusy: document.querySelector('#verifyDomainButton').getAttribute('aria-busy'),
+      inviteLabel: document.querySelector('#createInviteButton').textContent,
+      inviteBusy: document.querySelector('#createInviteButton').getAttribute('aria-busy'),
+      acceptLabel: document.querySelector('#acceptInviteButton').textContent,
+      acceptBusy: document.querySelector('#acceptInviteButton').getAttribute('aria-busy'),
+      deployLabel: document.querySelector('#deployButton').textContent,
+      deployBusy: document.querySelector('#deployButton').getAttribute('aria-busy'),
+      deployDisabled: document.querySelector('#deployButton').disabled,
+    })`), {
+      workspace: '43', template: '', selected: 0, componentEditors: 0,
+      starter: '0 of 5 signed starter checks complete. Choose a template.',
+      appName: 'Community app', organization: 'Fresh Scope B', city: '', madhhab: 'hanafi', accent: '#57A68E', accentHex: '#57A68E', brief: '',
+      srcdoc: null, manifestHidden: true, trackLookup: '', recordHidden: true, historyRecords: 0, domainSelection: '', domainOrigin: '',
+      inviteToken: '', inviteHidden: true, acceptToken: '', acceptResult: '', inviteRecords: 0, builderAlert: '', announcement: '',
+      previewLabel: 'Create staging preview', previewStatus: 'Waiting for build',
+      claimLabel: 'Issue DNS proof', claimBusy: 'false', verifyLabel: 'Verify DNS proof', verifyBusy: 'false', inviteLabel: 'Create invitation', inviteBusy: 'false',
+      acceptLabel: 'Accept and join', acceptBusy: 'false', deployLabel: 'Publish verified domain', deployBusy: 'false', deployDisabled: true,
+    }, 'created workspace starts with exact defaults and no prior draft, starter, trusted evidence, track, domain, invitation, retry, or live-region state');
+    assert.equal(await evaluate(client, `[...Array(sessionStorage.length)].map((_, index) => sessionStorage.key(index)).some((key) => key.includes(':8:43'))`), false, 'the created workspace has no fabricated local component-draft key');
+    assert.ok(requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'GET' && item.path === '/api/workspaces/41/people'), 'the prior workspace People request was in flight');
+    assert.ok(requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'GET' && item.path === '/api/conductor/tracks' && item.search.includes('workspaceId=41')), 'the prior workspace history request was in flight');
+    assert.ok(requests.slice(delayedCreateBoundaryStart).some((item) => item.method === 'GET' && item.path === '/api/workspaces/41/domains'), 'the prior workspace domain request was in flight');
+    await evaluate(client, `(() => {
+      const claim = document.querySelector('#claimDomainButton'); claim.textContent = 'Workspace B claim operation'; claim.setAttribute('aria-busy', 'true'); claim.disabled = true;
+      const invite = document.querySelector('#createInviteButton'); invite.textContent = 'Workspace B invite operation'; invite.setAttribute('aria-busy', 'true'); invite.disabled = true;
+      const accept = document.querySelector('#acceptInviteButton'); accept.textContent = 'Workspace B acceptance operation'; accept.setAttribute('aria-busy', 'true'); accept.disabled = true;
+      const deploy = document.querySelector('#deployButton'); deploy.textContent = 'Workspace B publication operation'; deploy.setAttribute('aria-busy', 'true'); deploy.disabled = true;
+    })()`);
+    await wait(500);
+    assert.deepEqual(await evaluate(client, `({ workspace: document.querySelector('#workspaceSelect').value, claim: document.querySelector('#claimDomainButton').textContent, claimBusy: document.querySelector('#claimDomainButton').getAttribute('aria-busy'), invite: document.querySelector('#createInviteButton').textContent, inviteBusy: document.querySelector('#createInviteButton').getAttribute('aria-busy'), accept: document.querySelector('#acceptInviteButton').textContent, acceptBusy: document.querySelector('#acceptInviteButton').getAttribute('aria-busy'), acceptToken: document.querySelector('#acceptInviteToken').value, acceptResult: document.querySelector('#acceptInviteResult').textContent, inviteRecords: document.querySelectorAll('#invitationList li').length, deploy: document.querySelector('#deployButton').textContent, deployBusy: document.querySelector('#deployButton').getAttribute('aria-busy') })`), { workspace: '43', claim: 'Workspace B claim operation', claimBusy: 'true', invite: 'Workspace B invite operation', inviteBusy: 'true', accept: 'Workspace B acceptance operation', acceptBusy: 'true', acceptToken: '', acceptResult: '', inviteRecords: 0, deploy: 'Workspace B publication operation', deployBusy: 'true' }, 'late workspace A mutation finalizers cannot select another workspace, append invitations, or relabel/reset workspace B controls');
+
+    await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '41'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '41'
+      && document.querySelector('#previewStatus').textContent === 'Verified staging ready'
+      && document.querySelector('#starterRecoveryState').textContent.includes('durable history confirmed')`), 'return to signed workspace derives progress only from authorized verified history');
+
+    await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '42'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '42'
+      && document.querySelector('#workspaceRole').textContent === 'Architect'
+      && document.querySelector('#buildHistoryState').textContent.includes('No workspace build records yet')`), 'local-draft source workspace');
+    await evaluate(client, `(() => {
+      const template = document.querySelector('#templateSelect');
+      template.value = 'community-iftar';
+      template.dispatchEvent(new Event('change', { bubbles: true }));
+      document.querySelector('#moduleList input[value="announcements"]').click();
+      const title = document.querySelector('[data-component-id="announcements"] .component-fields .field input');
+      title.value = 'Workspace 42 exact local draft';
+      title.dispatchEvent(new Event('input', { bubbles: true }));
+      for (const [id, value] of [['appName', 'Workspace 42 app'], ['organizationName', 'Workspace 42 organization'], ['city', 'Ogden']]) {
+        const input = document.getElementById(id); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#starterPathStatus').textContent.includes('3 of 5')
+      && document.querySelector('[data-component-id="announcements"] .component-fields .field input').value === 'Workspace 42 exact local draft'`), 'validated workspace-scoped local draft before cockpit creation');
+    delayPeopleResponse = true;
+    delayHistoryResponse = true;
+    delayDomainResponse = true;
+    await evaluate(client, `(() => {
+      document.querySelector('#retryPeople').click();
+      document.querySelector('#inviteTokenOutput').value = 'workspace-42-session-token';
+      document.querySelector('#inviteGrant').hidden = false;
+      document.querySelector('#workspaceAnnouncer').textContent = 'Workspace 42 stale announcement.';
+      document.querySelector('#workspaceName').value = 'Fresh Scope C';
+      document.querySelector('#createWorkspaceButton').click();
+    })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '44'
+      && document.querySelector('#workspaceRole').textContent === 'Architect'
+      && document.querySelector('#starterPathStatus').textContent.startsWith('0 of 5')`), 'second create-workspace boundary starts blank');
+    await wait(380);
+    assert.deepEqual(await evaluate(client, `({ template: document.querySelector('#templateSelect').value, selected: document.querySelectorAll('#moduleList input:checked').length, appName: document.querySelector('#appName').value, organization: document.querySelector('#organizationName').value, city: document.querySelector('#city').value, domainOrigin: document.querySelector('#domainOrigin').value, inviteToken: document.querySelector('#inviteTokenOutput').value, announcement: document.querySelector('#workspaceAnnouncer').textContent })`), { template: '', selected: 0, appName: 'Community app', organization: 'Fresh Scope C', city: '', domainOrigin: '', inviteToken: '', announcement: '' }, 'created workspace cannot inherit broader builder, domain, invitation, or announcement state');
+
+    await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '42'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '42'
+      && document.querySelector('#workspaceRole').textContent === 'Architect'
+      && document.querySelector('#templateSelect').value === 'community-iftar'
+      && document.querySelector('[data-component-id="announcements"] .component-fields .field input').value === 'Workspace 42 exact local draft'`), 'only the exact workspace-scoped validated local component draft restores');
+    assert.deepEqual(await evaluate(client, `({
+      selected: [...document.querySelectorAll('#moduleList input:checked')].map((input) => input.value),
+      starter: document.querySelector('#starterPathStatus').textContent,
+      completed: [...document.querySelectorAll('#signedStarterPath [data-complete]')].map((step) => step.dataset.complete),
+      appName: document.querySelector('#appName').value,
+      organization: document.querySelector('#organizationName').value,
+      city: document.querySelector('#city').value,
+      srcdoc: document.querySelector('#previewFrame').getAttribute('srcdoc'),
+      manifestHidden: document.querySelector('#manifestList').hidden,
+      inviteHidden: document.querySelector('#inviteGrant').hidden,
+    })`), {
+      selected: ['announcements'], starter: '0 of 5 signed starter checks complete. Confirm restored template.',
+      completed: ['false', 'false', 'false', 'false', 'false'], appName: 'Community app', organization: 'QA Other Workspace', city: '',
+      srcdoc: null, manifestHidden: true, inviteHidden: true,
+    }, 'restored local draft remains editable but cannot restore starter milestones, identity, receipt, or invitation state without authorized server history');
+    const restoredDocumentBeforeConfirmation = await evaluate(client, `document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value`);
+    for (const [expectedCount, expectedAction] of [[1, 'Confirm restored components'], [2, 'Confirm restored customization'], [3, 'Complete app details']]) {
+      await evaluate(client, `document.querySelector('#starterPrimaryButton').click()`);
+      await waitFor(() => evaluate(client, `document.querySelector('#starterPathStatus').textContent.startsWith('${expectedCount} of 5') && document.querySelector('#starterPrimaryButton').textContent === ${JSON.stringify(expectedAction)}`), `explicit restored-draft confirmation ${expectedCount}`);
+      assert.equal(await evaluate(client, `document.querySelector('[data-component-id="announcements"] .advanced-document textarea').value`), restoredDocumentBeforeConfirmation, `restored-draft confirmation ${expectedCount} must not switch templates or rewrite exact documents`);
+    }
+    assert.deepEqual(await evaluate(client, `({ template: document.querySelector('#templateSelect').value, selected: [...document.querySelectorAll('#moduleList input:checked')].map((input) => input.value), title: document.querySelector('[data-component-id="announcements"] .component-fields .field input').value })`), { template: 'community-iftar', selected: ['announcements'], title: 'Workspace 42 exact local draft' }, 'three intentional confirmation controls advance only current-scope starter guidance without discarding the validated local draft');
+
+    await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '44'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '44' && document.querySelector('#workspaceRole').textContent === 'Architect'`), 'created workspace selected before deletion fallback');
+    await evaluate(client, `(() => { document.querySelector('#builderAlert').textContent = 'Deleted workspace pending retry.'; document.querySelector('#builderAlert').hidden = false; document.querySelector('#workspaceAnnouncer').textContent = 'Deleted workspace announcement.'; })()`);
+    workspaces = workspaces.filter((workspace) => workspace.id !== 44);
+    await evaluate(client, `document.querySelector('#retryWorkspaces').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '41'
+      && document.querySelector('#workspaceRole').textContent === 'Architect'
+      && document.querySelector('#previewStatus').textContent === 'Verified staging ready'`), 'deleted selection falls back through the same fail-closed scope boundary');
+    assert.deepEqual(await evaluate(client, `({ builderAlert: document.querySelector('#builderAlert').textContent, announcement: document.querySelector('#workspaceAnnouncer').textContent, starterSummary: document.querySelector('#starterPathStatus').textContent, inviteToken: document.querySelector('#inviteTokenOutput').value })`), { builderAlert: '', announcement: '', starterSummary: '', inviteToken: '' }, 'fallback selection clears deleted-workspace retry, announcement, starter, and invitation state before authorized history recovery');
+
+    delayWorkspaceCreateResponse = true;
+    const samePrincipalCreateStart = requests.length;
+    await evaluate(client, `(() => { document.querySelector('#workspaceName').value = 'Stale same-principal workspace'; document.querySelector('#createWorkspaceButton').click(); })()`);
+    await waitFor(() => requests.slice(samePrincipalCreateStart).some((item) => item.method === 'POST' && item.path === '/api/workspaces'), 'delayed create before same-principal scope switch');
+    await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '43'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '43' && document.querySelector('#workspaceRole').textContent === 'Architect'`), 'newer same-principal workspace selection');
+    await wait(380);
+    assert.deepEqual(await evaluate(client, `({ workspace: document.querySelector('#workspaceSelect').value, createAlert: document.querySelector('#createWorkspaceAlert').textContent, createLabel: document.querySelector('#createWorkspaceButton').textContent, createBusy: document.querySelector('#createWorkspaceButton').getAttribute('aria-busy') })`), { workspace: '43', createAlert: '', createLabel: 'Create workspace', createBusy: 'false' }, 'a delayed create response cannot select its created workspace or reset controls after a newer same-principal scope selection');
+    await evaluate(client, `(() => { const select = document.querySelector('#workspaceSelect'); select.value = '41'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#workspaceSelect').value === '41' && document.querySelector('#workspaceRole').textContent === 'Architect'`), 'signed workspace restored after same-principal create race');
+
+    delayWorkspaceCreateResponse = true;
+    const delayedWorkspaceCreateStart = requests.length;
+    await evaluate(client, `(() => { document.querySelector('#workspaceName').value = 'Stale principal workspace'; document.querySelector('#createWorkspaceButton').click(); })()`);
+    await waitFor(() => requests.slice(delayedWorkspaceCreateStart).some((item) => item.method === 'POST' && item.path === '/api/workspaces'), 'delayed create-workspace request before principal switch');
+    await evaluate(client, `document.querySelector('#logoutButton').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#authView').hidden && !document.querySelector('#createWorkspaceButton').disabled`), 'logout resets the pending create-workspace control');
+    const postLogoutRequestStart = requests.length;
+    await evaluate(client, `(() => {
+      for (const [id, value] of [['loginEmail', 'qa@example.test'], ['loginPassword', 'correct horse battery staple']]) {
+        const input = document.getElementById(id); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      document.querySelector('#loginForm').requestSubmit();
+    })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#profileName').textContent === 'QA Architect'
+      && document.querySelector('#workspaceSelect').value === '41'
+      && document.querySelector('#workspaceRole').textContent === 'Architect'`), 'new principal establishes its own workspace scope while old creation is pending');
+    await wait(380);
+    assert.deepEqual(await evaluate(client, `({ workspace: document.querySelector('#workspaceSelect').value, profile: document.querySelector('#profileName').textContent, workspaceName: document.querySelector('#workspaceName').value, createAlert: document.querySelector('#createWorkspaceAlert').textContent, announcement: document.querySelector('#workspaceAnnouncer').textContent })`), { workspace: '41', profile: 'QA Architect', workspaceName: '', createAlert: '', announcement: '' }, 'a delayed create response cannot select a workspace or write UI state into a new principal session');
+    assert.equal(requests.slice(postLogoutRequestStart).filter((item) => item.method === 'GET' && item.path === '/api/workspaces').length, 1, 'the stale create response cannot trigger a second preferred-workspace reload in the new session');
   } finally {
     await closeChromium(chromium, 'component-journey');
     server.closeAllConnections?.();
