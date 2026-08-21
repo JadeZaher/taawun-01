@@ -268,6 +268,39 @@ test('cockpit inline modules parse before they are embedded in the server binary
   assert.doesNotThrow(() => new vm.Script(modules[0][1], { filename: 'index.html:inline-module' }));
 });
 
+test('public landing exposes aligned, truthful search metadata and crawl guidance', async () => {
+  const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const robots = await readFile(new URL('./robots.txt', import.meta.url), 'utf8');
+  const sitemap = await readFile(new URL('./sitemap.xml', import.meta.url), 'utf8');
+  const title = html.match(/<title>([^<]+)<\/title>/u)?.[1] || '';
+  const description = html.match(/<meta name="description" content="([^"]+)">/u)?.[1] || '';
+  const structuredSource = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/u)?.[1] || '';
+  const structured = JSON.parse(structuredSource);
+
+  assert.equal(title, 'Community Page Builder for Muslim Organizations | Taawun');
+  assert.ok(title.length <= 60, `title should remain concise: ${title.length}`);
+  assert.ok(description.length > 100 && description.length <= 160, `description should be useful and concise: ${description.length}`);
+  assert.match(description, /mosques, charities and Muslim groups/iu);
+  assert.match(html, /<link rel="canonical" href="https:\/\/taawun-production\.up\.railway\.app\/">/u);
+  assert.match(html, /<meta property="og:title" content="Community Page Builder for Muslim Organizations \| Taawun">/u);
+  assert.match(html, /<meta name="twitter:card" content="summary">/u);
+  assert.match(html, /id="authPanel"[^>]*data-nosnippet/u);
+  assert.match(html, /id="appView"[\s\S]*?hidden[\s\S]*?data-nosnippet/u);
+  assert.equal(structured['@type'], 'WebSite');
+  assert.equal(structured.name, 'Taawun');
+  assert.equal(structured.url, 'https://taawun-production.up.railway.app/');
+  assert.match(structured.description || '', /private-beta community page builder.*protected private previews/iu);
+  assert.doesNotMatch(structuredSource, /"(?:aggregateRating|review|offers?|price(?:Currency)?)"\s*:/iu);
+  assert.match(robots, /Disallow: \/api\//u);
+  assert.match(robots, /Sitemap: https:\/\/taawun-production\.up\.railway\.app\/sitemap\.xml/u);
+  assert.match(sitemap, /<loc>https:\/\/taawun-production\.up\.railway\.app\/<\/loc>/u);
+  assert.doesNotMatch(html, /<script[^>]+src="https?:\/\/|<link[^>]+rel="stylesheet"[^>]+href="https?:\/\//iu);
+  assert.match(html, /private preview/iu);
+  assert.match(html, /does not hold funds or settle payments/iu);
+  assert.match(html, /not religious rulings|not religious determinations/iu);
+  assert.doesNotMatch(html, /Taawun is Shariah[- ]certified|scholar[- ]approved (?:platform|software)|launch your app today|start free/iu);
+});
+
 test('publication expiry and successor trust stay server-clock and principal bound', async () => {
   const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const publicationClock = html.match(/function normalizePublicationContextEnvelope[\s\S]*?(?=\n\s*function resetPublicationContextUI)/u)?.[0] || '';
@@ -308,10 +341,10 @@ test('bounded UI safety mutations stay self/workspace scoped and version guarded
   const accountLifecycle = html.match(/function accountMarker[\s\S]*?(?=\n\s*const authTabs)/u)?.[0] || '';
 
   assert.doesNotMatch(html, /Enter the builder/u);
-  assert.match(html, /Create a community app/u);
-  assert.match(html, /Organize people and decisions/u);
-  assert.match(html, /Preview before sharing/u);
-  assert.match(html, /Reuse trusted templates/u);
+  assert.match(html, /Events and registrations/u);
+  assert.match(html, /Community information/u);
+  assert.match(html, /People and decisions/u);
+  assert.match(html, /Cooperative planning/u);
   assert.match(html, /id="revokeDomainButton"[^>]*>Revoke domain</u);
   assert.match(memberRemoval, /\/workspaces\/\$\{action\.marker\.workspaceID\}\/users\/\$\{action\.userID\}/u);
   assert.match(html, /Number\(member\.user_id\) !== principalID\(\)/u);
@@ -392,6 +425,10 @@ test('mobile auth shell preserves its value and custody explanation with accessi
         loginPanelRole: document.querySelector('#loginForm').getAttribute('role'),
         registerPanelRole: document.querySelector('#registerForm').getAttribute('role'),
         passwordDescription: document.querySelector('#registerPassword').getAttribute('aria-describedby'),
+        h1Text: document.querySelector('#authView h1')?.innerText.trim(),
+        navTargetsValid: [...document.querySelectorAll('.landing-nav a[href^="#"]')].every((link) => Boolean(document.querySelector(link.hash))),
+        mainSectionCount: document.querySelectorAll('#authView > section').length,
+        authNoSnippet: document.querySelector('#authPanel').hasAttribute('data-nosnippet'),
       };
     })()`);
     assert.deepEqual(semantics, {
@@ -403,6 +440,10 @@ test('mobile auth shell preserves its value and custody explanation with accessi
       loginPanelRole: 'tabpanel',
       registerPanelRole: 'tabpanel',
       passwordDescription: 'registerPasswordHelp',
+      h1Text: 'Build a trusted community page—together.',
+      navTargetsValid: true,
+      mainSectionCount: 9,
+      authNoSnippet: true,
     });
 
     await evaluate(client, `document.querySelector('#skipLink').focus()`);
@@ -433,6 +474,11 @@ test('mobile auth shell preserves its value and custody explanation with accessi
     assert.equal(await evaluate(client, `document.activeElement?.id`), 'loginTab');
     assert.equal(await evaluate(client, `document.querySelector('#loginForm').hidden`), false);
 
+    await evaluate(client, `document.querySelector('#landingRegisterButton').click()`);
+    await waitFor(() => evaluate(client, `document.activeElement?.id === 'registerUsername' && !document.querySelector('#registerForm').hidden`), 'landing register CTA');
+    await evaluate(client, `document.querySelector('#landingLoginButton').click()`);
+    await waitFor(() => evaluate(client, `document.activeElement?.id === 'loginEmail' && !document.querySelector('#loginForm').hidden`), 'landing sign-in CTA');
+
     for (const width of [320, 400]) {
       for (const scale of [1, 2]) {
         const layoutWidth = Math.round(width / scale);
@@ -461,13 +507,13 @@ test('mobile auth shell preserves its value and custody explanation with accessi
             layoutWidth: window.innerWidth,
             visibleH1s: [...document.querySelectorAll('h1')].filter((heading) => !heading.closest('[hidden]') && getComputedStyle(heading).display !== 'none').length,
             outcomes: document.querySelectorAll('.auth-outcome').length,
-            controlHeights: ['landingRegisterButton', 'landingLoginButton', 'loginTab', 'registerTab', 'loginEmail', 'loginPassword'].map((id) => Math.round(document.getElementById(id).getBoundingClientRect().height)),
+            controlHeights: ['skipLink', 'landingBrand', 'landingRegisterButton', 'landingLoginButton', 'loginTab', 'registerTab', 'loginEmail', 'loginPassword'].map((id) => Math.round(document.getElementById(id).getBoundingClientRect().height)),
           };
         })()`);
-        assert.match(authLayout.copy, /account identity, signed artifacts/u);
-        assert.match(authLayout.copy, /Community app records remain local-first/u);
-        assert.match(authLayout.copy, /does not hold funds or promise settlement/u);
-        assert.match(authLayout.copy, /required audit history after account deletion/u);
+        assert.match(authLayout.copy, /centrally keeps account details, created previews/u);
+        assert.match(authLayout.copy, /community page records are designed to live in community members’ browsers first/u);
+        assert.match(authLayout.copy, /does not hold funds or settle payments/u);
+        assert.match(authLayout.copy, /required history can remain after account deletion/u);
         assert.equal(authLayout.visible, true, `${width}px at ${scale * 100}% must show the concrete product and custody explanation`);
         assert.equal(authLayout.overflow, false, `${width}px at ${scale * 100}% must reflow without horizontal document overflow: ${authLayout.overflowElements.join(', ')}`);
         assert.equal(authLayout.layoutWidth, layoutWidth, `${width}px at ${scale * 100}% must use the expected reflow width`);

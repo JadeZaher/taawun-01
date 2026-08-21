@@ -4,8 +4,30 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#11161a">
+  <meta name="description" content="Taawun is a private-beta community page builder for mosques, charities and Muslim groups. Customize trusted templates and review a protected preview.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="https://taawun-production.up.railway.app/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Taawun">
+  <meta property="og:title" content="Community Page Builder for Muslim Organizations | Taawun">
+  <meta property="og:description" content="Taawun is a private-beta community page builder for mosques, charities and Muslim groups. Customize trusted templates and review a protected preview.">
+  <meta property="og:url" content="https://taawun-production.up.railway.app/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Community Page Builder for Muslim Organizations | Taawun">
+  <meta name="twitter:description" content="Taawun is a private-beta community page builder for mosques, charities and Muslim groups. Customize trusted templates and review a protected preview.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
-  <title>Taawun Builder</title>
+  <title>Community Page Builder for Muslim Organizations | Taawun</title>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": "https://taawun-production.up.railway.app/#website",
+      "name": "Taawun",
+      "url": "https://taawun-production.up.railway.app/",
+      "description": "A private-beta community page builder for mosques, Muslim charities, student groups, and grassroots organizations with protected private previews.",
+      "inLanguage": "en"
+    }
+  </script>
   <style>
     :root {
       color-scheme: dark;
@@ -58,7 +80,7 @@
     ::selection { background: var(--emerald); color: var(--parchment); }
 
     :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
-    .skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; padding: 10px 14px; background: var(--parchment); color: var(--ink); transform: translateY(-150%); }
+    .skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; min-height: 44px; display: flex; align-items: center; padding: 10px 14px; background: var(--parchment); color: var(--ink); transform: translateY(-150%); }
     .skip-link:focus { transform: translateY(0); }
 
     .eyebrow { color: var(--emerald-bright); font: 500 11px/1.3 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
@@ -101,24 +123,29 @@
     .notice.error { background: rgba(220, 107, 93, 0.1); border-color: rgba(220, 107, 93, 0.4); color: #ef9d93; }
     .notice.success { background: var(--soft-emerald); border-color: rgba(87, 166, 142, 0.35); color: #8ccab7; }
 
-    .auth-view { min-height: 100vh; display: grid; place-items: center; padding: 28px; }
-    .auth-shell { width: min(1120px, 100%); display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(330px, 0.65fr); border: 1px solid var(--line-strong); background: var(--ink-2); box-shadow: var(--shadow); }
-    .auth-story { min-height: 620px; padding: 48px; border-right: 1px solid var(--line-strong); display: grid; align-content: start; gap: 24px; background: linear-gradient(135deg, rgba(60, 114, 99, 0.2), transparent 58%); }
-    .auth-story h1 { max-width: 13ch; margin-top: 34px; font: 500 clamp(38px, 5vw, 58px)/1.03 var(--serif); letter-spacing: -0.025em; }
-    .auth-story h1 em { color: var(--emerald-bright); font-weight: 400; }
-    .auth-story p { max-width: 48ch; color: var(--parchment-dim); font-size: 14px; line-height: 1.55; }
-    .auth-story p strong { color: var(--parchment); font-weight: 500; }
-    .auth-outcomes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-    .auth-outcome { min-width: 0; padding: 12px; border-left: 2px solid var(--emerald); background: rgba(17, 22, 26, 0.48); }
-    .auth-outcome strong, .auth-outcome span { display: block; }
-    .auth-outcome strong { font-size: 12px; }
-    .auth-outcome span { margin-top: 4px; color: var(--parchment-dim); font-size: 11px; }
-    .auth-how { display: grid; gap: 7px; padding-top: 16px; border-top: 1px solid var(--line); }
-    .auth-how h2 { font: 500 19px/1.2 var(--serif); }
-    .auth-how ol { margin: 0; padding-left: 20px; color: var(--parchment-dim); font-size: 12px; }
-    .auth-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-    .auth-caveat { padding-left: 15px; border-left: 2px solid var(--gold); color: var(--parchment-dim); font-size: 11px; }
-    .auth-panel { padding: 52px 42px; align-self: center; }
+    .auth-view { min-height: 100vh; overflow-x: clip; }
+    .landing-header { position: sticky; top: 0; z-index: 30; border-bottom: 1px solid var(--line); background: rgba(17, 22, 26, 0.94); backdrop-filter: blur(14px); }
+    .landing-header-inner { width: min(1240px, 100%); min-height: 68px; margin: 0 auto; padding: 10px 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .landing-brand { min-width: 44px; min-height: 44px; text-decoration: none; }
+    .landing-nav { display: flex; align-items: center; justify-content: flex-end; gap: 6px 22px; }
+    .landing-nav a { min-height: 44px; display: inline-flex; align-items: center; color: var(--parchment-dim); font-size: 13px; text-decoration: none; }
+    .landing-nav a:hover { color: var(--parchment); }
+    .landing-nav .landing-nav-cta { padding: 8px 14px; border: 1px solid var(--line-strong); color: var(--parchment); font-weight: 600; }
+    .landing-hero { width: min(1240px, 100%); margin: 0 auto; padding: 78px 28px 70px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 430px); gap: clamp(36px, 7vw, 88px); align-items: center; }
+    .landing-hero-copy { min-width: 0; }
+    .landing-hero h1 { max-width: 12ch; margin: 20px 0 24px; font: 500 clamp(44px, 6vw, 78px)/0.98 var(--serif); letter-spacing: -0.04em; }
+    .landing-hero h1 em { color: var(--emerald-bright); font-weight: 400; }
+    .landing-lede { max-width: 62ch; color: var(--parchment-dim); font-size: clamp(17px, 2vw, 20px); line-height: 1.6; }
+    .landing-lede strong { color: var(--parchment); font-weight: 600; }
+    .auth-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+    .landing-audiences { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 0; padding: 0; list-style: none; }
+    .landing-audiences li { padding: 6px 9px; border: 1px solid var(--line); color: var(--parchment-dim); font: 500 11px/1.35 var(--mono); }
+    .landing-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin-top: 34px; border: 1px solid var(--line); background: var(--line); }
+    .landing-fact { min-width: 0; padding: 15px; background: var(--ink); }
+    .landing-fact strong, .landing-fact span { display: block; }
+    .landing-fact strong { color: var(--gold); font: 500 24px/1 var(--serif); }
+    .landing-fact span { margin-top: 6px; color: var(--parchment-dim); font-size: 11px; }
+    .auth-panel { min-width: 0; padding: 38px; border: 1px solid var(--line-strong); background: var(--ink-2); box-shadow: var(--shadow); scroll-margin-top: 86px; }
     .auth-panel h2 { margin: 12px 0 8px; font: 500 30px/1.15 var(--serif); }
     .auth-panel > p { color: var(--parchment-dim); margin-bottom: 24px; }
     .tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; margin-bottom: 22px; background: var(--ink); border: 1px solid var(--line); }
@@ -126,6 +153,49 @@
     .tab[aria-selected="true"] { background: var(--ink-3); color: var(--parchment); box-shadow: inset 0 -2px var(--emerald-bright); }
     .auth-form { display: grid; gap: 16px; }
     .auth-alert:empty { display: none; }
+
+    .landing-section { width: min(1240px, 100%); margin: 0 auto; padding: 84px 28px; }
+    .landing-section + .landing-section { border-top: 1px solid var(--line); }
+    .landing-section-head { max-width: 720px; margin-bottom: 38px; }
+    .landing-section h2 { margin-top: 12px; font: 500 clamp(30px, 4vw, 46px)/1.08 var(--serif); letter-spacing: -0.025em; }
+    .landing-section-head p { margin-top: 16px; color: var(--parchment-dim); font-size: 16px; line-height: 1.65; }
+    .auth-outcomes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .auth-outcome { min-width: 0; min-height: 220px; padding: 24px; border: 1px solid var(--line); border-top: 3px solid var(--emerald); background: var(--ink-2); }
+    .auth-outcome h3 { font: 500 21px/1.2 var(--serif); }
+    .auth-outcome p { margin-top: 12px; color: var(--parchment-dim); font-size: 13px; line-height: 1.65; }
+    .template-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .landing-template { min-width: 0; padding: 26px; border: 1px solid var(--line-strong); background: linear-gradient(145deg, rgba(60, 114, 99, 0.12), transparent 60%); }
+    .landing-template h3 { margin-top: 10px; font: 500 24px/1.2 var(--serif); }
+    .landing-template p { margin-top: 12px; color: var(--parchment-dim); line-height: 1.65; }
+    .landing-template ul { margin: 18px 0 0; padding-left: 19px; color: var(--parchment-dim); font-size: 13px; }
+    .landing-template li + li { margin-top: 6px; }
+    .customize-band { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: clamp(28px, 6vw, 70px); align-items: start; }
+    .customize-band h2 { margin-top: 12px; }
+    .customize-band > div > p { margin-top: 18px; color: var(--parchment-dim); font-size: 16px; line-height: 1.7; }
+    .customize-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .customize-item { min-width: 0; padding: 20px; border-left: 2px solid var(--gold); background: rgba(238, 231, 216, 0.035); }
+    .customize-item strong { display: block; }
+    .customize-item span { display: block; margin-top: 7px; color: var(--parchment-dim); font-size: 13px; line-height: 1.55; }
+    .auth-how { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; counter-reset: landing-steps; }
+    .auth-how article { min-width: 0; padding: 24px; border-top: 1px solid var(--line-strong); }
+    .auth-how article::before { counter-increment: landing-steps; content: "0" counter(landing-steps); display: block; margin-bottom: 18px; color: var(--emerald-bright); font: 500 12px/1 var(--mono); }
+    .auth-how h3 { font: 500 20px/1.25 var(--serif); }
+    .auth-how p { margin-top: 10px; color: var(--parchment-dim); font-size: 13px; line-height: 1.6; }
+    .trust-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .trust-card { min-width: 0; padding: 24px; border: 1px solid var(--line); background: var(--ink-2); }
+    .trust-card h3 { font: 500 20px/1.25 var(--serif); }
+    .trust-card p { margin-top: 10px; color: var(--parchment-dim); font-size: 13px; line-height: 1.65; }
+    .auth-caveat { margin-top: 22px; padding: 22px 24px; border: 1px solid rgba(199, 162, 74, 0.4); border-left: 4px solid var(--gold); background: var(--soft-gold); color: var(--parchment-dim); line-height: 1.65; }
+    .auth-caveat strong { color: var(--parchment); }
+    .landing-faq { display: grid; gap: 10px; }
+    .landing-faq details { border: 1px solid var(--line); background: var(--ink-2); }
+    .landing-faq summary { min-height: 52px; display: flex; align-items: center; padding: 14px 18px; color: var(--parchment); font-weight: 600; cursor: pointer; }
+    .landing-faq details p { max-width: 78ch; padding: 0 18px 18px; color: var(--parchment-dim); line-height: 1.7; }
+    .landing-final { text-align: center; }
+    .landing-final .landing-section-head { margin-inline: auto; }
+    .landing-final .auth-actions { justify-content: center; }
+    .landing-footer { border-top: 1px solid var(--line); }
+    .landing-footer-inner { width: min(1240px, 100%); margin: 0 auto; padding: 28px; display: flex; align-items: center; justify-content: space-between; gap: 18px; color: var(--parchment-dim); font-size: 12px; }
 
     .app-view { min-height: 100vh; }
     .topbar { position: sticky; top: 0; z-index: 20; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 24px; background: rgba(17, 22, 26, 0.93); border-bottom: 1px solid var(--line); backdrop-filter: blur(12px); }
@@ -341,6 +411,7 @@
     @keyframes pulse { 50% { opacity: 0.35; } }
 
     @media (max-width: 1120px) {
+      .auth-outcomes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .cockpit { grid-template-columns: 164px minmax(0, 1fr); }
       .rail { padding-inline: 16px; }
       .workspace { padding: 28px 22px; }
@@ -348,6 +419,12 @@
       .contract-grid { grid-template-columns: minmax(0, 1fr); }
     }
     @media (max-width: 880px) {
+      .landing-hero { grid-template-columns: minmax(0, 1fr); }
+      .landing-hero-copy { max-width: 760px; }
+      .auth-panel { width: min(560px, 100%); }
+      .template-grid, .trust-grid { grid-template-columns: minmax(0, 1fr); }
+      .customize-band { grid-template-columns: minmax(0, 1fr); }
+      .auth-how { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .cockpit { display: block; }
       .rail { position: static; width: 100%; height: auto; padding: 13px 20px; border-right: 0; border-bottom: 1px solid var(--line); }
       .rail-title { display: none; }
@@ -363,13 +440,18 @@
       .preview-frame, .preview-frame-wrap, .preview-empty { min-height: 480px; height: 480px; }
     }
     @media (max-width: 720px) {
-      .auth-view { padding: 16px; }
-      .auth-shell { grid-template-columns: 1fr; }
-      .auth-story { min-height: 0; padding: 28px; border-right: 0; border-bottom: 1px solid var(--line-strong); }
-      .auth-story h1 { margin-top: 30px; font-size: 37px; }
-      .auth-story p { margin-top: 26px; font-size: 13px; line-height: 1.45; }
-      .auth-panel { padding: 34px 28px; }
+      .landing-header { position: static; }
+      .landing-header-inner { padding-inline: 16px; flex-wrap: wrap; }
+      .landing-nav { width: 100%; justify-content: flex-start; overflow-x: auto; }
+      .landing-nav a { white-space: nowrap; }
+      .landing-hero { padding: 54px 16px; }
+      .landing-hero h1 { font-size: clamp(40px, 12vw, 56px); }
+      .landing-section { padding: 62px 16px; }
+      .auth-panel { padding: 32px 24px; }
       .auth-outcomes { grid-template-columns: 1fr; }
+      .auth-outcome { min-height: 0; }
+      .customize-list, .auth-how { grid-template-columns: minmax(0, 1fr); }
+      .landing-footer-inner { padding-inline: 16px; align-items: flex-start; flex-direction: column; }
       .topbar { padding: 0 16px; }
       .beta-tag, .session-copy { display: none; }
       .workspace { padding: 24px 16px; }
@@ -381,6 +463,13 @@
       .workspace-role { margin-left: 0; }
     }
     @media (max-width: 430px) {
+      .landing-nav a:not(.landing-nav-cta) { display: none; }
+      .landing-nav { width: auto; margin-left: auto; }
+      .landing-facts { grid-template-columns: minmax(0, 1fr); }
+      .landing-fact { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 10px; align-items: center; }
+      .landing-fact span { margin-top: 0; }
+      .auth-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+      .auth-actions a.button { display: flex; align-items: center; justify-content: center; text-decoration: none; }
       .composition-contract { grid-template-columns: 1fr; }
       .module-option { grid-template-columns: 18px 1fr; }
       .module-option code { grid-column: 2; }
@@ -394,13 +483,14 @@
       .preview-empty { padding: 28px; }
     }
     @media (max-width: 240px) {
-      .auth-view { padding: 8px; }
-      .auth-shell, .auth-story, .auth-panel, .auth-form, .field, .tabs { min-width: 0; }
-      .auth-shell { width: 100%; }
-      .auth-story { padding: 18px; }
-      .auth-story h1 { font-size: 30px; overflow-wrap: anywhere; }
-      .auth-story p, .auth-panel > p { overflow-wrap: anywhere; }
-      .auth-actions { display: grid; }
+      .auth-view, .auth-view * { min-width: 0; overflow-wrap: anywhere; }
+      .landing-header-inner { align-items: stretch; flex-direction: column; gap: 4px; padding: 8px; }
+      .landing-nav { width: 100%; margin-left: 0; }
+      .landing-nav .landing-nav-cta { width: 100%; justify-content: center; white-space: normal; }
+      .landing-hero, .landing-section { padding-inline: 8px; }
+      .landing-hero h1 { font-size: 34px; }
+      .landing-audiences { display: grid; }
+      .landing-template, .auth-outcome, .trust-card, .customize-item, .auth-how article { padding: 16px; }
       .auth-panel { padding: 24px 14px; }
       .tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .tab { font-size: 10px; letter-spacing: 0; overflow-wrap: anywhere; }
@@ -442,30 +532,42 @@
   <a id="skipLink" class="skip-link" href="#authPanel">Skip to account access</a>
 
   <main id="authView" class="auth-view">
-    <div class="auth-shell">
-      <section class="auth-story" aria-labelledby="authStoryTitle">
-        <div>
-          <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>Taawun</span></div>
-          <h1 id="authStoryTitle">Build a clear home for your <em>community.</em></h1>
-        </div>
-        <div class="auth-outcomes" aria-label="What Taawun helps communities do">
-          <div class="auth-outcome"><strong>Create a community app</strong><span>Start from an approved template and shape it with plain-language content.</span></div>
-          <div class="auth-outcome"><strong>Organize people and decisions</strong><span>See workspace roles and use Shura tools with explicit authority.</span></div>
-          <div class="auth-outcome"><strong>Preview before sharing</strong><span>Review a signed, sandboxed preview before any public publication step.</span></div>
-          <div class="auth-outcome"><strong>Reuse trusted templates</strong><span>Choose bounded components without turning content into code or permissions.</span></div>
-        </div>
-        <section class="auth-how" aria-labelledby="authHowTitle">
-          <h2 id="authHowTitle">How it works</h2>
-          <ol><li>Create or sign in to an account.</li><li>Choose a workspace, template, and components.</li><li>Review a signed preview; an Architect separately controls sharing.</li></ol>
-        </section>
-        <div class="auth-actions" aria-label="Account access shortcuts">
-          <button id="landingRegisterButton" class="button" type="button">Create account</button>
-          <button id="landingLoginButton" class="button secondary" type="button">Sign in</button>
-        </div>
-        <p class="auth-caveat"><strong>Trust and custody:</strong> Taawun keeps account identity, signed artifacts, and required audit or control records. Community app records remain local-first. Relay transit is encrypted; Taawun does not hold funds or promise settlement. Retention follows the record’s purpose, including required audit history after account deletion.</p>
-      </section>
+    <header class="landing-header">
+      <div class="landing-header-inner">
+        <a id="landingBrand" class="brand landing-brand" href="#landingTop" aria-label="Taawun home"><span class="brand-mark" aria-hidden="true"></span><span>Taawun</span></a>
+        <nav class="landing-nav" aria-label="Learn about Taawun">
+          <a href="#possibilities">What you can build</a>
+          <a href="#howItWorks">How it works</a>
+          <a href="#trust">Trust</a>
+          <a href="#questions">Questions</a>
+          <a class="landing-nav-cta" href="#authPanel">Account access</a>
+        </nav>
+      </div>
+    </header>
 
-      <section id="authPanel" class="auth-panel" aria-labelledby="authTitle" tabindex="-1">
+    <section id="landingTop" class="landing-hero" aria-labelledby="authStoryTitle">
+      <div class="landing-hero-copy">
+        <div class="eyebrow">Private beta for Muslim community organizations</div>
+        <h1 id="authStoryTitle">Build a trusted community page—<em>together.</em></h1>
+        <p class="landing-lede">Taawun is a <strong>community page builder for mosques, charities, student groups, and local organizers.</strong> Choose a useful starting point, shape every part around your needs, and let the right people review the exact result before anything is shared publicly.</p>
+        <div class="auth-actions" aria-label="Account access shortcuts">
+          <button id="landingRegisterButton" class="button" type="button" data-auth-shortcut="register">Create a private-beta account</button>
+          <button id="landingLoginButton" class="button secondary" type="button" data-auth-shortcut="login">Sign in</button>
+        </div>
+        <ul class="landing-audiences" aria-label="Designed for">
+          <li>Mosques</li>
+          <li>Muslim charities</li>
+          <li>Student groups</li>
+          <li>Grassroots organizers</li>
+        </ul>
+        <div class="landing-facts" aria-label="What is included in the current beta">
+          <div class="landing-fact"><strong>3</strong><span>guided starting templates</span></div>
+          <div class="landing-fact"><strong>11</strong><span>customizable building blocks</span></div>
+          <div class="landing-fact"><strong>3</strong><span>clear team roles</span></div>
+        </div>
+      </div>
+
+      <section id="authPanel" class="auth-panel" aria-labelledby="authTitle" tabindex="-1" data-nosnippet>
         <div class="eyebrow">Private beta · Account access</div>
         <h2 id="authTitle">Sign in or create an account</h2>
         <p>Your session stays in this browser tab and clears when you sign out or reload.</p>
@@ -506,13 +608,171 @@
           <button id="registerButton" class="button" type="submit">Create account</button>
         </form>
       </section>
-    </div>
+    </section>
+
+    <section id="possibilities" class="landing-section" aria-labelledby="possibilitiesTitle">
+      <div class="landing-section-head">
+        <div class="eyebrow">Built around real community work</div>
+        <h2 id="possibilitiesTitle">Community work should be easier to shape and safer to review.</h2>
+        <p>Organizers often piece together forms, messages, spreadsheets, and website updates while trying to keep everyone aligned. Taawun brings that preparation into one guided place, so a team can build a clear page, decide who may change it, and understand what will be shared.</p>
+      </div>
+      <div class="auth-outcomes" aria-label="What communities can prepare with Taawun">
+        <article class="auth-outcome">
+          <h3>Events and registrations</h3>
+          <p>Shape an iftar or community event page with schedules, announcements, signup questions, and volunteer details. Registration controls are for preview and rehearsal in the current beta, not yet a shared visitor database.</p>
+        </article>
+        <article class="auth-outcome">
+          <h3>Community information</h3>
+          <p>Bring notices, campaign information, volunteer plans, eligibility notes, and your own fields into one organized page instead of scattering them across disconnected documents.</p>
+        </article>
+        <article class="auth-outcome">
+          <h3>People and decisions</h3>
+          <p>Invite teammates with clear responsibilities, prepare proposals, record votes, and preserve the final decision so the community process is easier to follow.</p>
+        </article>
+        <article class="auth-outcome">
+          <h3>Cooperative planning</h3>
+          <p>Explore marketplace and ethical-finance processes in a no-money practice space. Teams can rehearse review and approval steps without moving funds or implying a religious ruling.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="templates" class="landing-section" aria-labelledby="templatesTitle">
+      <div class="landing-section-head">
+        <div class="eyebrow">Choose a starting point</div>
+        <h2 id="templatesTitle">Start with a real community need, then make it yours.</h2>
+        <p>Taawun does not ask you to describe an idea and hope a machine invents the right app. Pick one of three guided templates, choose the parts you need, and shape them around the way your community actually works.</p>
+      </div>
+      <div class="template-grid">
+        <article class="landing-template">
+          <div class="eyebrow">Template 01</div>
+          <h3>Community Iftar</h3>
+          <p>Prepare a welcoming event page for a shared meal or community gathering.</p>
+          <ul><li>Event details and announcements</li><li>Registration questions</li><li>Campaign information</li><li>Volunteer coordination</li></ul>
+        </article>
+        <article class="landing-template">
+          <div class="eyebrow">Template 02</div>
+          <h3>Community Workspace</h3>
+          <p>Bring broader community operations into one reviewable starting point.</p>
+          <ul><li>People and responsibilities</li><li>Proposals and decisions</li><li>Reference review</li><li>No-money finance practice</li></ul>
+        </article>
+        <article class="landing-template">
+          <div class="eyebrow">Template 03</div>
+          <h3>Bazaar Cooperative</h3>
+          <p>Rehearse how a cooperative offering could move through community oversight.</p>
+          <ul><li>Offering information</li><li>Review stages</li><li>Community decision records</li><li>Practice-only financial flows</li></ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="customize" class="landing-section customize-band" aria-labelledby="customizeTitle">
+      <div>
+        <div class="eyebrow">Your community, your structure</div>
+        <h2 id="customizeTitle">Change more than a logo and a headline.</h2>
+        <p>Each page is assembled from separate building blocks your team can understand. Choose which parts appear, edit their ordinary words and fields, add the details your community needs, and remove what does not belong.</p>
+        <p>You can add dates, locations, questions, lists, eligibility notes, and grouped information without writing code. The current preview keeps each part distinct so a reviewer can inspect it clearly.</p>
+      </div>
+      <div class="customize-list" aria-label="Ways to customize a Taawun page">
+        <div class="customize-item"><strong>Choose the right parts</strong><span>Use event registration, announcements, community decisions, volunteer support, reference review, or practice finance flows.</span></div>
+        <div class="customize-item"><strong>Add your own fields</strong><span>Capture the names, dates, questions, lists, and notes that matter to this particular effort.</span></div>
+        <div class="customize-item"><strong>Shape the presentation</strong><span>Set the name, location, wording, and color while keeping the page clear and consistent.</span></div>
+        <div class="customize-item"><strong>Keep a usable history</strong><span>Return to earlier work, inspect what was prepared, and create a new version without silently changing the old one.</span></div>
+      </div>
+    </section>
+
+    <section id="howItWorks" class="landing-section" aria-labelledby="authHowTitle">
+      <div class="landing-section-head">
+        <div class="eyebrow">A guided path</div>
+        <h2 id="authHowTitle">From community idea to protected private preview in four steps.</h2>
+        <p>The guided path is designed for organizers, not programmers. Every public-sharing step remains separate and requires the right person, a web address controlled by the community, and a successful review.</p>
+      </div>
+      <div class="auth-how">
+        <article><h3>Create a private team space</h3><p>Give one event, team, or community effort its own people, drafts, and history.</p></article>
+        <article><h3>Choose what you need</h3><p>Start from a useful template and select the building blocks that fit the work.</p></article>
+        <article><h3>Make it your own</h3><p>Change the content and add the fields, lists, and details your community needs.</p></article>
+        <article><h3>Invite review</h3><p>Let the right people inspect the exact result and check its proof before any public-sharing step.</p></article>
+      </div>
+    </section>
+
+    <section id="trust" class="landing-section" aria-labelledby="trustTitle">
+      <div class="landing-section-head">
+        <div class="eyebrow">Cooperation with clear responsibility</div>
+        <h2 id="trustTitle">Know who can act, what they reviewed, and where the boundary is.</h2>
+        <p>Taawun means cooperation. The platform is being built around participation with visible responsibility—not a pile of shared passwords or an unexplained “publish” button.</p>
+      </div>
+      <div class="trust-grid">
+        <article class="trust-card"><h3>Give people the right responsibility</h3><p>The workspace owner manages access and future sharing. Maintainers can improve a page and prepare new previews. Viewers can inspect without changing the build. Invitations can be revoked and members can be removed.</p></article>
+        <article class="trust-card"><h3>Know what your team reviewed</h3><p>Every completed preview includes proof you can check. It shows the private team space, template, and content, plus where and how long the preview may be used. If that proof no longer matches or has expired, Taawun stops showing the preview as verified.</p></article>
+        <article class="trust-card"><h3>Record decisions without overclaiming</h3><p>Teams can prepare proposals, record votes, and preserve final decisions. Those records support accountable community process; they are not religious rulings or evidence of scholar approval.</p></article>
+      </div>
+      <p class="auth-caveat"><strong>Clear information and money boundaries:</strong> Day-to-day community page records are designed to live in community members’ browsers first. Taawun centrally keeps account details, created previews, and the history needed to protect and operate the service. When members share community records between browsers, Taawun may carry them over an encrypted connection, and some required history can remain after account deletion. Taawun does not hold funds or settle payments. Donation, escrow, Zakat, Qard Hasan, stipend, and revenue-sharing flows are no-money practice environments—not transactions, religious determinations, or scholar-approved rulings.</p>
+    </section>
+
+    <section id="beta" class="landing-section" aria-labelledby="betaTitle">
+      <div class="landing-section-head">
+        <div class="eyebrow">A truthful private beta</div>
+        <h2 id="betaTitle">What you can rely on today—and what still needs proving.</h2>
+        <p>Private beta should make the boundary clearer, not hide it. Taawun’s working journey ends with a protected, reviewable preview shared inside a private team workspace.</p>
+      </div>
+      <div class="template-grid">
+        <article class="landing-template">
+          <div class="eyebrow">Available now</div>
+          <h3>Build and review together</h3>
+          <ul><li>Three templates and eleven customizable building blocks</li><li>Private previews with clear proof of what was reviewed</li><li>Team invitations, clear responsibilities, and access removal</li><li>Proposal, vote, and final-decision records</li><li>No-money finance planning and review practice</li></ul>
+        </article>
+        <article class="landing-template">
+          <div class="eyebrow">Prepared, but still gated</div>
+          <h3>Public sharing</h3>
+          <p>Taawun can prepare your community’s own web address and check whether it is ready. Putting a page live there still requires an address controlled by the community and review by a person with the right permission; that full journey is not yet claimed as generally available.</p>
+        </article>
+        <article class="landing-template">
+          <div class="eyebrow">Not claimed</div>
+          <h3>Money, rulings, and a live marketplace</h3>
+          <p>The current beta does not move or settle money, provide religious rulings, promise scholar approval, sell templates, or generate arbitrary applications from a prompt. Those are not shortcuts hidden behind the account form.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="questions" class="landing-section" aria-labelledby="questionsTitle">
+      <div class="landing-section-head">
+        <div class="eyebrow">Questions from community organizers</div>
+        <h2 id="questionsTitle">Understand Taawun before you create an account.</h2>
+      </div>
+      <div class="landing-faq">
+        <details><summary>What is Taawun?</summary><p>Taawun is a guided community page builder for mosques, charities, Muslim student associations, and grassroots groups. It combines customizable starting points, clear team responsibilities, decision records, and a private review step.</p></details>
+        <details><summary>Do I need to know how to code?</summary><p>No. The guided path lets you choose a template, select page parts, edit ordinary fields, add your own information, and review the result without writing code.</p></details>
+        <details><summary>Is Taawun a mosque website builder?</summary><p>It can prepare and review community and event pages in a private workspace. It is not yet a public replacement for a mosque website because we have not completed a real launch on a community-owned web address.</p></details>
+        <details><summary>What can I build today?</summary><p>You can customize a Community Iftar page, a broader Community Workspace, or a Bazaar Cooperative practice page using eleven building blocks. The result is a private preview your invited teammates can inspect.</p></details>
+        <details><summary>Can Taawun collect registrations from our whole community?</summary><p>You can design and test registration questions and controls. The beta does not yet collect everyone’s answers in one shared place.</p></details>
+        <details><summary>How does Taawun protect a preview?</summary><p>The service gives each completed preview proof you can check. It confirms the exact page, private team space, content, and where and how long the preview may be used. If something is missing, changed, or expired, Taawun does not show the preview as verified.</p></details>
+        <details><summary>Where is our information kept?</summary><p>Community page records are designed to stay in members’ browsers first. Taawun centrally keeps account details, created previews, and the history needed to protect and operate the service. When members share records between browsers, Taawun may carry them over an encrypted connection, and required history may remain after account deletion.</p></details>
+        <details><summary>Does Taawun process donations or payments?</summary><p>No. Finance features are practice workflows for reviewing steps and approvals. Taawun does not hold funds, process escrow, settle payments, or calculate a binding religious obligation.</p></details>
+        <details><summary>Is Taawun Shariah-certified or scholar-approved?</summary><p>No. Ethical and religious references are clearly marked as reference-only. They do not replace a qualified scholar, create a religious ruling, or certify a community’s work.</p></details>
+        <details><summary>Can we publish on our own web address?</summary><p>The platform can prepare and check a web address controlled by your community, but we have not yet completed a real launch there. Public sharing remains a guided beta step reviewed with you, not a self-service promise.</p></details>
+      </div>
+    </section>
+
+    <section class="landing-section landing-final" aria-labelledby="finalCtaTitle">
+      <div class="landing-section-head">
+        <div class="eyebrow">Bring a real community need</div>
+        <h2 id="finalCtaTitle">Help shape a better way to build for your community.</h2>
+        <p>Create a private-beta account to explore the real templates and protected preview journey. Bring an event, team space, or cooperative idea that your group can review together.</p>
+      </div>
+      <div class="auth-actions" aria-label="Final account access">
+        <button class="button" type="button" data-auth-shortcut="register">Create a private-beta account</button>
+        <button class="button secondary" type="button" data-auth-shortcut="login">Sign in</button>
+      </div>
+    </section>
+
+    <footer class="landing-footer">
+      <div class="landing-footer-inner"><span>Taawun · Built for clear community cooperation</span><span>Private beta · Public pages on community-owned web addresses are not yet generally available</span></div>
+    </footer>
   </main>
 
   <div
     id="appView"
     class="app-view"
     hidden
+    data-nosnippet
     data-signals="{_appName: 'Community Iftar', _organizationName: '', _city: '', _madhhab: 'hanafi', _accentColor: '#57a68e', _buildBrief: '', _moduleRegistration: true, _moduleAnnouncements: true, _moduleDonation: true, _previewDirty: false}"
   >
     <header class="topbar">
@@ -6212,16 +6472,12 @@
       });
     });
 
-    element('landingRegisterButton').addEventListener('click', () => {
-      switchAuthTab('register');
-      element('registerUsername').focus();
+    document.querySelectorAll('[data-auth-shortcut]').forEach((button) => button.addEventListener('click', () => {
+      const tab = button.dataset.authShortcut === 'register' ? 'register' : 'login';
+      switchAuthTab(tab);
+      element(tab === 'register' ? 'registerUsername' : 'loginEmail').focus();
       element('authPanel').scrollIntoView({ block: 'start' });
-    });
-    element('landingLoginButton').addEventListener('click', () => {
-      switchAuthTab('login');
-      element('loginEmail').focus();
-      element('authPanel').scrollIntoView({ block: 'start' });
-    });
+    }));
 
     const workspaceTabs = [...document.querySelectorAll('[data-workspace-tab]')];
     workspaceTabs.forEach((button, index) => {

@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /mcp
+Disallow: /oauth/
+Disallow: /.well-known/
+Disallow: /runtime/
+Disallow: /index.test.mjs
+Disallow: /AGENTS.md
+
+Sitemap: https://taawun-production.up.railway.app/sitemap.xml

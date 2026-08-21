@@ -146,3 +146,29 @@ Add/Remove, selection changes, and template-switch Apply/Cancel. Invalid or
 reserved JSON never replaces the last valid document. The logged-out landing
 keeps account access immediate while describing outcomes before the later trust,
 custody, and retention caveats; its claims remain bounded to existing primitives.
+
+## Public landing and search contract
+
+The logged-out document is both the account entrance and the crawlable public
+explanation. Its title, description, visible H1, social metadata, and JSON-LD
+must describe the same current private-beta capability. Search language may name
+a community app or mosque page builder, but visible copy must immediately bound
+that promise to the three curated templates, eleven customizable building
+blocks, authorized workspace collaboration, and an exact private preview.
+
+Do not imply arbitrary generated applications, live shared registration data,
+generally available customer-domain serving, money movement or settlement,
+scholar approval, a live marketplace, or proven federation, TURN, and E2EE.
+Product counts come from the catalog, not marketing estimates. Financial and
+religious-reference copy always says practice/reference-only. Information copy
+retains the browser-first community-record boundary plus centrally retained
+identity, preview, audit, and control records.
+
+All indexable content stays in the initial HTML with one visible H1, ordered
+headings, working fragment navigation, and account access at the top of the
+journey. Auth forms and their dynamic messages are `data-nosnippet`. The robots
+file is crawl guidance only and never a security boundary. Canonical, sitemap,
+Open Graph, and structured-data URLs move together when a controlled branded
+hostname replaces the current Railway service hostname. Structured data never
+adds pricing, ratings, testimonials, organization facts, or availability that
+is absent from the visible page.
