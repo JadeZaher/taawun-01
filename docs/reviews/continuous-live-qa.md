@@ -1473,3 +1473,53 @@ routes and all old authorities are `401`. Historical workspace `47` remains the
 explicit operator-authority cleanup blocker and was not touched. External
 DNS/reviewer/Bazaar proof and the five-person human study remain separately
 blocked/not-started and are not claimed by this gate.
+
+## Truthful SEO landing-page checkpoint — 2026-08-21
+
+Application commit `ba95c5d3d5dc3d61c1dcbf70559456a4064862c3` replaced the
+logged-out product-first screen with a comprehensive plain-language landing page
+for mosques, Muslim charities, student groups and grassroots organizers. The
+page describes the three real starting templates, eleven customizable building
+blocks, team roles, decision and no-money practice flows, the protected preview
+journey, and the current private-beta boundaries. It does not claim public custom
+domain availability, live payments or settlement, scholar approval, marketplace
+acceptance, customer adoption, testimonials, pricing, or a completed human study.
+
+Search-facing evidence is aligned with the visible page: the live title is
+`Community Page Builder for Muslim Organizations | Taawun`; the description is
+private-beta scoped; canonical, Open Graph and Twitter metadata use the current
+Railway service URL; minimal `WebSite` JSON-LD is present; and `/robots.txt` plus
+`/sitemap.xml` both return `200`. The public landing has one visible H1, semantic
+section headings, ten visible questions and answers, and real anchor targets. The
+account and authenticated application surfaces are marked `data-nosnippet`; no
+review, rating, offer, price, FAQ or application schema is fabricated.
+
+The exact source passed the full Go package sweep, both production builds, and
+all 13 non-browser Node/runtime checks. Independent code, accessibility and
+truth/SEO review each returned APPROVE after the final corrections. The in-app
+Browser verified the exact source at desktop, 400 px, 320 px and the tool's 240 px
+floor for a requested 200 px width: there was no horizontal overflow, one visible
+H1, controls were at least 44 px, and account shortcuts focused the correct input.
+A fresh live Browser pass on the deployed page reconfirmed the desktop landmarks,
+ten-question FAQ, 44 px minimum controls, working account shortcuts and zero
+console warnings/errors. A separate standalone Chromium launch was unavailable
+because the local browser process failed before page attachment; no additional
+credit is claimed from that runner.
+
+Railway deployment `c8f17826-25d6-44b3-a6ed-dcf66a06255b` reached terminal
+`SUCCESS` with image
+`sha256:dc006cbf8229ed0f80de3dd5874849c438f59cd054409ef8dd0cf1767de9d1c1`.
+Fresh `/api/health`, `/`, `/robots.txt` and `/sitemap.xml` probes all returned
+`200`. A bounded 30-minute Railway snapshot showed ten requests, nine `2xx`, one
+non-server `4xx`, zero `5xx`, p95 41 ms, CPU average/max
+`0.00007`/`0.00216` vCPU, and memory average/max `30.3`/`33.9` MB. Runtime logs
+show one volume mount, one database initialization and one server start; Railway
+classifies the two application startup lines as error-stream records, but neither
+contains an error and there is no panic, exit or restart signal.
+
+**Verdict:** ACCEPT the truthful SEO landing page on application commit
+`ba95c5d3d5dc3d61c1dcbf70559456a4064862c3` / Railway deployment
+`c8f17826-25d6-44b3-a6ed-dcf66a06255b`. This gate created no user, workspace,
+domain, publication, Bazaar, finance or reviewer fixture. Workspace `47`,
+controlled DNS/reviewer/Bazaar proof, the genuine five-person study, and deferred
+federation/TURN/E2EE remain unchanged and unclaimed.
