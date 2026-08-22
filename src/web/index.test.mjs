@@ -335,10 +335,16 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(loader, /window\.innerWidth > 840/u);
   assert.match(loader, /event\.key === 'Escape'/u);
   assert.match(loader, /setAttribute\('aria-pressed', String\(active\)\)/u);
+  assert.match(loader, /const landingMain = document\.querySelector\('main'\)/u);
+  assert.match(loader, /if \(landingMain\) observer\.observe\(landingMain\)/u);
+  assert.match(loader, /sceneVisible = entries\.some\(\(entry\) => entry\.isIntersecting\) \|\| \[landingMain\]\.some/u);
   assert.match(loader, /const sideChanges = currentSide !== nextSide/u);
   assert.match(loader, /if \(sideChanges && progress > 0\.12 && progress < 0\.88\)/u);
   assert.match(html, /--geometry-x: 22vw/u);
   assert.match(html, /transition: transform 1200ms cubic-bezier\(\.22,\.72,\.2,1\)/u);
+  assert.equal((html.match(/class="content-section geometry-continuation(?: final)?"/gu) || []).length, 3);
+  assert.doesNotMatch(html, /geometry-continuation[^>]*data-geometry-state/u);
+  assert.match(html, /\.content-section\.geometry-continuation \{ background: linear-gradient\(90deg,[^}]*transparent 100%\)/u);
   assert.match(html, /--geometry-turn: 1deg/u);
   assert.match(html, /data-side="left"[^}]*--geometry-turn: -1deg/u);
   assert.ok(loader.indexOf('if (!capable()') < loader.indexOf("import('/geometric-renderer.js')"), 'capability checks must precede the renderer request');
@@ -372,6 +378,7 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(renderer, /let internalPulse = travel \* \(0\.58 \+ 0\.42 \* sin\(phase\)\)/u);
   assert.match(renderer, /let kaleidoscopeTravel = max\(sceneTravel, internalPulse \* 0\.45\)/u);
   assert.match(renderer, /let lensCenter = vec2f\(side \* 0\.08 \+ 0\.26 \* sin\(phase \* 0\.72 \+ transition\), -0\.18 \+ 0\.12 \* cos\(phase \* 0\.54\)\)/u);
+  assert.match(renderer, /let canvasUV = \(position\.xy \* 2\.0 - resolution\) \/ resolution\.y;\s*var uv = canvasUV/u);
   assert.match(renderer, /let outerStarScale = 1\.0 - travel \* 0\.035/u);
   assert.match(renderer, /let innerRosetteScale = 1\.0 \+ travel \* 0\.045/u);
   assert.match(renderer, /let star = starOutline\(cell \/ outerStarScale\) \* outerStarScale/u);
@@ -401,15 +408,26 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.doesNotMatch(renderer, /mirrorPoint|deepLayer|4\.25/u);
   assert.doesNotMatch(renderer, /uv \/= .*sin/u);
   assert.match(renderer, /1\.0 - smoothstep\(0\.04, 0\.66, lensDistance\)/u);
+  assert.match(renderer, /let viewportHalfExtent = vec2f\(resolution\.x \/ resolution\.y, 1\.0\)/u);
+  assert.match(renderer, /let viewportEdgeDistance = min\(viewportHalfExtent\.x - abs\(canvasUV\.x\), viewportHalfExtent\.y - abs\(canvasUV\.y\)\)/u);
+  assert.match(renderer, /let viewportFeather = smoothstep\(0\.015, 0\.10, viewportEdgeDistance\)/u);
+  assert.match(renderer, /field \* edgeFade \* viewportFeather/u);
   assert.match(renderer, /const FIXED_STEP_SECONDS = 1 \/ 60/u);
   assert.match(renderer, /const MAX_DT_SECONDS = 0\.05/u);
   assert.match(renderer, /const SPRING_STIFFNESS = 72/u);
   assert.match(renderer, /const SPRING_DAMPING = 2 \* Math\.sqrt\(SPRING_STIFFNESS\)/u);
   assert.match(renderer, /const INTERNAL_PHASE_RATE = 0\.55/u);
+  assert.match(renderer, /const INTERNAL_PHASE_EASE = 0\.18/u);
+  assert.match(renderer, /const INTERNAL_PHASE_SETTLE_VELOCITY = 0\.001/u);
   assert.match(renderer, /const MAX_VELOCITY = 0\.9/u);
   assert.match(renderer, /while \(physicsAccumulator >= FIXED_STEP_SECONDS\)/u);
   assert.match(renderer, /const internalMotionActive = Math\.abs\(priorDistance\) > SETTLE_DISTANCE \|\| Math\.abs\(springVelocity\) > SETTLE_VELOCITY/u);
-  assert.match(renderer, /if \(internalMotionActive\) internalPhase = \(internalPhase \+ INTERNAL_PHASE_RATE \* FIXED_STEP_SECONDS\) % \(Math\.PI \* 2\)/u);
+  assert.match(renderer, /const internalPhaseTarget = internalMotionActive \? INTERNAL_PHASE_RATE : 0/u);
+  assert.match(renderer, /internalPhaseVelocity \+= \(internalPhaseTarget - internalPhaseVelocity\) \* INTERNAL_PHASE_EASE/u);
+  assert.match(renderer, /if \(!internalMotionActive && Math\.abs\(internalPhaseVelocity\) <= INTERNAL_PHASE_SETTLE_VELOCITY\) internalPhaseVelocity = 0/u);
+  assert.match(renderer, /internalPhase = \(internalPhase \+ internalPhaseVelocity \* FIXED_STEP_SECONDS\) % \(Math\.PI \* 2\)/u);
+  assert.match(renderer, /settling = !springSettled \|\| internalPhaseVelocity !== 0/u);
+  assert.match(renderer, /if \(!settling\) \{\s*physicsAccumulator = 0;\s*lastPhysicsTime = 0;/u);
   assert.match(renderer, /priorDistance \* \(targetScroll - springScroll\) <= 0/u);
   assert.match(renderer, /const motionAmount = moving \? Math\.min\(1,[\s\S]*?const settledMix = 1 - motionAmount/u);
   assert.match(renderer, /const sideChanges = currentSide !== nextSide/u);
@@ -533,9 +551,17 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     assert.ok(settled.samples.every((sample) => sample.transition === 0), 'the first right-to-right scene transition must not activate the larger side-crossing rotation or shimmer');
     const internalPhaseDeltas = settled.samples.slice(1).map((sample, index) => sample.phase - settled.samples[index].phase);
     assert.ok(internalPhaseDeltas.some((delta) => delta > 0) && internalPhaseDeltas.every((delta) => delta >= 0 && delta <= 0.04), 'same-side scrolling advances a small fixed-rate internal phase without wheel-speed-linked jumps');
+    assert.ok(internalPhaseDeltas.at(-1) <= 0.001, 'internal phase eases to an imperceptible final step instead of freezing at full velocity');
     assert.ok(settled.samples.some((sample) => sample.sharp < 0.99) && settled.samples.at(-1)?.sharp === 1, 'moving frames soften and the final settled frame sharpens the tessellation');
     await wait(250);
     assert.equal(await evaluate(client, `window.__gpuQA.submissions`), settled.submissions, 'settled spring must stop submitting frames');
+
+    const beforeContinuationScroll = settled.submissions;
+    await evaluate(client, `document.querySelector('.geometry-continuation:last-of-type').scrollIntoView({ block: 'center', behavior: 'instant' })`);
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.state === '5' && document.querySelector('.geometry-stage').dataset.side === 'right' && document.querySelector('.geometry-stage').dataset.spring === 'settled' && window.__gpuQA.submissions > ${beforeContinuationScroll + 3}`), 'final right-side scene remains active through post-template main content');
+    const continuationState = await evaluate(client, `({ states: document.querySelectorAll('[data-geometry-state]').length, continuations: document.querySelectorAll('.geometry-continuation').length, backgrounds: [...document.querySelectorAll('.geometry-continuation')].map((section) => getComputedStyle(section).backgroundImage) })`);
+    assert.deepEqual({ states: continuationState.states, continuations: continuationState.continuations }, { states: 6, continuations: 3 });
+    assert.ok(continuationState.backgrounds.every((background) => background.includes('linear-gradient')), 'desktop continuation sections retain translucent right-side geometry lanes');
     await evaluate(client, `window.__gpuQA.lose()`);
     await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && !document.querySelector('#motionToggle').hidden && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'true'`), 'device-loss static fallback');
     await evaluate(client, `window.__gpuQA.nullAdapter = true; document.querySelector('#motionToggle').click(); document.querySelector('#motionToggle').click()`);
@@ -755,6 +781,8 @@ test('public landing and account shell remain distinct, responsive, and keyboard
       canvasHidden: document.querySelector('#geometryCanvas')?.parentElement?.getAttribute('aria-hidden'),
       geometryStates: document.querySelectorAll('[data-geometry-state]').length,
       geometrySides: [...document.querySelectorAll('[data-geometry-state]')].map((section) => section.dataset.geometrySide),
+      continuationCount: document.querySelectorAll('.geometry-continuation').length,
+      continuationBackgrounds: [...document.querySelectorAll('.geometry-continuation')].map((section) => getComputedStyle(section).backgroundColor),
       hasAuthForm: Boolean(document.querySelector('#loginForm, #registerForm, #appView')),
       copy: document.querySelector('main').innerText.replace(/\\s+/g, ' ').trim(),
       overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -775,6 +803,8 @@ test('public landing and account shell remain distinct, responsive, and keyboard
     assert.equal(landingSemantics.canvasHidden, 'true');
     assert.equal(landingSemantics.geometryStates, 6);
     assert.deepEqual(landingSemantics.geometrySides, ['right', 'right', 'left', 'left', 'right', 'right']);
+    assert.equal(landingSemantics.continuationCount, 3);
+    assert.ok(landingSemantics.continuationBackgrounds.every((background) => background !== 'rgba(0, 0, 0, 0)'), 'mobile continuation copy retains a readable static background');
     assert.equal(landingSemantics.hasAuthForm, false);
     assert.match(landingSemantics.copy, /does not hold funds or settle payments/iu);
     assert.match(landingSemantics.copy, /community-owned web address/iu);

@@ -67,7 +67,8 @@ const shaderSource = `
     let section = u.stageMotion.x;
     let side = u.stageMotion.y;
     let transition = u.stageMotion.z;
-    var uv = (position.xy * 2.0 - resolution) / resolution.y;
+    let canvasUV = (position.xy * 2.0 - resolution) / resolution.y;
+    var uv = canvasUV;
     uv.x -= side * 0.34;
     let softness = mix(1.75, 1.0, u.stageMotion.w);
     let travel = 1.0 - u.stageMotion.w;
@@ -106,7 +107,10 @@ const shaderSource = `
     color += vec3f(0.95, 0.68, 0.24) * pow(max(0.0, 1.0 - lensDistance), 5.0) * 0.14;
     let field = clamp(baseLayer.x * 0.4 + baseLayer.y * 0.62 + (emeraldBand.x * 0.18 + rustBand.x * 0.16) * chromaticEnvelope + mirrorBand.y * (0.03 + lens * 0.09) + lens * 0.05 + refractionEdge * (0.04 + lens * 0.14), 0.0, 1.0);
     let edgeFade = 1.0 - smoothstep(0.16, 1.65, length(uv));
-    let alpha = clamp(field * edgeFade * (0.52 + transition * 0.22) * mix(0.82, 1.0, u.stageMotion.w), 0.0, 0.82);
+    let viewportHalfExtent = vec2f(resolution.x / resolution.y, 1.0);
+    let viewportEdgeDistance = min(viewportHalfExtent.x - abs(canvasUV.x), viewportHalfExtent.y - abs(canvasUV.y));
+    let viewportFeather = smoothstep(0.015, 0.10, viewportEdgeDistance);
+    let alpha = clamp(field * edgeFade * viewportFeather * (0.52 + transition * 0.22) * mix(0.82, 1.0, u.stageMotion.w), 0.0, 0.82);
     return vec4f(color * alpha, alpha);
   }
 `;
@@ -145,6 +149,8 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
   const SPRING_STIFFNESS = 72;
   const SPRING_DAMPING = 2 * Math.sqrt(SPRING_STIFFNESS);
   const INTERNAL_PHASE_RATE = 0.55;
+  const INTERNAL_PHASE_EASE = 0.18;
+  const INTERNAL_PHASE_SETTLE_VELOCITY = 0.001;
   const MAX_VELOCITY = 0.9;
   const SETTLE_DISTANCE = 0.0002;
   const SETTLE_VELOCITY = 0.0005;
@@ -159,6 +165,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
   let lastPhysicsTime = 0;
   let settling = false;
   let internalPhase = 0;
+  let internalPhaseVelocity = 0;
 
   const teardown = ({ notify = false } = {}) => {
     if (!alive) return;
@@ -211,26 +218,28 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       const acceleration = SPRING_STIFFNESS * (targetScroll - springScroll) - SPRING_DAMPING * springVelocity;
       springVelocity = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, springVelocity + acceleration * FIXED_STEP_SECONDS));
       springScroll += springVelocity * FIXED_STEP_SECONDS;
-      if (internalMotionActive) internalPhase = (internalPhase + INTERNAL_PHASE_RATE * FIXED_STEP_SECONDS) % (Math.PI * 2);
+      const internalPhaseTarget = internalMotionActive ? INTERNAL_PHASE_RATE : 0;
+      internalPhaseVelocity += (internalPhaseTarget - internalPhaseVelocity) * INTERNAL_PHASE_EASE;
+      if (!internalMotionActive && Math.abs(internalPhaseVelocity) <= INTERNAL_PHASE_SETTLE_VELOCITY) internalPhaseVelocity = 0;
+      internalPhase = (internalPhase + internalPhaseVelocity * FIXED_STEP_SECONDS) % (Math.PI * 2);
       physicsAccumulator -= FIXED_STEP_SECONDS;
       if (priorDistance !== 0 && priorDistance * (targetScroll - springScroll) <= 0) {
         springScroll = targetScroll;
         springVelocity = 0;
-        physicsAccumulator = 0;
         break;
       }
     }
-    if (Math.abs(targetScroll - springScroll) <= SETTLE_DISTANCE && Math.abs(springVelocity) <= SETTLE_VELOCITY) {
+    const springSettled = Math.abs(targetScroll - springScroll) <= SETTLE_DISTANCE && Math.abs(springVelocity) <= SETTLE_VELOCITY;
+    if (springSettled) {
       springScroll = targetScroll;
       springVelocity = 0;
-      physicsAccumulator = 0;
-      settling = false;
-      lastPhysicsTime = 0;
-      stage.dataset.spring = 'settled';
-    } else {
-      settling = true;
-      stage.dataset.spring = 'settling';
     }
+    settling = !springSettled || internalPhaseVelocity !== 0;
+    if (!settling) {
+      physicsAccumulator = 0;
+      lastPhysicsTime = 0;
+    }
+    stage.dataset.spring = settling ? 'settling' : 'settled';
     return settling;
   };
 

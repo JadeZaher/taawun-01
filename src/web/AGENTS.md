@@ -185,11 +185,17 @@ section. Same-side section changes perform no lateral interpolation. Only the
 two authored side changes traverse the page, using an additional smootherstep
 inside the fixed-rate critically damped response so the crossings begin and end
 slowly instead of following wheel or swipe speed. The desktop resting offset is
-22vw, keeping those two traversals restrained. Small
+22vw, keeping those two traversals restrained. Renderer eligibility follows the
+entire public `main` region rather than ending with the sixth marker. The three
+post-Templates sections add no geometry states: they retain state 5 on the right
+and use a left-weighted translucent background so cards and text stay readable
+without hard-occluding the fixed scene. Small
 screens keep only restrained static edge peeks that fade beyond the viewport.
 Their 1.2-second transform uses a smooth non-overshooting curve, so swipe or
 wheel rate never changes the transition duration. Static fallback scaling is
-limited to 3.5% and occurs only for a real side change. The resting pattern
+limited to 3.5% and occurs only for a real side change. Continuation sections use
+a stronger uniform reading surface on mobile, reduced-transparency, increased-
+contrast, and forced-color paths. The resting pattern
 is a disciplined repeated eight-point star and rosette tessellation with narrow
 polygonal straps. Shared rosette corners form an outlined octagonal connector
 with an open center. Paired diagonal bridge rails enter at the real offset
@@ -212,10 +218,13 @@ WebGPU may enhance only on capable desktop devices after idle, never moves text
 or captures scrolling. Scroll events update only a normalized target. A bounded
 critically damped response advances at a fixed 60Hz physics step with capped
 elapsed time and velocity; an explicit target-crossing guard prevents numerical
-overshoot. A separate internal phase advances at a fixed 0.55 radians per second
-only while that response is moving, then sleeps with it; wheel or swipe speed can
-move the target but cannot set this phase rate. Its bounded envelope evolves the
-rosette scale, perpendicular mirror depth, and at most 0.0008 cell of rail
+overshoot. A separate internal phase eases toward a fixed 0.55 radians per second
+while that response is moving, then eases its velocity to zero before sleeping;
+wheel or swipe speed can move the target but cannot set this phase rate. This
+short fixed-step tail prevents the localized lens and caustic from freezing at a
+nonzero velocity when the scroll spring reaches its target. Its bounded envelope
+evolves the rosette scale, perpendicular mirror depth, and at most 0.0008 cell of
+rail
 separation even through same-side spans, so scroll progress never freezes the
 decoration. The resting lattice orientation remains invariant across all six
 sections. Only while an authored side transition and physical settling overlap
@@ -228,7 +237,11 @@ settlement, while the localized color phase simply freezes until the next scroll
 This restrained kaleidoscope overlap changes only the nested star outlines.
 Lattice scale, octagonal
 connectors, bridge rails, and over/under straps remain fixed spatial anchors, so
-there is no whole-field zoom or added lateral swing. It renders a
+there is no whole-field zoom or added lateral swing. The broad radial field is
+also multiplied by a narrow viewport-aware feather computed from unshifted canvas
+coordinates and the actual aspect ratio. Alpha reaches zero just inside every
+physical edge even on square or portrait-capable desktop viewports, so the
+shifted lattice cannot reveal the exact canvas boundary. It renders a
 sharper final tessellation and stops scheduling frames once both displacement and
 velocity settle. The subtle navigation motion button uses `aria-pressed` and
 keeps a reversible user preference. The progressively enhanced mobile menu

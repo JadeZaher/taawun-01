@@ -38,6 +38,7 @@
   if (!stage || !canvas || !toggle) return;
 
   const sections = [...document.querySelectorAll('[data-geometry-state]')];
+  const landingMain = document.querySelector('main');
   let sceneFrame = 0;
   let staticMotionPaused = false;
   const updateStaticScene = () => {
@@ -184,15 +185,17 @@
   }, { passive: true });
 
   const observer = new IntersectionObserver((entries) => {
-    sceneVisible = entries.some((entry) => entry.isIntersecting) || [...document.querySelectorAll('[data-geometry-state]')].some((section) => {
-      const rect = section.getBoundingClientRect();
+    sceneVisible = entries.some((entry) => entry.isIntersecting) || [landingMain].some((region) => {
+      if (!region) return false;
+      const rect = region.getBoundingClientRect();
       return rect.bottom > 0 && rect.top < window.innerHeight;
     });
     if (!sceneVisible) renderer?.pause();
     else if (renderer) renderer.resume();
     else reconcilePreference();
   }, { rootMargin: '80px 0px', threshold: 0 });
-  sections.forEach((section) => observer.observe(section));
+  if (landingMain) observer.observe(landingMain);
+  else sections.forEach((section) => observer.observe(section));
   if (!pageLoaded) window.addEventListener('load', () => { pageLoaded = true; reconcilePreference(); }, { once: true });
 
   window.addEventListener('pagehide', () => {
