@@ -304,16 +304,18 @@ test('public landing exposes aligned, truthful search metadata and crawl guidanc
   assert.match(html, /not religious rulings/iu);
   assert.match(html, /Sūrat al-Māʾidah · 5:2 \(excerpt\)/u);
   assert.match(html, /<blockquote lang="ar" dir="rtl">وَتَعَاوَنُواْ عَلَى ٱلۡبِرِّ وَٱلتَّقۡوَىٰۖ وَلَا تَعَاوَنُواْ عَلَى ٱلۡإِثۡمِ وَٱلۡعُدۡوَٰنِۚ<\/blockquote>/u);
+  assert.match(html, /<section class="verse-translation" lang="en" aria-labelledby="verseTranslationLabel">[\s\S]*?English translation · Dr\. Mustafa Khattab, The Clear Quran[\s\S]*?Cooperate with one another in goodness and righteousness, and do not cooperate in sin and transgression\.[\s\S]*?<\/section>/u);
   assert.doesNotMatch(html, /24:35|visual language|visual inspiration/iu);
   assert.match(html, /href="\/account#register"/u);
   assert.match(html, /href="\/account#login"/u);
   assert.doesNotMatch(html, /Taawun is Shariah[- ]certified|scholar[- ]approved (?:platform|software)|launch your app today|start free/iu);
 });
 
-test('geometric enhancement is surface-level, optional, and scroll-driven', async () => {
+test('geometric enhancement is surface-level, optional, and spring-driven', async () => {
   const html = await readFile(new URL('./landing.html', import.meta.url), 'utf8');
   const loader = await readFile(new URL('./geometric-landing.js', import.meta.url), 'utf8');
   const renderer = await readFile(new URL('./geometric-renderer.js', import.meta.url), 'utf8');
+  const scrollHandler = renderer.match(/const onScroll = \(\) => \{[\s\S]*?\n  \};/u)?.[0] || '';
 
   assert.match(html, /class="geometry-stage"[^>]*aria-hidden="true"/u);
   assert.match(html, /\.geometry-stage \{ position: fixed; inset: 0;[^}]*background: transparent;/u);
@@ -332,6 +334,7 @@ test('geometric enhancement is surface-level, optional, and scroll-driven', asyn
   assert.match(loader, /event\.key === 'Escape'/u);
   assert.match(loader, /setAttribute\('aria-pressed', String\(active\)\)/u);
   assert.match(loader, /progress > 0\.12 && progress < 0\.88/u);
+  assert.match(html, /transition: transform 900ms cubic-bezier\(\.18,1\.16,\.32,1\)/u);
   assert.ok(loader.indexOf('if (!capable()') < loader.indexOf("import('/geometric-renderer.js')"), 'capability checks must precede the renderer request');
   assert.match(renderer, /powerPreference: 'low-power'/u);
   assert.match(renderer, /adapter\.isFallbackAdapter/u);
@@ -340,8 +343,23 @@ test('geometric enhancement is surface-level, optional, and scroll-driven', asyn
   assert.doesNotMatch(renderer, /requestAnimationFrame\(render\)|preventDefault\(\)|setInterval\(/u);
   assert.match(renderer, /device\.lost/u);
   assert.match(renderer, /refractionEdge/u);
-  assert.match(renderer, /1\.0 - smoothstep\(0\.004, 0\.055, line\)/u);
+  assert.match(renderer, /fn segmentDistance\(/u);
+  assert.match(renderer, /fn starOutline\(/u);
+  assert.doesNotMatch(renderer, /for \(var i = 0u; i < 16u/u);
+  assert.match(renderer, /let straps = min\(diagonalA, diagonalB\)/u);
+  assert.match(renderer, /let primaryAA = max\(fwidth\(primaryDistance\) \* softness/u);
+  assert.match(renderer, /let softness = mix\(1\.75, 1\.0, u\.stageMotion\.w\)/u);
+  assert.doesNotMatch(renderer, /uv \/= .*sin/u);
   assert.match(renderer, /1\.0 - smoothstep\(0\.04, 0\.66, lensDistance\)/u);
+  assert.match(renderer, /const FIXED_STEP_SECONDS = 1 \/ 60/u);
+  assert.match(renderer, /const MAX_DT_SECONDS = 0\.05/u);
+  assert.match(renderer, /const SPRING_STIFFNESS = 72/u);
+  assert.match(renderer, /const SPRING_DAMPING = 10\.5/u);
+  assert.match(renderer, /const MAX_VELOCITY = 0\.9/u);
+  assert.match(renderer, /while \(physicsAccumulator >= FIXED_STEP_SECONDS\)/u);
+  assert.match(renderer, /if \(moving\) requestDraw\(\)/u);
+  assert.match(scrollHandler, /const nextTarget = readScrollTarget\(\)/u);
+  assert.doesNotMatch(scrollHandler, /writeBuffer|window\.scrollY|dataset\.state/u);
   assert.match(renderer, /clearValue: \{ r: 0, g: 0, b: 0, a: 0 \}/u);
   assert.match(renderer, /color \* alpha, alpha/u);
 });
@@ -381,7 +399,7 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     await client.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
       let loseDevice;
       const lost = new Promise((resolve) => { loseDevice = resolve; });
-      window.__gpuQA = { adapterRequests: 0, submissions: 0, destroys: 0, nullAdapter: false, lose: () => loseDevice({ reason: 'destroyed' }) };
+      window.__gpuQA = { adapterRequests: 0, submissions: 0, destroys: 0, uniforms: [], nullAdapter: false, lose: () => loseDevice({ reason: 'destroyed' }) };
       Object.defineProperty(navigator, 'hardwareConcurrency', { configurable: true, value: 8 });
       Object.defineProperty(navigator, 'deviceMemory', { configurable: true, value: 8 });
       const connectionListeners = [];
@@ -391,7 +409,7 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
       const pass = { setPipeline() {}, setBindGroup() {}, draw() {}, end() {} };
       const device = {
         lost,
-        queue: { writeBuffer() {}, submit() { window.__gpuQA.submissions += 1; } },
+        queue: { writeBuffer(_buffer, _offset, data) { window.__gpuQA.uniforms.push(Array.from(data)); }, submit() { window.__gpuQA.submissions += 1; } },
         createShaderModule() { return { getCompilationInfo: async () => ({ messages: [] }) }; },
         createRenderPipeline() { return { getBindGroupLayout() { return {}; } }; },
         createBuffer() { return { destroy() {} }; },
@@ -430,9 +448,16 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     assert.equal(await evaluate(client, `localStorage.getItem('taawun-decorative-motion')`), null);
 
     const beforeScroll = await evaluate(client, `window.__gpuQA.submissions`);
-    await evaluate(client, `window.scrollTo({ top: window.innerHeight * 1.2, behavior: 'instant' })`);
-    await waitFor(() => evaluate(client, `window.__gpuQA.submissions > ${beforeScroll}`), 'scroll-threshold redraw');
+    const scrollTarget = await evaluate(client, `(() => { window.scrollTo({ top: window.innerHeight * 1.2, behavior: 'instant' }); return window.scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight); })()`);
+    await waitFor(() => evaluate(client, `window.__gpuQA.submissions >= ${beforeScroll + 3}`), 'spring continues after one scroll event');
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.state !== '0'`), 'approaching-section state transition');
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.spring === 'settled'`), 'bounded spring settlement');
+    const settled = await evaluate(client, `({ submissions: window.__gpuQA.submissions, samples: window.__gpuQA.uniforms.slice(${beforeScroll}).map((values) => ({ scroll: values[2], sharp: values[7] })) })`);
+    assert.ok(settled.submissions > beforeScroll + 2 && settled.submissions < beforeScroll + 120, `spring must settle in a bounded number of frames: ${settled.submissions - beforeScroll}`);
+    assert.ok(settled.samples.some((sample) => sample.scroll > scrollTarget + 0.0001), 'underdamped spring should gently overshoot the target');
+    assert.ok(settled.samples.some((sample) => sample.sharp === 0) && settled.samples.at(-1)?.sharp === 1, 'moving frames soften and the final settled frame sharpens the tessellation');
+    await wait(250);
+    assert.equal(await evaluate(client, `window.__gpuQA.submissions`), settled.submissions, 'settled spring must stop submitting frames');
     await evaluate(client, `window.__gpuQA.lose()`);
     await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && !document.querySelector('#motionToggle').hidden && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'true'`), 'device-loss static fallback');
     await evaluate(client, `window.__gpuQA.nullAdapter = true; document.querySelector('#motionToggle').click(); document.querySelector('#motionToggle').click()`);
@@ -661,6 +686,9 @@ test('public landing and account shell remain distinct, responsive, and keyboard
       motionHidden: document.querySelector('#motionToggle').hidden,
       motionPressed: document.querySelector('#motionToggle').getAttribute('aria-pressed'),
       staticEdgePeek: (() => { const rect = document.querySelector('.geometry-static').getBoundingClientRect(); return rect.left < 0 || rect.right > innerWidth; })(),
+      translation: document.querySelector('.verse-translation-text')?.innerText.trim(),
+      translationLabel: document.querySelector('#verseTranslationLabel')?.textContent.trim(),
+      translationLang: document.querySelector('.verse-translation')?.getAttribute('lang'),
     }))()`);
     assert.equal(landingSemantics.h1, 'Many hands. One clear community effort.');
     assert.equal(landingSemantics.visibleH1s, 1);
@@ -678,6 +706,9 @@ test('public landing and account shell remain distinct, responsive, and keyboard
     assert.equal(landingSemantics.motionHidden, false);
     assert.equal(landingSemantics.motionPressed, 'true');
     assert.equal(landingSemantics.staticEdgePeek, true);
+    assert.equal(landingSemantics.translation, 'Cooperate with one another in goodness and righteousness, and do not cooperate in sin and transgression.');
+    assert.equal(landingSemantics.translationLabel, 'English translation · Dr. Mustafa Khattab, The Clear Quran');
+    assert.equal(landingSemantics.translationLang, 'en');
     assert.ok(landingSemantics.controlHeights.every((height) => height >= 44), `landing controls must be at least 44 CSS px: ${landingSemantics.controlHeights}`);
 
     await evaluate(client, `document.querySelector('#menuToggle').click()`);

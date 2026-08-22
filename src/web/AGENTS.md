@@ -182,15 +182,25 @@ states alternate right, right, left, right, right, left while readable content
 uses the inverse side; interpolation begins before a section reaches the center
 so the geometry visibly crosses adjacent whitespace rather than snapping at a
 threshold. Small screens keep only restrained static edge peeks that fade beyond
-the viewport. The static HTML and CSS fallback carry the complete product story.
+the viewport. Their fixed-duration transform uses one gentle overshoot curve, so
+swipe or wheel rate never changes the transition duration. The resting pattern
+is a disciplined repeated eight-point star and rosette tessellation with narrow
+polygonal straps; emerald, gold, and rust refraction belongs to displaced and
+mirrored depth layers rather than deforming every base edge. The static HTML and
+CSS fallback carry the complete product story.
 
 WebGPU may enhance only on capable desktop devices after idle, never moves text
-or captures scrolling, and submits one frame only when scroll state changes. The
-subtle navigation motion button uses `aria-pressed` and keeps a reversible user
-preference. The progressively enhanced mobile menu remains readable without
-JavaScript, uses 44px controls, and restores focus when Escape closes it. Reduced
-motion, forced colors, increased contrast, reduced transparency, reduced data,
-low-power, small-screen, shader, and device-loss paths stay on the still design.
-Sacred text remains semantic, selectable, and separate from the decorative
-renderer. The public excerpt is Qur'an 5:2 with its exact citation; adjacent copy
-does not interpret the verse as a visual metaphor or product claim.
+or captures scrolling. Scroll events update only a normalized target. A bounded
+underdamped spring advances at a fixed 60Hz physics step with capped elapsed time
+and velocity, gently overshoots independently of input-device speed, renders a
+sharper final tessellation, and stops scheduling frames once both displacement
+and velocity settle. The subtle navigation motion button uses `aria-pressed` and
+keeps a reversible user preference. The progressively enhanced mobile menu
+remains readable without JavaScript, uses 44px controls, and restores focus when
+Escape closes it. Reduced motion, forced colors, increased contrast, reduced
+transparency, reduced data, low-power, small-screen, shader, and device-loss
+paths stay on the still design. Sacred text remains semantic, selectable, and
+separate from the decorative renderer. The public excerpt is Qur'an 5:2 with its
+exact citation and a visibly labeled English translation attributed to Dr.
+Mustafa Khattab, The Clear Quran; adjacent copy does not interpret the verse as
+a visual metaphor or product claim.

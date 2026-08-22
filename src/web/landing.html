@@ -59,7 +59,7 @@
     .skip-link:focus { transform: translateY(0); }
 
     .geometry-stage { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: transparent; pointer-events: none; --geometry-x: 28vw; --geometry-scale: 1; --geometry-turn: 2deg; }
-    .geometry-static { position: absolute; top: 50%; left: 50%; width: min(62vw, 900px); aspect-ratio: 1; opacity: 0.58; background-image: radial-gradient(circle at 64% 28%, rgba(224, 183, 91, 0.34), transparent 24%), repeating-conic-gradient(from 22.5deg at 50% 50%, rgba(99, 184, 155, 0.28) 0 2deg, transparent 2deg 22.5deg), repeating-radial-gradient(circle at 50% 50%, transparent 0 28px, rgba(224, 183, 91, 0.18) 29px 30px, transparent 31px 56px); mask-image: radial-gradient(circle, #000 0 48%, transparent 76%); transform: translate(calc(-50% + var(--geometry-x)), -50%) scale(var(--geometry-scale)) rotate(var(--geometry-turn)); transition: transform 760ms cubic-bezier(.2,.75,.2,1), opacity 480ms ease; }
+    .geometry-static { position: absolute; top: 50%; left: 50%; width: min(62vw, 900px); aspect-ratio: 1; opacity: 0.58; background-image: radial-gradient(circle at 64% 28%, rgba(224, 183, 91, 0.34), transparent 24%), repeating-conic-gradient(from 22.5deg at 50% 50%, rgba(99, 184, 155, 0.28) 0 2deg, transparent 2deg 22.5deg), repeating-radial-gradient(circle at 50% 50%, transparent 0 28px, rgba(224, 183, 91, 0.18) 29px 30px, transparent 31px 56px); mask-image: radial-gradient(circle, #000 0 48%, transparent 76%); transform: translate(calc(-50% + var(--geometry-x)), -50%) scale(var(--geometry-scale)) rotate(var(--geometry-turn)); transition: transform 900ms cubic-bezier(.18,1.16,.32,1), opacity 520ms ease; }
     .geometry-stage[data-side="left"] { --geometry-x: -28vw; --geometry-turn: -7deg; }
     .geometry-stage[data-transition="true"] { --geometry-scale: 1.15; }
     .geometry-stage[data-motion="paused"] .geometry-static { transition: none; }
@@ -125,6 +125,9 @@
     .verse-section[data-geometry-side="left"] .verse-card { margin-left: auto; }
     .verse-card blockquote { color: #fff5d9; font: 400 clamp(23px, 3.5vw, 39px)/2 var(--serif); }
     .verse-card figcaption { margin-top: 28px; color: var(--gold); font: 600 12px/1.5 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
+    .verse-translation { max-width: 62ch; margin: 30px auto 0; padding-top: 26px; border-top: 1px solid rgba(224, 183, 91, 0.3); text-align: left; }
+    .verse-translation-label { color: var(--gold); font: 600 11px/1.5 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .verse-translation-text { margin-top: 10px; color: var(--parchment); font: 400 clamp(17px, 1.8vw, 21px)/1.6 var(--serif); }
 
     .content-section { position: relative; z-index: 2; padding: 110px max(28px, calc((100vw - 1224px) / 2)); background: var(--ink); border-top: 1px solid var(--line); }
     .content-section.geometry-content { min-height: 100svh; background: linear-gradient(90deg, rgba(8, 17, 15, 0.1) 0 42%, rgba(8, 17, 15, 0.86) 78%); }
@@ -280,6 +283,10 @@
     <section class="verse-section" data-geometry-state="3" data-geometry-side="right" aria-labelledby="verseCaption">
       <figure class="verse-card">
         <blockquote lang="ar" dir="rtl">وَتَعَاوَنُواْ عَلَى ٱلۡبِرِّ وَٱلتَّقۡوَىٰۖ وَلَا تَعَاوَنُواْ عَلَى ٱلۡإِثۡمِ وَٱلۡعُدۡوَٰنِۚ</blockquote>
+        <section class="verse-translation" lang="en" aria-labelledby="verseTranslationLabel">
+          <p id="verseTranslationLabel" class="verse-translation-label">English translation · Dr. Mustafa Khattab, The Clear Quran</p>
+          <p class="verse-translation-text">Cooperate with one another in goodness and righteousness, and do not cooperate in sin and transgression.</p>
+        </section>
         <figcaption id="verseCaption">Sūrat al-Māʾidah · 5:2 (excerpt)</figcaption>
       </figure>
     </section>

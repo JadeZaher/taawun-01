@@ -7,16 +7,35 @@ const shaderSource = `
     return vec4f(p[i], 0.0, 1.0);
   }
   fn rotate2(v: vec2f, a: f32) -> vec2f { let c = cos(a); let s = sin(a); return mat2x2f(c, -s, s, c) * v; }
-  fn starDistance(p: vec2f) -> f32 {
-    let angle = atan2(p.y, p.x);
-    let radius = length(p);
-    let boundary = mix(0.19, 0.47, pow(0.5 + 0.5 * cos(angle * 8.0), 1.8));
-    return abs(radius - boundary);
+  fn segmentDistance(p: vec2f, a: vec2f, b: vec2f) -> f32 {
+    let edge = b - a;
+    let projection = clamp(dot(p - a, edge) / max(dot(edge, edge), 0.00001), 0.0, 1.0);
+    return length(p - (a + edge * projection));
   }
-  fn lattice(point: vec2f, scale: f32, turn: f32) -> vec3f {
+  fn starOutline(p: vec2f) -> f32 {
+    let outerSector = 0.78539816;
+    let halfSector = 0.39269908;
+    let angle = atan2(p.y, p.x);
+    let foldedAngle = abs((fract(angle / outerSector + 0.5) - 0.5) * outerSector);
+    let foldedPoint = vec2f(cos(foldedAngle), sin(foldedAngle)) * length(p);
+    let outerPoint = vec2f(0.445, 0.0);
+    let innerPoint = vec2f(cos(halfSector), sin(halfSector)) * 0.205;
+    return segmentDistance(foldedPoint, outerPoint, innerPoint);
+  }
+  fn lattice(point: vec2f, scale: f32, turn: f32, softness: f32) -> vec3f {
     let cell = fract(rotate2(point, turn) * scale) - vec2f(0.5);
-    let line = min(starDistance(cell), abs(abs(cell.x) + abs(cell.y) - 0.49) * 0.62);
-    return vec3f(1.0 - smoothstep(0.004, 0.055, line), 1.0 - smoothstep(0.002, 0.018, line), line);
+    let star = starOutline(cell);
+    let diagonalA = abs(abs(cell.x + cell.y) - 0.5) * 0.70710678;
+    let diagonalB = abs(abs(cell.x - cell.y) - 0.5) * 0.70710678;
+    let straps = min(diagonalA, diagonalB);
+    let innerRosette = starOutline(rotate2(cell, 0.39269908) * 1.42) / 1.42;
+    let primaryDistance = min(star, straps);
+    let secondaryDistance = innerRosette;
+    let primaryAA = max(fwidth(primaryDistance) * softness, 0.0008);
+    let secondaryAA = max(fwidth(secondaryDistance) * softness, 0.0006);
+    let primary = 1.0 - smoothstep(0.010, 0.010 + primaryAA, primaryDistance);
+    let secondary = 1.0 - smoothstep(0.004, 0.004 + secondaryAA, secondaryDistance);
+    return vec3f(primary, secondary, primaryDistance);
   }
   @fragment fn fragmentMain(@builtin(position) position: vec4f) -> @location(0) vec4f {
     let resolution = max(u.viewportScroll.xy, vec2f(1.0));
@@ -27,15 +46,17 @@ const shaderSource = `
     let transition = u.stageMotion.z;
     var uv = (position.xy * 2.0 - resolution) / resolution.y;
     uv.x -= side * (0.48 - transition * 0.14);
-    uv /= 1.0 + (0.10 + transition * 0.09) * sin(uv.y * 2.2 + section * 0.7);
-    let turn = (section - 2.0) * 0.052 + phase * 0.055 + transition * 0.2;
-    let baseLayer = lattice(uv + vec2f(scroll * 0.055, -scroll * 0.03), 3.25 + section * 0.12 - transition * 0.3, turn);
-    let deepLayer = lattice(uv * 1.12 + vec2f(0.08, -0.05), 4.3, -turn * 0.7);
+    let softness = mix(1.75, 1.0, u.stageMotion.w);
+    let turn = (section - 2.0) * 0.052 + phase * 0.03 + transition * 0.08;
+    let basePoint = rotate2(uv + vec2f(scroll * 0.045, -scroll * 0.025), transition * 0.025);
+    let baseLayer = lattice(basePoint, 3.25 + section * 0.1, turn, softness);
+    let mirrorPoint = vec2f(-uv.x, uv.y) * 1.1 + vec2f(0.08, -0.05);
+    let deepLayer = lattice(mirrorPoint, 4.25, -turn * 0.7, softness * 1.1);
     let lensCenter = vec2f(side * 0.08 + 0.32 * sin(scroll * 3.4 + transition), -0.18 + phase * 0.34);
     let lensDistance = length(uv - lensCenter);
     let lens = 1.0 - smoothstep(0.04, 0.66, lensDistance);
     let refractedPoint = uv + normalize(uv - lensCenter + vec2f(0.001)) * lens * 0.04;
-    let refracted = lattice(refractedPoint, 3.4 + section * 0.12, turn + lens * 0.045);
+    let refracted = lattice(refractedPoint, 3.25 + section * 0.1, turn + lens * 0.035, softness);
     let refractionEdge = abs(refracted.x - baseLayer.x);
     let caustic = 0.5 + 0.5 * sin(uv.x * 5.0 - uv.y * 3.0 - phase * 5.0);
     var color = vec3f(0.012, 0.04, 0.034);
@@ -46,7 +67,7 @@ const shaderSource = `
     color += vec3f(0.95, 0.68, 0.24) * pow(max(0.0, 1.0 - lensDistance), 5.0) * 0.14;
     let field = clamp(baseLayer.x * 0.34 + baseLayer.y * 0.72 + deepLayer.x * 0.18 + lens * 0.08 + refractionEdge * 0.35, 0.0, 1.0);
     let edgeFade = 1.0 - smoothstep(0.16, 1.65, length(uv));
-    let alpha = clamp(field * edgeFade * (0.54 + transition * 0.28) * u.stageMotion.w, 0.0, 0.82);
+    let alpha = clamp(field * edgeFade * (0.52 + transition * 0.22) * mix(0.82, 1.0, u.stageMotion.w), 0.0, 0.82);
     return vec4f(color * alpha, alpha);
   }
 `;
@@ -80,6 +101,23 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
   let resolutionScale = 1;
   let configuredWidth = 0;
   let configuredHeight = 0;
+  const FIXED_STEP_SECONDS = 1 / 60;
+  const MAX_DT_SECONDS = 0.05;
+  const SPRING_STIFFNESS = 72;
+  const SPRING_DAMPING = 10.5;
+  const MAX_VELOCITY = 0.9;
+  const SETTLE_DISTANCE = 0.0002;
+  const SETTLE_VELOCITY = 0.0005;
+  const readScrollTarget = () => {
+    const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    return Math.min(1, Math.max(0, window.scrollY / maxScroll));
+  };
+  let targetScroll = readScrollTarget();
+  let springScroll = targetScroll;
+  let springVelocity = 0;
+  let physicsAccumulator = 0;
+  let lastPhysicsTime = 0;
+  let settling = false;
 
   const teardown = ({ notify = false } = {}) => {
     if (!alive) return;
@@ -90,6 +128,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     frame = 0;
     delayedFrame = 0;
     stage.removeAttribute('data-enhanced');
+    stage.removeAttribute('data-spring');
     delete canvas.dataset.renderer;
     try { uniformBuffer.destroy(); } catch { /* Already unavailable. */ }
     try { device.destroy(); } catch { /* Device loss is already the fallback. */ }
@@ -121,14 +160,39 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     }
   };
 
-  const draw = () => {
+  const advanceSpring = (timestamp) => {
+    const elapsed = lastPhysicsTime ? Math.min(MAX_DT_SECONDS, Math.max(0, (timestamp - lastPhysicsTime) / 1000)) : FIXED_STEP_SECONDS;
+    lastPhysicsTime = timestamp;
+    physicsAccumulator = Math.min(MAX_DT_SECONDS, physicsAccumulator + elapsed);
+    while (physicsAccumulator >= FIXED_STEP_SECONDS) {
+      const acceleration = SPRING_STIFFNESS * (targetScroll - springScroll) - SPRING_DAMPING * springVelocity;
+      springVelocity = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, springVelocity + acceleration * FIXED_STEP_SECONDS));
+      springScroll += springVelocity * FIXED_STEP_SECONDS;
+      physicsAccumulator -= FIXED_STEP_SECONDS;
+    }
+    if (Math.abs(targetScroll - springScroll) <= SETTLE_DISTANCE && Math.abs(springVelocity) <= SETTLE_VELOCITY) {
+      springScroll = targetScroll;
+      springVelocity = 0;
+      physicsAccumulator = 0;
+      settling = false;
+      lastPhysicsTime = 0;
+      stage.dataset.spring = 'settled';
+    } else {
+      settling = true;
+      stage.dataset.spring = 'settling';
+    }
+    return settling;
+  };
+
+  const draw = (timestamp = performance.now()) => {
     frame = 0;
     if (!alive || paused || document.hidden) return;
     try {
       const started = performance.now();
       const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-      const scroll = Math.min(1, Math.max(0, window.scrollY / maxScroll));
-      const anchor = window.scrollY + window.innerHeight * 0.68;
+      const moving = advanceSpring(timestamp);
+      const scroll = Math.min(1, Math.max(0, springScroll));
+      const anchor = scroll * maxScroll + window.innerHeight * 0.68;
       const centers = sections.map((section) => section.offsetTop + section.offsetHeight * 0.5);
       let nextIndex = centers.findIndex((center) => center > anchor);
       if (nextIndex < 0) nextIndex = centers.length;
@@ -152,7 +216,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       stage.dataset.state = selected?.dataset.geometryState || String(Math.round(section));
       stage.dataset.side = (progress < 0.5 ? currentSide : nextSide) < 0 ? 'left' : 'right';
       if (transition > 0.24) stage.dataset.transition = 'true'; else stage.removeAttribute('data-transition');
-      device.queue.writeBuffer(uniformBuffer, 0, new Float32Array([canvas.width, canvas.height, scroll, phase, section, side, transition, 0.94]));
+      device.queue.writeBuffer(uniformBuffer, 0, new Float32Array([canvas.width, canvas.height, scroll, phase, section, side, transition, moving ? 0 : 1]));
       const encoder = device.createCommandEncoder();
       const pass = encoder.beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }] });
       pass.setPipeline(pipeline);
@@ -166,6 +230,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       const elapsed = performance.now() - started;
       if (elapsed > 50 || (elapsed > 20 && lastFrameCostExceeded)) { teardown({ notify: true }); return; }
       if (elapsed > 20) { resolutionScale = 0.7; lastFrameCostExceeded = true; configuredWidth = 0; configuredHeight = 0; resize(); }
+      if (moving) requestDraw();
     } catch {
       teardown({ notify: true });
     }
@@ -180,7 +245,15 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     }
     frame = requestAnimationFrame(draw);
   };
-  const onScroll = () => requestDraw();
+  const onScroll = () => {
+    const nextTarget = readScrollTarget();
+    if (Math.abs(nextTarget - targetScroll) > Number.EPSILON) {
+      targetScroll = nextTarget;
+      settling = true;
+      stage.dataset.spring = 'settling';
+      requestDraw();
+    }
+  };
   window.addEventListener('scroll', onScroll, { passive: true });
   device.lost.then(() => teardown({ notify: true }));
   resize();
@@ -188,9 +261,9 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
   requestDraw();
   return {
     active() { return alive; },
-    pause() { paused = true; if (frame) cancelAnimationFrame(frame); if (delayedFrame) window.clearTimeout(delayedFrame); frame = 0; delayedFrame = 0; },
+    pause() { paused = true; if (frame) cancelAnimationFrame(frame); if (delayedFrame) window.clearTimeout(delayedFrame); frame = 0; delayedFrame = 0; lastPhysicsTime = 0; },
     resume() { paused = false; requestDraw(); },
-    resize() { resize(); requestDraw(); },
+    resize() { targetScroll = readScrollTarget(); settling = Math.abs(targetScroll - springScroll) > SETTLE_DISTANCE; lastPhysicsTime = 0; resize(); requestDraw(); },
     destroy() { teardown(); },
   };
   } catch {
