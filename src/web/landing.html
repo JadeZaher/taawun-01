@@ -58,10 +58,10 @@
     .skip-link { position: fixed; z-index: 100; top: 8px; left: 8px; min-height: 44px; display: flex; align-items: center; padding: 10px 14px; background: var(--parchment); color: var(--ink); transform: translateY(-160%); }
     .skip-link:focus { transform: translateY(0); }
 
-    .geometry-stage { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: transparent; pointer-events: none; --geometry-x: 28vw; --geometry-scale: 1; --geometry-turn: 2deg; }
-    .geometry-static { position: absolute; top: 50%; left: 50%; width: min(62vw, 900px); aspect-ratio: 1; opacity: 0.58; background-image: radial-gradient(circle at 64% 28%, rgba(224, 183, 91, 0.34), transparent 24%), repeating-conic-gradient(from 22.5deg at 50% 50%, rgba(99, 184, 155, 0.28) 0 2deg, transparent 2deg 22.5deg), repeating-radial-gradient(circle at 50% 50%, transparent 0 28px, rgba(224, 183, 91, 0.18) 29px 30px, transparent 31px 56px); mask-image: radial-gradient(circle, #000 0 48%, transparent 76%); transform: translate(calc(-50% + var(--geometry-x)), -50%) scale(var(--geometry-scale)) rotate(var(--geometry-turn)); transition: transform 900ms cubic-bezier(.18,1.16,.32,1), opacity 520ms ease; }
-    .geometry-stage[data-side="left"] { --geometry-x: -28vw; --geometry-turn: -7deg; }
-    .geometry-stage[data-transition="true"] { --geometry-scale: 1.15; }
+    .geometry-stage { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: transparent; pointer-events: none; --geometry-x: 22vw; --geometry-scale: 1; --geometry-turn: 1deg; }
+    .geometry-static { position: absolute; top: 50%; left: 50%; width: min(62vw, 900px); aspect-ratio: 1; opacity: 0.58; background-image: radial-gradient(circle at 64% 28%, rgba(224, 183, 91, 0.34), transparent 24%), repeating-conic-gradient(from 22.5deg at 50% 50%, rgba(99, 184, 155, 0.28) 0 2deg, transparent 2deg 22.5deg), repeating-radial-gradient(circle at 50% 50%, transparent 0 28px, rgba(224, 183, 91, 0.18) 29px 30px, transparent 31px 56px); mask-image: radial-gradient(circle, #000 0 48%, transparent 76%); transform: translate(calc(-50% + var(--geometry-x)), -50%) scale(var(--geometry-scale)) rotate(var(--geometry-turn)); transition: transform 1200ms cubic-bezier(.22,.72,.2,1), opacity 520ms ease; }
+    .geometry-stage[data-side="left"] { --geometry-x: -22vw; --geometry-turn: -1deg; }
+    .geometry-stage[data-transition="true"] { --geometry-scale: 1.035; }
     .geometry-stage[data-motion="paused"] .geometry-static { transition: none; }
     #geometryCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 320ms ease; }
     .geometry-stage[data-enhanced="true"] #geometryCanvas { opacity: 0.9; }
@@ -130,10 +130,13 @@
     .verse-translation-text { margin-top: 10px; color: var(--parchment); font: 400 clamp(17px, 1.8vw, 21px)/1.6 var(--serif); }
 
     .content-section { position: relative; z-index: 2; padding: 110px max(28px, calc((100vw - 1224px) / 2)); background: var(--ink); border-top: 1px solid var(--line); }
-    .content-section.geometry-content { min-height: 100svh; background: linear-gradient(90deg, rgba(8, 17, 15, 0.1) 0 42%, rgba(8, 17, 15, 0.86) 78%); }
+    .content-section.geometry-content { min-height: 100svh; background: rgba(8, 17, 15, 0.5); }
+    .content-section.geometry-content[data-geometry-side="left"] { background: linear-gradient(90deg, rgba(8, 17, 15, 0.1) 0 42%, rgba(8, 17, 15, 0.86) 78%); }
+    .content-section.geometry-content[data-geometry-side="right"] { background: linear-gradient(90deg, rgba(8, 17, 15, 0.86) 22%, rgba(8, 17, 15, 0.1) 58%); }
     .content-head { max-width: 780px; }
     .geometry-content .content-head, .geometry-content .card-grid { width: min(900px, 74vw); }
     .geometry-content[data-geometry-side="left"] .content-head, .geometry-content[data-geometry-side="left"] .card-grid { margin-left: auto; }
+    .geometry-content[data-geometry-side="right"] .content-head, .geometry-content[data-geometry-side="right"] .card-grid { margin-right: auto; }
     .card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 44px; }
     .card { min-width: 0; padding: 26px; border: 1px solid var(--line); background: linear-gradient(150deg, #10231d, #0b1412); }
     .card h3 { margin: 10px 0 12px; font: 500 24px/1.2 var(--serif); }
@@ -173,7 +176,7 @@
       .story-copy { width: 100%; }
       .story-section[data-geometry-side] .story-copy, .verse-section[data-geometry-side] .verse-card { margin-inline: 0; }
       .geometry-content .content-head, .geometry-content .card-grid { width: 100%; }
-      .content-section.geometry-content { background: rgba(8, 17, 15, 0.62); }
+      .content-section.geometry-content[data-geometry-side] { background: rgba(8, 17, 15, 0.62); }
       .card-grid { grid-template-columns: 1fr; }
       .footer-inner { flex-direction: column; }
     }
@@ -280,7 +283,7 @@
       </div>
     </section>
 
-    <section class="verse-section" data-geometry-state="3" data-geometry-side="right" aria-labelledby="verseCaption">
+    <section class="verse-section" data-geometry-state="3" data-geometry-side="left" aria-labelledby="verseCaption">
       <figure class="verse-card">
         <blockquote lang="ar" dir="rtl">وَتَعَاوَنُواْ عَلَى ٱلۡبِرِّ وَٱلتَّقۡوَىٰۖ وَلَا تَعَاوَنُواْ عَلَى ٱلۡإِثۡمِ وَٱلۡعُدۡوَٰنِۚ</blockquote>
         <section class="verse-translation" lang="en" aria-labelledby="verseTranslationLabel">
@@ -300,7 +303,7 @@
       </div>
     </section>
 
-    <section id="templates" class="content-section geometry-content" data-geometry-state="5" data-geometry-side="left" aria-labelledby="templatesTitle">
+    <section id="templates" class="content-section geometry-content" data-geometry-state="5" data-geometry-side="right" aria-labelledby="templatesTitle">
       <div class="content-head">
         <p class="eyebrow">Three honest starting points</p>
         <h2 id="templatesTitle">Begin with a real community need. Make it unmistakably yours.</h2>

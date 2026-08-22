@@ -322,7 +322,9 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(html, /id="motionToggle"[^>]*type="button"[^>]*aria-pressed="true"/u);
   assert.match(html, /id="motionToggle"[^>]*aria-label="Decorative motion"/u);
   assert.match(html, /id="menuToggle"[^>]*aria-expanded="false"[^>]*aria-controls="primaryNavigation"/u);
-  assert.deepEqual([...html.matchAll(/data-geometry-state="\d+" data-geometry-side="(right|left)"/gu)].map((match) => match[1]), ['right', 'right', 'left', 'right', 'right', 'left']);
+  const geometrySides = [...html.matchAll(/data-geometry-state="\d+" data-geometry-side="(right|left)"/gu)].map((match) => match[1]);
+  assert.deepEqual(geometrySides, ['right', 'right', 'left', 'left', 'right', 'right']);
+  assert.equal(geometrySides.slice(1).filter((side, index) => side !== geometrySides[index]).length, 2);
   assert.match(html, /prefers-reduced-motion: reduce/u);
   assert.match(html, /forced-colors: active/u);
   assert.match(loader, /prefers-reduced-motion: reduce/u);
@@ -333,8 +335,12 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(loader, /window\.innerWidth > 840/u);
   assert.match(loader, /event\.key === 'Escape'/u);
   assert.match(loader, /setAttribute\('aria-pressed', String\(active\)\)/u);
-  assert.match(loader, /progress > 0\.12 && progress < 0\.88/u);
-  assert.match(html, /transition: transform 900ms cubic-bezier\(\.18,1\.16,\.32,1\)/u);
+  assert.match(loader, /const sideChanges = currentSide !== nextSide/u);
+  assert.match(loader, /if \(sideChanges && progress > 0\.12 && progress < 0\.88\)/u);
+  assert.match(html, /--geometry-x: 22vw/u);
+  assert.match(html, /transition: transform 1200ms cubic-bezier\(\.22,\.72,\.2,1\)/u);
+  assert.match(html, /--geometry-turn: 1deg/u);
+  assert.match(html, /data-side="left"[^}]*--geometry-turn: -1deg/u);
   assert.ok(loader.indexOf('if (!capable()') < loader.indexOf("import('/geometric-renderer.js')"), 'capability checks must precede the renderer request');
   assert.match(renderer, /powerPreference: 'low-power'/u);
   assert.match(renderer, /adapter\.isFallbackAdapter/u);
@@ -346,17 +352,65 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(renderer, /fn segmentDistance\(/u);
   assert.match(renderer, /fn starOutline\(/u);
   assert.doesNotMatch(renderer, /for \(var i = 0u; i < 16u/u);
-  assert.match(renderer, /let straps = min\(diagonalA, diagonalB\)/u);
-  assert.match(renderer, /let primaryAA = max\(fwidth\(primaryDistance\) \* softness/u);
+  assert.match(renderer, /fn octagonMetric\(/u);
+  assert.match(renderer, /let junctionInterior = 1\.0 - smoothstep\(0\.105, 0\.135, junctionMetric\)/u);
+  assert.match(renderer, /let connector = stroke\(abs\(junctionMetric - 0\.145\), 0\.008, softness\)/u);
+  assert.match(renderer, /let diagonalBridgeAxis = abs\(abs\(cell\.x\) - abs\(cell\.y\)\) \* 0\.70710678/u);
+  assert.match(renderer, /let bridgePairDistance = abs\(diagonalBridgeAxis - 0\.012\)/u);
+  assert.match(renderer, /let bridgeStarGate = smoothstep\(0\.392, 0\.410, length\(cell\)\)/u);
+  assert.match(renderer, /let bridgeConnectorGate = smoothstep\(0\.132, 0\.150, junctionMetric\)/u);
+  assert.match(renderer, /let bridgeRails = stroke\(bridgePairDistance, 0\.004, softness\) \* bridgeStarGate \* bridgeConnectorGate/u);
+  assert.match(renderer, /max\(connector, max\(bridgeRails, max\(strapA, strapB\)\)\)/u);
+  assert.match(renderer, /let verticalCrossingID = round\(tiledPoint\.x\) \+ floor\(tiledPoint\.y\)/u);
+  assert.match(renderer, /let horizontalCrossingID = floor\(tiledPoint\.x\) \+ round\(tiledPoint\.y\)/u);
+  assert.match(renderer, /let crossingID = select\(horizontalCrossingID, verticalCrossingID, verticalCrossing\)/u);
+  assert.match(renderer, /let overUnder = step\(0\.5, fract\(crossingID \* 0\.5\)\)/u);
+  assert.match(renderer, /strapA = stroke\(diagonalA[\s\S]*?strapB = stroke\(diagonalB/u);
   assert.match(renderer, /let softness = mix\(1\.75, 1\.0, u\.stageMotion\.w\)/u);
+  assert.match(renderer, /let travel = 1\.0 - u\.stageMotion\.w/u);
+  assert.match(renderer, /let sceneTravel = travel \* transition/u);
+  assert.match(renderer, /let outerStarScale = 1\.0 - travel \* 0\.035/u);
+  assert.match(renderer, /let innerRosetteScale = 1\.0 \+ travel \* 0\.045/u);
+  assert.match(renderer, /let star = starOutline\(cell \/ outerStarScale\) \* outerStarScale/u);
+  assert.match(renderer, /let innerRosette = starOutline\(rotate2\(cell, 0\.39269908\) \* 1\.42 \/ innerRosetteScale\) \* innerRosetteScale \/ 1\.42/u);
+  assert.match(renderer, /fn lattice\(point: vec2f, scale: f32, turn: f32, softness: f32, travel: f32\)/u);
+  assert.match(renderer, /let latticeScale = 3\.45/u);
+  assert.doesNotMatch(renderer, /latticeScale \*=|latticeScale = [^;]*(?:travel|section)/u);
+  assert.match(renderer, /let stableTurn = 0\.018/u);
+  assert.doesNotMatch(renderer, /stableTurn\s*=\s*[^;]*section/u);
+  assert.match(renderer, /let turn = stableTurn \+ sceneTravel \* 0\.012/u);
+  assert.match(renderer, /let basePoint = rotate2\(uv, sceneTravel \* 0\.006\)/u);
+  assert.match(renderer, /uv\.x -= side \* 0\.34/u);
+  assert.match(renderer, /let bandCellOffset = 0\.010 \+ lens \* 0\.010 \+ sceneTravel \* 0\.002/u);
+  assert.doesNotMatch(renderer, /scroll \* 0\.045|scroll \* 0\.025/u);
+  assert.match(renderer, /lattice\(basePoint, latticeScale, turn, softness, sceneTravel\)/u);
+  assert.match(renderer, /lattice\(basePoint \+ bandOffset, latticeScale, turn, softness, sceneTravel\)/u);
+  assert.doesNotMatch(renderer, /turn = .*transition|rotate2\([^\n]*transition \* 0\.025/u);
+  assert.match(renderer, /let bandMagnitude = bandCellOffset \/ latticeScale/u);
+  assert.match(renderer, /let chromaticEnvelope = 0\.07 \+ lens \* 0\.68/u);
+  assert.match(renderer, /let emeraldBand = lattice\(basePoint \+ bandOffset/u);
+  assert.match(renderer, /let rustBand = lattice\(basePoint - bandOffset/u);
+  assert.match(renderer, /let mirrorBand = lattice\(basePoint \+ mirrorOffset/u);
+  assert.match(renderer, /let mirrorOffset = vec2f\(-bandOffset\.y, bandOffset\.x\) \* 0\.72/u);
+  assert.match(renderer, /refractionVector \/ max\(length\(refractionVector\), 0\.0001\)/u);
+  assert.match(renderer, /bandVector \/ max\(length\(bandVector\), 0\.0001\)/u);
+  assert.doesNotMatch(renderer, /normalize\(/u);
+  assert.doesNotMatch(renderer, /mirrorPoint|deepLayer|4\.25/u);
   assert.doesNotMatch(renderer, /uv \/= .*sin/u);
   assert.match(renderer, /1\.0 - smoothstep\(0\.04, 0\.66, lensDistance\)/u);
   assert.match(renderer, /const FIXED_STEP_SECONDS = 1 \/ 60/u);
   assert.match(renderer, /const MAX_DT_SECONDS = 0\.05/u);
   assert.match(renderer, /const SPRING_STIFFNESS = 72/u);
-  assert.match(renderer, /const SPRING_DAMPING = 10\.5/u);
+  assert.match(renderer, /const SPRING_DAMPING = 2 \* Math\.sqrt\(SPRING_STIFFNESS\)/u);
   assert.match(renderer, /const MAX_VELOCITY = 0\.9/u);
   assert.match(renderer, /while \(physicsAccumulator >= FIXED_STEP_SECONDS\)/u);
+  assert.match(renderer, /priorDistance \* \(targetScroll - springScroll\) <= 0/u);
+  assert.match(renderer, /const motionAmount = moving \? Math\.min\(1,[\s\S]*?const settledMix = 1 - motionAmount/u);
+  assert.match(renderer, /const sideChanges = currentSide !== nextSide/u);
+  assert.match(renderer, /const sideProgress = progress \* progress \* progress \* \(progress \* \(progress \* 6 - 15\) \+ 10\)/u);
+  assert.match(renderer, /const side = sideChanges \? currentSide \+ \(nextSide - currentSide\) \* sideProgress : currentSide/u);
+  assert.match(renderer, /const transition = sideChanges \? Math\.sin\(Math\.PI \* earlyProgress\) : 0/u);
+  assert.match(renderer, /if \(sideChanges && transition > 0\.24\) stage\.dataset\.transition = 'true'/u);
   assert.match(renderer, /if \(moving\) requestDraw\(\)/u);
   assert.match(scrollHandler, /const nextTarget = readScrollTarget\(\)/u);
   assert.doesNotMatch(scrollHandler, /writeBuffer|window\.scrollY|dataset\.state/u);
@@ -399,7 +453,7 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     await client.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
       let loseDevice;
       const lost = new Promise((resolve) => { loseDevice = resolve; });
-      window.__gpuQA = { adapterRequests: 0, submissions: 0, destroys: 0, uniforms: [], nullAdapter: false, lose: () => loseDevice({ reason: 'destroyed' }) };
+      window.__gpuQA = { adapterRequests: 0, submissions: 0, destroys: 0, uniforms: [], shaderSource: '', nullAdapter: false, lose: () => loseDevice({ reason: 'destroyed' }) };
       Object.defineProperty(navigator, 'hardwareConcurrency', { configurable: true, value: 8 });
       Object.defineProperty(navigator, 'deviceMemory', { configurable: true, value: 8 });
       const connectionListeners = [];
@@ -410,7 +464,7 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
       const device = {
         lost,
         queue: { writeBuffer(_buffer, _offset, data) { window.__gpuQA.uniforms.push(Array.from(data)); }, submit() { window.__gpuQA.submissions += 1; } },
-        createShaderModule() { return { getCompilationInfo: async () => ({ messages: [] }) }; },
+        createShaderModule({ code }) { window.__gpuQA.shaderSource = code; return { getCompilationInfo: async () => ({ messages: [] }) }; },
         createRenderPipeline() { return { getBindGroupLayout() { return {}; } }; },
         createBuffer() { return { destroy() {} }; },
         createBindGroup() { return {}; },
@@ -432,13 +486,18 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     })();` });
     await client.send('Page.navigate', { url: origin });
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage')?.dataset.enhanced === 'true' && !document.querySelector('#motionToggle').hidden`), 'mocked WebGPU enhancement');
-    const initial = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, submissions: window.__gpuQA.submissions, renderer: document.querySelector('#geometryCanvas').dataset.renderer || '', controlHeight: Math.round(document.querySelector('#motionToggle').getBoundingClientRect().height), state: document.querySelector('.geometry-stage').dataset.state, side: document.querySelector('.geometry-stage').dataset.side })`);
+    const initial = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, submissions: window.__gpuQA.submissions, renderer: document.querySelector('#geometryCanvas').dataset.renderer || '', controlHeight: Math.round(document.querySelector('#motionToggle').getBoundingClientRect().height), state: document.querySelector('.geometry-stage').dataset.state, side: document.querySelector('.geometry-stage').dataset.side, connector: window.__gpuQA.shaderSource.includes('junctionInterior') && window.__gpuQA.shaderSource.includes('overUnder'), connectedOctagon: window.__gpuQA.shaderSource.includes('bridgePairDistance') && window.__gpuQA.shaderSource.includes('bridgeConnectorGate'), stableCrossing: window.__gpuQA.shaderSource.includes('verticalCrossingID') && window.__gpuQA.shaderSource.includes('horizontalCrossingID'), adjacentBands: window.__gpuQA.shaderSource.includes('bandCellOffset / latticeScale') && window.__gpuQA.shaderSource.includes('basePoint + bandOffset') && window.__gpuQA.shaderSource.includes('basePoint - bandOffset'), nestedTravel: window.__gpuQA.shaderSource.includes('outerStarScale') && window.__gpuQA.shaderSource.includes('innerRosetteScale') && window.__gpuQA.shaderSource.includes('travel: f32') })`);
     assert.equal(initial.requests, 1);
     assert.ok(initial.submissions >= 1);
     assert.equal(initial.renderer, 'webgpu');
     assert.ok(initial.controlHeight >= 44);
     assert.equal(initial.state, '0');
     assert.equal(initial.side, 'right');
+    assert.equal(initial.connector, true);
+    assert.equal(initial.connectedOctagon, true);
+    assert.equal(initial.stableCrossing, true);
+    assert.equal(initial.adjacentBands, true);
+    assert.equal(initial.nestedTravel, true);
 
     await evaluate(client, `document.querySelector('#motionToggle').click()`);
     await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && !document.querySelector('#motionToggle').hidden && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'false'`), 'reversible user pause');
@@ -448,14 +507,23 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     assert.equal(await evaluate(client, `localStorage.getItem('taawun-decorative-motion')`), null);
 
     const beforeScroll = await evaluate(client, `window.__gpuQA.submissions`);
-    const scrollTarget = await evaluate(client, `(() => { window.scrollTo({ top: window.innerHeight * 1.2, behavior: 'instant' }); return window.scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight); })()`);
+    const scrollTarget = await evaluate(client, `(() => {
+      const sections = [...document.querySelectorAll('[data-geometry-state]')];
+      const centers = sections.slice(0, 2).map((section) => section.offsetTop + section.offsetHeight * 0.5);
+      const target = Math.max(0, (centers[0] + centers[1]) * 0.5 - window.innerHeight * 0.68);
+      window.scrollTo({ top: target, behavior: 'instant' });
+      return window.scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    })()`);
     await waitFor(() => evaluate(client, `window.__gpuQA.submissions >= ${beforeScroll + 3}`), 'spring continues after one scroll event');
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.state !== '0'`), 'approaching-section state transition');
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.spring === 'settled'`), 'bounded spring settlement');
-    const settled = await evaluate(client, `({ submissions: window.__gpuQA.submissions, samples: window.__gpuQA.uniforms.slice(${beforeScroll}).map((values) => ({ scroll: values[2], sharp: values[7] })) })`);
+    const settled = await evaluate(client, `({ submissions: window.__gpuQA.submissions, samples: window.__gpuQA.uniforms.slice(${beforeScroll}).map((values) => ({ scroll: values[2], side: values[5], transition: values[6], sharp: values[7] })) })`);
     assert.ok(settled.submissions > beforeScroll + 2 && settled.submissions < beforeScroll + 120, `spring must settle in a bounded number of frames: ${settled.submissions - beforeScroll}`);
-    assert.ok(settled.samples.some((sample) => sample.scroll > scrollTarget + 0.0001), 'underdamped spring should gently overshoot the target');
-    assert.ok(settled.samples.some((sample) => sample.sharp === 0) && settled.samples.at(-1)?.sharp === 1, 'moving frames soften and the final settled frame sharpens the tessellation');
+    assert.ok(settled.samples.every((sample) => sample.scroll <= scrollTarget + 0.00001), 'smoothed travel must not overshoot the target');
+    assert.ok(settled.samples.every((sample, index, samples) => index === 0 || sample.scroll + 0.00001 >= samples[index - 1].scroll), 'downward travel must settle without a reverse swing');
+    assert.ok(settled.samples.every((sample) => sample.side === 1), 'the first right-to-right scene transition must not interpolate laterally');
+    assert.ok(settled.samples.every((sample) => sample.transition === 0), 'the first right-to-right scene transition must not rotate, shimmer, or morph the lattice');
+    assert.ok(settled.samples.some((sample) => sample.sharp < 0.99) && settled.samples.at(-1)?.sharp === 1, 'moving frames soften and the final settled frame sharpens the tessellation');
     await wait(250);
     assert.equal(await evaluate(client, `window.__gpuQA.submissions`), settled.submissions, 'settled spring must stop submitting frames');
     await evaluate(client, `window.__gpuQA.lose()`);
@@ -696,7 +764,7 @@ test('public landing and account shell remain distinct, responsive, and keyboard
     assert.equal(landingSemantics.loginHref, '/account#login');
     assert.equal(landingSemantics.canvasHidden, 'true');
     assert.equal(landingSemantics.geometryStates, 6);
-    assert.deepEqual(landingSemantics.geometrySides, ['right', 'right', 'left', 'right', 'right', 'left']);
+    assert.deepEqual(landingSemantics.geometrySides, ['right', 'right', 'left', 'left', 'right', 'right']);
     assert.equal(landingSemantics.hasAuthForm, false);
     assert.match(landingSemantics.copy, /does not hold funds or settle payments/iu);
     assert.match(landingSemantics.copy, /community-owned web address/iu);

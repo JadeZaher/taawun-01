@@ -178,23 +178,54 @@ the visible page.
 
 The Islamic geometric scene is progressive decoration. It occupies one
 transparent full-viewport layer rather than a framed object. Six authored scene
-states alternate right, right, left, right, right, left while readable content
-uses the inverse side; interpolation begins before a section reaches the center
-so the geometry visibly crosses adjacent whitespace rather than snapping at a
-threshold. Small screens keep only restrained static edge peeks that fade beyond
-the viewport. Their fixed-duration transform uses one gentle overshoot curve, so
-swipe or wheel rate never changes the transition duration. The resting pattern
+states group geometry right, right, left, left, right, right while readable
+content uses the inverse left, left, right, right, left, left sequence. Those two
+intentional sways avoid forcing the reader's eye across the screen at every
+section. Same-side section changes perform no lateral interpolation. Only the
+two authored side changes traverse the page, using an additional smootherstep
+inside the fixed-rate critically damped response so the crossings begin and end
+slowly instead of following wheel or swipe speed. The desktop resting offset is
+22vw, keeping those two traversals restrained. Small
+screens keep only restrained static edge peeks that fade beyond the viewport.
+Their 1.2-second transform uses a smooth non-overshooting curve, so swipe or
+wheel rate never changes the transition duration. Static fallback scaling is
+limited to 3.5% and occurs only for a real side change. The resting pattern
 is a disciplined repeated eight-point star and rosette tessellation with narrow
-polygonal straps; emerald, gold, and rust refraction belongs to displaced and
-mirrored depth layers rather than deforming every base edge. The static HTML and
-CSS fallback carry the complete product story.
+polygonal straps. Shared rosette corners form an outlined octagonal connector
+with an open center. Paired diagonal bridge rails enter at the real offset
+outer-arm intersection near lattice radius 0.406 and end on that octagon's
+boundary, making the connector part of the strap network without cutting through
+either interior. Alternating strap gaps
+establish a visible over/under interlock. Crossing parity comes from the shared
+global lattice coordinate: a
+vertical edge uses `round(x)+floor(y)` and a horizontal edge uses
+`floor(x)+round(y)`, so both cell halves agree which physical diagonal passes on
+top. Emerald, gold, and rust refraction stays within adjacent parallel samples
+of that exact lattice. Rail separation is authored in cell space from 0.010 to a
+maximum 0.022, then divided by the active lattice scale; the mirrored rail is a
+true small perpendicular offset, not a second scaled drawing elsewhere on the
+surface. Chromatic rails keep only a subtle baseline outside the localized lens
+envelope. Refraction remains visible without deforming or obscuring the crisp
+base edges. The static HTML and CSS fallback carry the complete product story.
 
 WebGPU may enhance only on capable desktop devices after idle, never moves text
 or captures scrolling. Scroll events update only a normalized target. A bounded
-underdamped spring advances at a fixed 60Hz physics step with capped elapsed time
-and velocity, gently overshoots independently of input-device speed, renders a
-sharper final tessellation, and stops scheduling frames once both displacement
-and velocity settle. The subtle navigation motion button uses `aria-pressed` and
+critically damped response advances at a fixed 60Hz physics step with capped
+elapsed time and velocity; an explicit target-crossing guard prevents numerical
+overshoot. Its motion amount fades with remaining distance and velocity. The
+resting lattice orientation is invariant across all six sections. Only while an
+authored side transition and physical settling overlap does it add
+at most 0.018 radians of combined travel-only lattice rotation plus a 0.002-cell
+rail shimmer before returning exactly to the stable scene rotation. While that
+same transition-bound travel amount is nonzero, the outer star contracts by at
+most 3.5%
+and the inner rosette expands by at most 4.5%; both return to their exact authored
+resting geometry on settlement. This restrained kaleidoscope overlap changes
+only the nested star outlines. Lattice scale, octagonal connectors, bridge rails,
+and over/under straps remain fixed spatial anchors, so there is no whole-field
+zoom or added lateral swing. It renders a
+sharper final tessellation and stops scheduling frames once both displacement and
+velocity settle. The subtle navigation motion button uses `aria-pressed` and
 keeps a reversible user preference. The progressively enhanced mobile menu
 remains readable without JavaScript, uses 44px controls, and restores focus when
 Escape closes it. Reduced motion, forced colors, increased contrast, reduced

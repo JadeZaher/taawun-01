@@ -51,11 +51,14 @@
     const currentIndex = Math.max(0, nextIndex - 1);
     const span = Math.max(1, centers[nextIndex] - centers[currentIndex]);
     const progress = currentIndex === nextIndex ? 0 : Math.min(1, Math.max(0, (anchor - centers[currentIndex]) / span));
+    const currentSide = sections[currentIndex].dataset.geometrySide;
+    const nextSide = sections[nextIndex].dataset.geometrySide;
+    const sideChanges = currentSide !== nextSide;
     const selected = progress < 0.5 ? currentIndex : nextIndex;
     const section = sections[selected];
     stage.dataset.state = section.dataset.geometryState || String(selected);
     stage.dataset.side = section.dataset.geometrySide === 'left' ? 'left' : 'right';
-    if (progress > 0.12 && progress < 0.88) stage.dataset.transition = 'true';
+    if (sideChanges && progress > 0.12 && progress < 0.88) stage.dataset.transition = 'true';
     else stage.removeAttribute('data-transition');
   };
   const scheduleStaticScene = () => {
