@@ -275,6 +275,9 @@ its observer, preference, or device. The matching persisted `pageshow`
 recomputes main-region visibility and resumes that one renderer or re-enters the
 same eligibility gate if initialization was pending. A non-persisted pagehide
 still disconnects and destroys normally. No restoration path registers a second
-observer or duplicate listener. The signed-in cockpit brand is a 44px semantic
+observer or duplicate listener. Persisted restoration also cancels the frozen
+canvas opacity transition, applies the already-authoritative enhanced opacity
+for one layout frame, then removes both temporary inline overrides so ordinary
+future transitions remain CSS-owned. The signed-in cockpit brand is a 44px semantic
 link back to the public `/` story; the account document itself remains noindex
 and contains no decorative renderer.

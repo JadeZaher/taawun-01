@@ -567,13 +567,20 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
       const hidden = new Event('pagehide');
       Object.defineProperty(hidden, 'persisted', { value: true });
       window.dispatchEvent(hidden);
+      const canvas = document.querySelector('#geometryCanvas');
+      canvas.style.transition = 'opacity 999s linear';
+      canvas.style.opacity = '0';
       document.querySelector('[data-geometry-state="2"]').scrollIntoView({ block: 'center', behavior: 'instant' });
     })()`);
     await wait(120);
     assert.equal(await evaluate(client, `window.__gpuQA.submissions`), beforeBackForwardCache.submissions, 'persisted pagehide pauses the retained renderer');
     await evaluate(client, `(() => { const shown = new Event('pageshow'); Object.defineProperty(shown, 'persisted', { value: true }); window.dispatchEvent(shown); })()`);
-    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.spring === 'settled' && window.__gpuQA.submissions > ${beforeBackForwardCache.submissions + 2}`), 'back-forward cache pageshow resumes and settles the retained renderer');
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.spring === 'settled'
+      && document.querySelector('.geometry-stage').dataset.enhanced === 'true'
+      && getComputedStyle(document.querySelector('#geometryCanvas')).opacity === '0.9'
+      && window.__gpuQA.submissions > ${beforeBackForwardCache.submissions + 2}`), 'back-forward cache pageshow restores visible canvas and settles the retained renderer');
     assert.equal(await evaluate(client, `window.__gpuQA.adapterRequests`), beforeBackForwardCache.adapters, 'back-forward cache recovery reuses one renderer without duplicate initialization');
+    assert.deepEqual(await evaluate(client, `({ opacity: document.querySelector('#geometryCanvas').style.opacity, transition: document.querySelector('#geometryCanvas').style.transition })`), { opacity: '', transition: '' }, 'back-forward cache visibility recovery removes temporary inline overrides so later lifecycle transitions remain available');
 
     const beforeContinuationScroll = settled.submissions;
     await evaluate(client, `document.querySelector('.geometry-continuation:last-of-type').scrollIntoView({ block: 'center', behavior: 'instant' })`);

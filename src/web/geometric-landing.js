@@ -77,6 +77,7 @@
   let renderer = null;
   let idleHandle = 0;
   let resizeFrame = 0;
+  let canvasRecoveryFrame = 0;
   let sceneVisible = false;
   let initializing = false;
   let pageLoaded = document.readyState === 'complete';
@@ -104,7 +105,28 @@
     if (!active) stage.removeAttribute('data-transition');
   };
 
+  const clearCanvasRecovery = () => {
+    if (canvasRecoveryFrame) window.cancelAnimationFrame(canvasRecoveryFrame);
+    canvasRecoveryFrame = 0;
+    canvas.style.removeProperty('transition');
+    canvas.style.removeProperty('opacity');
+  };
+
+  const restoreEnhancedCanvasVisibility = () => {
+    if (!renderer || stage.dataset.enhanced !== 'true' || !capable()) return;
+    clearCanvasRecovery();
+    canvas.style.transition = 'none';
+    canvas.style.opacity = '0.9';
+    void canvas.offsetWidth;
+    canvasRecoveryFrame = window.requestAnimationFrame(() => {
+      canvasRecoveryFrame = 0;
+      canvas.style.removeProperty('transition');
+      canvas.style.removeProperty('opacity');
+    });
+  };
+
   const stop = ({ motionActive = motionControlEligible() && !userPaused() } = {}) => {
+    clearCanvasRecovery();
     renderer?.destroy();
     renderer = null;
     stage.removeAttribute('data-enhanced');
@@ -205,6 +227,7 @@
     }
     if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
     if (sceneFrame) window.cancelAnimationFrame(sceneFrame);
+    clearCanvasRecovery();
     idleHandle = 0;
     resizeFrame = 0;
     sceneFrame = 0;
@@ -230,7 +253,9 @@
       const rect = region.getBoundingClientRect();
       return rect.bottom > 0 && rect.top < window.innerHeight;
     });
-    if (renderer && capable() && !document.hidden) renderer.resume();
-    else reconcilePreference();
+    if (renderer && capable() && !document.hidden) {
+      renderer.resume();
+      restoreEnhancedCanvasVisibility();
+    } else reconcilePreference();
   });
 })();
