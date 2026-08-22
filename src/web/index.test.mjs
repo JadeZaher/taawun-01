@@ -429,14 +429,18 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(renderer, /const INTERNAL_PHASE_RATE = 0\.55/u);
   assert.match(renderer, /const INTERNAL_PHASE_EASE = 0\.18/u);
   assert.match(renderer, /const INTERNAL_PHASE_SETTLE_VELOCITY = 0\.001/u);
+  assert.match(renderer, /const SCROLL_ACTIVITY_DECAY = 0\.12/u);
+  assert.match(renderer, /const SCROLL_ACTIVITY_SETTLE = 0\.004/u);
+  assert.match(renderer, /const SCROLL_ACTIVITY_STRENGTH = 0\.32/u);
   assert.match(renderer, /const MAX_VELOCITY = 0\.9/u);
   assert.match(renderer, /while \(physicsAccumulator >= FIXED_STEP_SECONDS\)/u);
-  assert.match(renderer, /const internalMotionActive = Math\.abs\(priorDistance\) > SETTLE_DISTANCE \|\| Math\.abs\(springVelocity\) > SETTLE_VELOCITY/u);
+  assert.match(renderer, /const internalMotionActive = Math\.abs\(priorDistance\) > SETTLE_DISTANCE \|\| Math\.abs\(springVelocity\) > SETTLE_VELOCITY \|\| scrollActivity > SCROLL_ACTIVITY_SETTLE/u);
   assert.match(renderer, /const internalPhaseTarget = internalMotionActive \? INTERNAL_PHASE_RATE : 0/u);
   assert.match(renderer, /internalPhaseVelocity \+= \(internalPhaseTarget - internalPhaseVelocity\) \* INTERNAL_PHASE_EASE/u);
   assert.match(renderer, /if \(!internalMotionActive && Math\.abs\(internalPhaseVelocity\) <= INTERNAL_PHASE_SETTLE_VELOCITY\) internalPhaseVelocity = 0/u);
   assert.match(renderer, /internalPhase = \(internalPhase \+ internalPhaseVelocity \* FIXED_STEP_SECONDS\) % \(Math\.PI \* 2\)/u);
-  assert.match(renderer, /settling = !springSettled \|\| internalPhaseVelocity !== 0/u);
+  assert.match(renderer, /scrollActivity \*= 1 - SCROLL_ACTIVITY_DECAY/u);
+  assert.match(renderer, /settling = !springSettled \|\| internalPhaseVelocity !== 0 \|\| scrollActivity !== 0/u);
   assert.match(renderer, /if \(!settling\) \{\s*physicsAccumulator = 0;\s*lastPhysicsTime = 0;/u);
   assert.match(renderer, /priorDistance \* \(targetScroll - springScroll\) <= 0/u);
   assert.match(renderer, /const motionAmount = moving \? Math\.min\(1,[\s\S]*?const settledMix = 1 - motionAmount/u);
@@ -448,6 +452,7 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(renderer, /if \(sideChanges && transition > 0\.24\) stage\.dataset\.transition = 'true'/u);
   assert.match(renderer, /if \(moving\) requestDraw\(\)/u);
   assert.match(scrollHandler, /const nextTarget = readScrollTarget\(\)/u);
+  assert.match(scrollHandler, /scrollActivity = 1/u);
   assert.doesNotMatch(scrollHandler, /writeBuffer|window\.scrollY|dataset\.state/u);
   assert.match(renderer, /clearValue: \{ r: 0, g: 0, b: 0, a: 0 \}/u);
   assert.match(renderer, /color \* alpha, alpha/u);
@@ -543,6 +548,21 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     await evaluate(client, `document.querySelector('#motionToggle').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage')?.dataset.enhanced === 'true' && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'true'`), 'motion resume');
     assert.equal(await evaluate(client, `localStorage.getItem('taawun-decorative-motion')`), null);
+
+    const beforeMicroScroll = await evaluate(client, `window.__gpuQA.submissions`);
+    const microScrollTarget = await evaluate(client, `(() => {
+      window.scrollTo({ top: 1, behavior: 'instant' });
+      return window.scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    })()`);
+    assert.ok(microScrollTarget > 0 && microScrollTarget < 0.0002, 'the regression nudge stays below the positional spring settle distance');
+    await waitFor(() => evaluate(client, `window.__gpuQA.submissions >= ${beforeMicroScroll + 3}`), 'first tiny scroll immediately drives visible internal motion');
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.spring === 'settled'`), 'tiny-scroll activity settles cleanly');
+    const microScroll = await evaluate(client, `window.__gpuQA.uniforms.slice(${beforeMicroScroll}).map((values) => ({ phase: values[3], side: values[5], transition: values[6], sharp: values[7] }))`);
+    assert.ok(microScroll.length > 2 && microScroll.length < 90, `tiny-scroll activity remains bounded: ${microScroll.length}`);
+    assert.ok(microScroll.some((sample) => sample.sharp < 0.8), 'the first tiny delta produces a visible fixed-strength tessellation pulse');
+    assert.ok(microScroll.slice(1).some((sample, index) => sample.phase > microScroll[index].phase), 'the first tiny delta advances the internal phase');
+    assert.ok(microScroll.every((sample) => sample.side === 1 && sample.transition === 0), 'the tiny same-side pulse adds no lateral crossing or full-field shimmer');
+    assert.equal(microScroll.at(-1)?.sharp, 1, 'the tiny-scroll pulse returns to the exact sharp resting pattern');
 
     const beforeScroll = await evaluate(client, `window.__gpuQA.submissions`);
     const scrollTarget = await evaluate(client, `(() => {

@@ -151,6 +151,9 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
   const INTERNAL_PHASE_RATE = 0.55;
   const INTERNAL_PHASE_EASE = 0.18;
   const INTERNAL_PHASE_SETTLE_VELOCITY = 0.001;
+  const SCROLL_ACTIVITY_DECAY = 0.12;
+  const SCROLL_ACTIVITY_SETTLE = 0.004;
+  const SCROLL_ACTIVITY_STRENGTH = 0.32;
   const MAX_VELOCITY = 0.9;
   const SETTLE_DISTANCE = 0.0002;
   const SETTLE_VELOCITY = 0.0005;
@@ -166,6 +169,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
   let settling = false;
   let internalPhase = 0;
   let internalPhaseVelocity = 0;
+  let scrollActivity = 0;
 
   const teardown = ({ notify = false } = {}) => {
     if (!alive) return;
@@ -214,7 +218,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     physicsAccumulator = Math.min(MAX_DT_SECONDS, physicsAccumulator + elapsed);
     while (physicsAccumulator >= FIXED_STEP_SECONDS) {
       const priorDistance = targetScroll - springScroll;
-      const internalMotionActive = Math.abs(priorDistance) > SETTLE_DISTANCE || Math.abs(springVelocity) > SETTLE_VELOCITY;
+      const internalMotionActive = Math.abs(priorDistance) > SETTLE_DISTANCE || Math.abs(springVelocity) > SETTLE_VELOCITY || scrollActivity > SCROLL_ACTIVITY_SETTLE;
       const acceleration = SPRING_STIFFNESS * (targetScroll - springScroll) - SPRING_DAMPING * springVelocity;
       springVelocity = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, springVelocity + acceleration * FIXED_STEP_SECONDS));
       springScroll += springVelocity * FIXED_STEP_SECONDS;
@@ -222,6 +226,8 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       internalPhaseVelocity += (internalPhaseTarget - internalPhaseVelocity) * INTERNAL_PHASE_EASE;
       if (!internalMotionActive && Math.abs(internalPhaseVelocity) <= INTERNAL_PHASE_SETTLE_VELOCITY) internalPhaseVelocity = 0;
       internalPhase = (internalPhase + internalPhaseVelocity * FIXED_STEP_SECONDS) % (Math.PI * 2);
+      scrollActivity *= 1 - SCROLL_ACTIVITY_DECAY;
+      if (scrollActivity <= SCROLL_ACTIVITY_SETTLE) scrollActivity = 0;
       physicsAccumulator -= FIXED_STEP_SECONDS;
       if (priorDistance !== 0 && priorDistance * (targetScroll - springScroll) <= 0) {
         springScroll = targetScroll;
@@ -234,7 +240,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       springScroll = targetScroll;
       springVelocity = 0;
     }
-    settling = !springSettled || internalPhaseVelocity !== 0;
+    settling = !springSettled || internalPhaseVelocity !== 0 || scrollActivity !== 0;
     if (!settling) {
       physicsAccumulator = 0;
       lastPhysicsTime = 0;
@@ -250,7 +256,8 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       const started = performance.now();
       const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
       const moving = advanceSpring(timestamp);
-      const motionAmount = moving ? Math.min(1, Math.abs(springVelocity) / MAX_VELOCITY * 0.55 + Math.abs(targetScroll - springScroll) * 8) : 0;
+      const springMotionAmount = Math.abs(springVelocity) / MAX_VELOCITY * 0.55 + Math.abs(targetScroll - springScroll) * 8;
+      const motionAmount = moving ? Math.min(1, Math.max(springMotionAmount, scrollActivity * SCROLL_ACTIVITY_STRENGTH)) : 0;
       const settledMix = 1 - motionAmount;
       const scroll = Math.min(1, Math.max(0, springScroll));
       const anchor = scroll * maxScroll + window.innerHeight * 0.68;
@@ -312,6 +319,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     const nextTarget = readScrollTarget();
     if (Math.abs(nextTarget - targetScroll) > Number.EPSILON) {
       targetScroll = nextTarget;
+      scrollActivity = 1;
       settling = true;
       stage.dataset.spring = 'settling';
       requestDraw();

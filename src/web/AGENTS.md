@@ -241,8 +241,12 @@ nonzero velocity when the scroll spring reaches its target. Its bounded envelope
 evolves the rosette scale, perpendicular mirror depth, and at most 0.0008 cell of
 rail
 separation even through same-side spans, so scroll progress never freezes the
-decoration. The resting lattice orientation remains invariant across all six
-sections. Only while an authored side transition and physical settling overlap
+decoration. Every nonzero scroll-position change also seeds one fixed-strength,
+fixed-decay internal envelope. This closes the sub-settlement first-scroll dead
+zone without linking amplitude to wheel speed, adding another lateral sway, or
+keeping the GPU awake after the phase tail settles. The resting lattice
+orientation remains invariant across all six sections. Only while an authored
+side transition and physical settling overlap
 does it add at most 0.018 radians of combined travel-only lattice rotation plus
 another 0.0012 cell of rail shimmer. At same-side strength the outer star
 contracts by at most 1.575% and the inner rosette expands by at most 2.025%; a
