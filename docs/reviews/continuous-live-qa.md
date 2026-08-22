@@ -1867,3 +1867,62 @@ participant fixture was created. **Verdict:** ACCEPT application commit
 `d82c182d-2fa9-46df-819a-9f9b1fb2ad8c`. Controlled DNS/reviewer/Bazaar proof,
 the genuine five-person study, workspace `47`, federation, TURN and complete
 E2EE key lifecycle remain unchanged and unclaimed.
+
+## Visible landing return and expired-preview recovery checkpoint — 2026-08-22
+
+Application commit `f5810b9` closes the user-visible failure modes reported
+from the account cockpit without weakening signed-artifact authority. The public
+WebGPU canvas becomes visible immediately after the renderer's first successful
+frame rather than depending on a cosmetic opacity transition that navigation or
+browser-history restoration could strand at zero. Persisted history restoration
+retains one renderer and cancels a frozen transition; ordinary reload and Back
+navigation also resolve directly to enhanced opacity `0.9`. Scroll interpolation,
+spring settlement, the six-state right/right/left/left/right/right sequence and
+the two approved lateral crossings are unchanged. The signed-in cockpit brand is
+now a 44 px semantic link to the public landing.
+
+Server-confirmed expired previews remain immutable and unavailable. Their doomed
+reopen control becomes disabled and is labeled `Signed preview expired`.
+Architects and Maintainers receive `Prepare fresh preview`, which copies only the
+curated component documents into a local draft, sends no network request, focuses
+the separate `Create staging preview` action and requires review of the current
+workspace and approved origins before a distinct signature is requested. Viewer
+guidance remains inspect-only. Exact selected-track ID, track-record epoch,
+principal, workspace, preview epoch and draft guards prevent a delayed expired
+response for track A from clearing or relabeling track B.
+
+The exact source passed every Go package, both production builds and all 19 Node
+contracts with real Chromium serialized on Windows. Production binary SHA-256
+values were `98903BF483BDC33F6F1AC45FEBBF524C1F65A3162919DBB558896A9C42FECF0A`
+and `4B819EE3A81232EFD2075FA90190F8CE0869D684AAF1589A7296713D1D9C9BB7`.
+Promoted Chromium proved fresh computed canvas opacity `0.9` with no transition
+dependency, visible back/forward-cache recovery, single-renderer reuse, cleanup
+on device loss, zero-network expired-draft preparation and delayed cross-track
+expiry isolation. Independent review returned APPROVE with no remaining finding.
+
+Railway deployment `1f2925f9-bc38-46d1-ad44-3bf20c82e02b` reached terminal
+`SUCCESS` with runtime image
+`sha256:9fb3357e3115896bb8437793973384a0bc8a22f1a5cd8f700349bf8593dfc65e`.
+Fresh in-app Browser evidence at 1,280 px observed `renderer=webgpu`,
+`data-enhanced=true`, motion running and computed opacity `0.9`; navigation from
+`/` to the noindexed `/account#login` route and Back returned to the same visible,
+running geometry with transition duration `0s`. Independent GETs returned `200`
+for `/api/health` and `/`; Railway request IDs were
+`DY3mJ_Q1QcyEtRRNLPU1MQ` and `4lpeNFKkQeSBKbqwLPU1MQ`. Served landing, loader and
+account documents contained the immediate-enhanced rule, persisted recovery,
+semantic public-home link and explicit expired-preview recovery controls.
+
+Deployment-scoped HTTP `500..599` was empty. The bounded 15-minute snapshot
+reported 19 `2xx`, one expected `4xx`, zero `5xx`, p95 7 ms, CPU average/max
+`0.000209`/`0.002762` vCPU and memory average/max `12.675`/`13.304` MB. Runtime
+output contains one volume mount, database initialization, server start and
+container start with no panic, exit, restart or application error; Railway labels
+the two normal Go standard-logger startup lines as error-stream records.
+
+No account, user, workspace, domain, publication, Bazaar, finance, reviewer or
+participant fixture was created. **Verdict:** ACCEPT application commit `f5810b9`
+/ Railway deployment `1f2925f9-bc38-46d1-ad44-3bf20c82e02b`. Rollback source
+remains application `50a5e63aaad8e1a2c23941b8ad47ba3492804539`; its prior
+accepted deployment was `7ee525de-af38-4a20-ae59-7b0746b757d2`. Controlled
+DNS/reviewer/Bazaar proof, the genuine five-person study, workspace `47`,
+federation, TURN and complete E2EE key lifecycle remain unchanged and unclaimed.
