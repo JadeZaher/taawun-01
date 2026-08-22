@@ -301,21 +301,26 @@ test('public landing exposes aligned, truthful search metadata and crawl guidanc
   assert.doesNotMatch(html, /<script[^>]+src="https?:\/\/|<link[^>]+rel="stylesheet"[^>]+href="https?:\/\//iu);
   assert.match(html, /private preview/iu);
   assert.match(html, /does not hold funds or settle payments/iu);
-  assert.match(html, /not religious rulings|not a product claim, certification or ruling/iu);
-  assert.match(html, /Sūrat an-Nūr · 24:35/u);
-  assert.match(html, /<blockquote lang="ar" dir="rtl">اللَّهُ نُورُ السَّمَاوَاتِ وَالْأَرْضِ[\s\S]*?وَاللَّهُ بِكُلِّ شَيْءٍ عَلِيمٌ<\/blockquote>/u);
+  assert.match(html, /not religious rulings/iu);
+  assert.match(html, /Sūrat al-Māʾidah · 5:2 \(excerpt\)/u);
+  assert.match(html, /<blockquote lang="ar" dir="rtl">وَتَعَاوَنُواْ عَلَى ٱلۡبِرِّ وَٱلتَّقۡوَىٰۖ وَلَا تَعَاوَنُواْ عَلَى ٱلۡإِثۡمِ وَٱلۡعُدۡوَٰنِۚ<\/blockquote>/u);
+  assert.doesNotMatch(html, /24:35|visual language|visual inspiration/iu);
   assert.match(html, /href="\/account#register"/u);
   assert.match(html, /href="\/account#login"/u);
   assert.doesNotMatch(html, /Taawun is Shariah[- ]certified|scholar[- ]approved (?:platform|software)|launch your app today|start free/iu);
 });
 
-test('geometric enhancement is bounded, optional, and scroll-driven', async () => {
+test('geometric enhancement is surface-level, optional, and scroll-driven', async () => {
   const html = await readFile(new URL('./landing.html', import.meta.url), 'utf8');
   const loader = await readFile(new URL('./geometric-landing.js', import.meta.url), 'utf8');
   const renderer = await readFile(new URL('./geometric-renderer.js', import.meta.url), 'utf8');
 
-  assert.match(html, /class="geometry-stage" aria-hidden="true"/u);
-  assert.match(html, /id="motionToggle"[^>]*type="checkbox"[^>]*checked/u);
+  assert.match(html, /class="geometry-stage"[^>]*aria-hidden="true"/u);
+  assert.match(html, /\.geometry-stage \{ position: fixed; inset: 0;[^}]*background: transparent;/u);
+  assert.match(html, /id="motionToggle"[^>]*type="button"[^>]*aria-pressed="true"/u);
+  assert.match(html, /id="motionToggle"[^>]*aria-label="Decorative motion"/u);
+  assert.match(html, /id="menuToggle"[^>]*aria-expanded="false"[^>]*aria-controls="primaryNavigation"/u);
+  assert.deepEqual([...html.matchAll(/data-geometry-state="\d+" data-geometry-side="(right|left)"/gu)].map((match) => match[1]), ['right', 'right', 'left', 'right', 'right', 'left']);
   assert.match(html, /prefers-reduced-motion: reduce/u);
   assert.match(html, /forced-colors: active/u);
   assert.match(loader, /prefers-reduced-motion: reduce/u);
@@ -324,6 +329,9 @@ test('geometric enhancement is bounded, optional, and scroll-driven', async () =
   assert.match(loader, /connection && connection\.saveData/u);
   assert.match(loader, /connection\?\.addEventListener\?\.\('change', reconcilePreference\)/u);
   assert.match(loader, /window\.innerWidth > 840/u);
+  assert.match(loader, /event\.key === 'Escape'/u);
+  assert.match(loader, /setAttribute\('aria-pressed', String\(active\)\)/u);
+  assert.match(loader, /progress > 0\.12 && progress < 0\.88/u);
   assert.ok(loader.indexOf('if (!capable()') < loader.indexOf("import('/geometric-renderer.js')"), 'capability checks must precede the renderer request');
   assert.match(renderer, /powerPreference: 'low-power'/u);
   assert.match(renderer, /adapter\.isFallbackAdapter/u);
@@ -332,6 +340,10 @@ test('geometric enhancement is bounded, optional, and scroll-driven', async () =
   assert.doesNotMatch(renderer, /requestAnimationFrame\(render\)|preventDefault\(\)|setInterval\(/u);
   assert.match(renderer, /device\.lost/u);
   assert.match(renderer, /refractionEdge/u);
+  assert.match(renderer, /1\.0 - smoothstep\(0\.004, 0\.055, line\)/u);
+  assert.match(renderer, /1\.0 - smoothstep\(0\.04, 0\.66, lensDistance\)/u);
+  assert.match(renderer, /clearValue: \{ r: 0, g: 0, b: 0, a: 0 \}/u);
+  assert.match(renderer, /color \* alpha, alpha/u);
 });
 
 test('promoted browser proves WebGPU enhancement, reversible pause, failure fallback, and reduced motion', { timeout: 90_000 }, async () => {
@@ -369,7 +381,7 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     await client.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
       let loseDevice;
       const lost = new Promise((resolve) => { loseDevice = resolve; });
-      window.__gpuQA = { adapterRequests: 0, submissions: 0, destroys: 0, lose: () => loseDevice({ reason: 'destroyed' }) };
+      window.__gpuQA = { adapterRequests: 0, submissions: 0, destroys: 0, nullAdapter: false, lose: () => loseDevice({ reason: 'destroyed' }) };
       Object.defineProperty(navigator, 'hardwareConcurrency', { configurable: true, value: 8 });
       Object.defineProperty(navigator, 'deviceMemory', { configurable: true, value: 8 });
       const connectionListeners = [];
@@ -388,7 +400,7 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
         destroy() { window.__gpuQA.destroys += 1; },
       };
       Object.defineProperty(navigator, 'gpu', { configurable: true, value: {
-        async requestAdapter() { window.__gpuQA.adapterRequests += 1; return { isFallbackAdapter: false, async requestDevice() { return device; } }; },
+        async requestAdapter() { window.__gpuQA.adapterRequests += 1; if (window.__gpuQA.nullAdapter) return null; return { isFallbackAdapter: false, async requestDevice() { return device; } }; },
         getPreferredCanvasFormat() { return 'bgra8unorm'; },
       } });
       Object.defineProperty(window, 'GPUBufferUsage', { configurable: true, value: { UNIFORM: 1, COPY_DST: 2 } });
@@ -401,31 +413,36 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
       window.cancelIdleCallback = (id) => window.clearTimeout(id);
     })();` });
     await client.send('Page.navigate', { url: origin });
-    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage')?.dataset.enhanced === 'true' && !document.querySelector('#motionControl').hidden`), 'mocked WebGPU enhancement');
-    const initial = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, submissions: window.__gpuQA.submissions, renderer: document.querySelector('#geometryCanvas').dataset.renderer || '', controlHeight: Math.round(document.querySelector('#motionControl').getBoundingClientRect().height) })`);
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage')?.dataset.enhanced === 'true' && !document.querySelector('#motionToggle').hidden`), 'mocked WebGPU enhancement');
+    const initial = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, submissions: window.__gpuQA.submissions, renderer: document.querySelector('#geometryCanvas').dataset.renderer || '', controlHeight: Math.round(document.querySelector('#motionToggle').getBoundingClientRect().height), state: document.querySelector('.geometry-stage').dataset.state, side: document.querySelector('.geometry-stage').dataset.side })`);
     assert.equal(initial.requests, 1);
     assert.ok(initial.submissions >= 1);
     assert.equal(initial.renderer, 'webgpu');
     assert.ok(initial.controlHeight >= 44);
+    assert.equal(initial.state, '0');
+    assert.equal(initial.side, 'right');
 
     await evaluate(client, `document.querySelector('#motionToggle').click()`);
-    await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && !document.querySelector('#motionControl').hidden && !document.querySelector('#motionToggle').checked`), 'reversible user pause');
+    await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && !document.querySelector('#motionToggle').hidden && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'false'`), 'reversible user pause');
     assert.equal(await evaluate(client, `localStorage.getItem('taawun-decorative-motion')`), 'off');
     await evaluate(client, `document.querySelector('#motionToggle').click()`);
-    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage')?.dataset.enhanced === 'true' && document.querySelector('#motionToggle').checked`), 'motion resume');
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage')?.dataset.enhanced === 'true' && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'true'`), 'motion resume');
     assert.equal(await evaluate(client, `localStorage.getItem('taawun-decorative-motion')`), null);
 
     const beforeScroll = await evaluate(client, `window.__gpuQA.submissions`);
     await evaluate(client, `window.scrollTo({ top: window.innerHeight * 1.2, behavior: 'instant' })`);
     await waitFor(() => evaluate(client, `window.__gpuQA.submissions > ${beforeScroll}`), 'scroll-threshold redraw');
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.state !== '0'`), 'approaching-section state transition');
     await evaluate(client, `window.__gpuQA.lose()`);
-    await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && document.querySelector('#motionControl').hidden`), 'device-loss static fallback');
+    await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && !document.querySelector('#motionToggle').hidden && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'true'`), 'device-loss static fallback');
+    await evaluate(client, `window.__gpuQA.nullAdapter = true; document.querySelector('#motionToggle').click(); document.querySelector('#motionToggle').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && !document.querySelector('#motionToggle').hidden && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'true' && window.__gpuQA.adapterRequests >= 3`), 'null-adapter static fallback keeps its motion control');
 
     await client.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     await client.send('Page.navigate', { url: origin });
     await waitFor(() => evaluate(client, `document.readyState === 'complete'`), 'reduced-motion landing');
     await wait(200);
-    const reduced = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, canvasDisplay: getComputedStyle(document.querySelector('#geometryCanvas')).display, controlHidden: document.querySelector('#motionControl').hidden })`);
+    const reduced = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, canvasDisplay: getComputedStyle(document.querySelector('#geometryCanvas')).display, controlHidden: document.querySelector('#motionToggle').hidden })`);
     assert.equal(reduced.requests, 0, 'reduced motion must not request a GPU adapter');
     assert.equal(reduced.canvasDisplay, 'none');
     assert.equal(reduced.controlHidden, true);
@@ -442,7 +459,7 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     await client.send('Page.navigate', { url: origin });
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage')?.dataset.enhanced === 'true'`), 'save-data live gate setup');
     await evaluate(client, `window.__setSaveData(true)`);
-    await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && document.querySelector('#motionControl').hidden`), 'save-data live fallback');
+    await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && !document.querySelector('#motionToggle').hidden && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'true'`), 'save-data live fallback');
   } finally {
     await closeChromium(chromium, 'webgpu-lifecycle');
     server.closeAllConnections?.();
@@ -634,22 +651,39 @@ test('public landing and account shell remain distinct, responsive, and keyboard
       loginHref: document.querySelector('a[href="/account#login"]')?.getAttribute('href'),
       canvasHidden: document.querySelector('#geometryCanvas')?.parentElement?.getAttribute('aria-hidden'),
       geometryStates: document.querySelectorAll('[data-geometry-state]').length,
+      geometrySides: [...document.querySelectorAll('[data-geometry-state]')].map((section) => section.dataset.geometrySide),
       hasAuthForm: Boolean(document.querySelector('#loginForm, #registerForm, #appView')),
       copy: document.querySelector('main').innerText.replace(/\\s+/g, ' ').trim(),
       overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-      controlHeights: [...document.querySelectorAll('a.button, .nav-account')].map((item) => Math.round(item.getBoundingClientRect().height)),
+      controlHeights: [...document.querySelectorAll('a.button, .nav-account, .nav-control:not([hidden])')].filter((item) => item.getClientRects().length > 0).map((item) => Math.round(item.getBoundingClientRect().height)),
+      menuHidden: document.querySelector('#menuToggle').hidden,
+      menuExpanded: document.querySelector('#menuToggle').getAttribute('aria-expanded'),
+      motionHidden: document.querySelector('#motionToggle').hidden,
+      motionPressed: document.querySelector('#motionToggle').getAttribute('aria-pressed'),
+      staticEdgePeek: (() => { const rect = document.querySelector('.geometry-static').getBoundingClientRect(); return rect.left < 0 || rect.right > innerWidth; })(),
     }))()`);
     assert.equal(landingSemantics.h1, 'Many hands. One clear community effort.');
     assert.equal(landingSemantics.visibleH1s, 1);
     assert.equal(landingSemantics.registerHref, '/account#register');
     assert.equal(landingSemantics.loginHref, '/account#login');
     assert.equal(landingSemantics.canvasHidden, 'true');
-    assert.equal(landingSemantics.geometryStates, 5);
+    assert.equal(landingSemantics.geometryStates, 6);
+    assert.deepEqual(landingSemantics.geometrySides, ['right', 'right', 'left', 'right', 'right', 'left']);
     assert.equal(landingSemantics.hasAuthForm, false);
     assert.match(landingSemantics.copy, /does not hold funds or settle payments/iu);
     assert.match(landingSemantics.copy, /community-owned web address/iu);
     assert.equal(landingSemantics.overflow, false);
+    assert.equal(landingSemantics.menuHidden, false);
+    assert.equal(landingSemantics.menuExpanded, 'false');
+    assert.equal(landingSemantics.motionHidden, false);
+    assert.equal(landingSemantics.motionPressed, 'true');
+    assert.equal(landingSemantics.staticEdgePeek, true);
     assert.ok(landingSemantics.controlHeights.every((height) => height >= 44), `landing controls must be at least 44 CSS px: ${landingSemantics.controlHeights}`);
+
+    await evaluate(client, `document.querySelector('#menuToggle').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#menuToggle').getAttribute('aria-expanded') === 'true' && getComputedStyle(document.querySelector('#primaryNavigation')).display !== 'none' && document.activeElement === document.querySelector('#primaryNavigation a')`), 'mobile navigation opens into forward focus order');
+    await pressKey(client, 'Escape', 'Escape', 27);
+    await waitFor(() => evaluate(client, `document.querySelector('#menuToggle').getAttribute('aria-expanded') === 'false' && document.activeElement === document.querySelector('#menuToggle')`), 'Escape closes mobile navigation and restores focus');
 
     for (const layoutWidth of [160, 200, 320, 400]) {
       await client.send('Emulation.setDeviceMetricsOverride', { width: layoutWidth, height: 1_000, deviceScaleFactor: 1, mobile: false });
@@ -658,11 +692,13 @@ test('public landing and account shell remain distinct, responsive, and keyboard
         overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
         visibleH1s: [...document.querySelectorAll('h1')].filter((heading) => getComputedStyle(heading).display !== 'none').length,
         canvasEnhanced: document.querySelector('.geometry-stage').hasAttribute('data-enhanced'),
-        targets: [...document.querySelectorAll('a.button, .nav-account')].map((item) => Math.round(item.getBoundingClientRect().height)),
+        navOverlap: document.querySelector('.brand').getBoundingClientRect().right > document.querySelector('.nav-actions').getBoundingClientRect().left,
+        targets: [...document.querySelectorAll('a.button, .nav-account, .nav-control:not([hidden])')].filter((item) => item.getClientRects().length > 0).map((item) => Math.round(item.getBoundingClientRect().height)),
       })`);
       assert.equal(layout.overflow, false, `${layoutWidth}px public landing must not overflow horizontally`);
       assert.equal(layout.visibleH1s, 1, `${layoutWidth}px public landing must keep one H1`);
       assert.equal(layout.canvasEnhanced, false, `${layoutWidth}px public landing must remain static`);
+      assert.equal(layout.navOverlap, false, `${layoutWidth}px public brand and controls must not overlap`);
       assert.ok(layout.targets.every((height) => height >= 44), `${layoutWidth}px public targets must remain at least 44px: ${layout.targets}`);
     }
 

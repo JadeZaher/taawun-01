@@ -58,14 +58,15 @@
     .skip-link { position: fixed; z-index: 100; top: 8px; left: 8px; min-height: 44px; display: flex; align-items: center; padding: 10px 14px; background: var(--parchment); color: var(--ink); transform: translateY(-160%); }
     .skip-link:focus { transform: translateY(0); }
 
-    .geometry-stage { position: fixed; top: 20vh; right: 4vw; z-index: 0; width: min(46vw, 680px); height: min(62vh, 720px); overflow: hidden; border: 1px solid rgba(224, 183, 91, 0.24); background: #0a1713; box-shadow: 0 36px 140px rgba(0, 0, 0, 0.48); pointer-events: none; }
-    .geometry-static { position: absolute; inset: 0; opacity: 0.78; background-image: radial-gradient(circle at 64% 28%, rgba(224, 183, 91, 0.3), transparent 24%), repeating-conic-gradient(from 22.5deg at 50% 50%, rgba(99, 184, 155, 0.25) 0 2deg, transparent 2deg 22.5deg), repeating-radial-gradient(circle at 50% 50%, transparent 0 28px, rgba(224, 183, 91, 0.16) 29px 30px, transparent 31px 56px); transform: scale(1.3) rotate(2deg); }
-    #geometryCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 220ms ease; }
-    .geometry-stage[data-enhanced="true"] #geometryCanvas { opacity: 0.94; }
+    .geometry-stage { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: transparent; pointer-events: none; --geometry-x: 28vw; --geometry-scale: 1; --geometry-turn: 2deg; }
+    .geometry-static { position: absolute; top: 50%; left: 50%; width: min(62vw, 900px); aspect-ratio: 1; opacity: 0.58; background-image: radial-gradient(circle at 64% 28%, rgba(224, 183, 91, 0.34), transparent 24%), repeating-conic-gradient(from 22.5deg at 50% 50%, rgba(99, 184, 155, 0.28) 0 2deg, transparent 2deg 22.5deg), repeating-radial-gradient(circle at 50% 50%, transparent 0 28px, rgba(224, 183, 91, 0.18) 29px 30px, transparent 31px 56px); mask-image: radial-gradient(circle, #000 0 48%, transparent 76%); transform: translate(calc(-50% + var(--geometry-x)), -50%) scale(var(--geometry-scale)) rotate(var(--geometry-turn)); transition: transform 760ms cubic-bezier(.2,.75,.2,1), opacity 480ms ease; }
+    .geometry-stage[data-side="left"] { --geometry-x: -28vw; --geometry-turn: -7deg; }
+    .geometry-stage[data-transition="true"] { --geometry-scale: 1.15; }
+    .geometry-stage[data-motion="paused"] .geometry-static { transition: none; }
+    #geometryCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 320ms ease; }
+    .geometry-stage[data-enhanced="true"] #geometryCanvas { opacity: 0.9; }
     .geometry-stage[data-enhanced="true"] .geometry-static { opacity: 0; }
-    .geometry-vignette { position: absolute; inset: 0; background: radial-gradient(circle at 58% 38%, transparent 0 28%, rgba(8, 17, 15, 0.5) 78%), linear-gradient(0deg, rgba(8, 17, 15, 0.62), transparent 46%); }
-    .motion-control { position: fixed; right: 4vw; top: calc(20vh + min(62vh, 720px) + 10px); z-index: 12; min-height: 44px; display: inline-flex; align-items: center; gap: 9px; padding: 8px 11px; border: 1px solid var(--line); background: var(--ink); color: var(--parchment-dim); font-size: 12px; }
-    .motion-control input { width: 20px; height: 20px; accent-color: var(--emerald); }
+    .geometry-vignette { position: absolute; inset: 0; background: transparent; }
 
     .site-header { position: fixed; inset: 0 0 auto; z-index: 20; border-bottom: 1px solid var(--line); background: var(--ink); }
     .nav-shell { width: min(1280px, 100%); min-height: 72px; margin: 0 auto; padding: 10px 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
@@ -73,15 +74,28 @@
     .brand-mark { width: 24px; height: 24px; position: relative; transform: rotate(45deg); border: 1px solid var(--emerald); }
     .brand-mark::before, .brand-mark::after { content: ""; position: absolute; inset: 5px -7px; border: 1px solid rgba(224, 183, 91, 0.75); }
     .brand-mark::after { transform: rotate(90deg); }
-    .nav-links { display: flex; align-items: center; gap: 8px 22px; }
+    .nav-links { display: flex; align-items: center; gap: 8px 22px; margin-left: auto; }
     .nav-links a { min-height: 44px; display: inline-flex; align-items: center; color: var(--parchment-dim); font-size: 13px; text-decoration: none; }
     .nav-links a:hover { color: var(--parchment); }
     .nav-account { padding: 8px 15px; border: 1px solid var(--line); color: var(--parchment) !important; }
+    .nav-actions { display: flex; align-items: center; gap: 6px; }
+    .nav-control { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 7px 10px; border: 1px solid transparent; background: transparent; color: var(--parchment-dim); font: 600 11px/1 var(--mono); letter-spacing: .04em; cursor: pointer; }
+    .nav-control:hover, .nav-control[aria-pressed="false"] { border-color: var(--line); color: var(--parchment); }
+    .nav-control[hidden] { display: none; }
+    .motion-mark { width: 13px; height: 13px; border: 1px solid currentColor; transform: rotate(45deg); }
+    .motion-toggle[aria-pressed="false"] .motion-mark { border-style: dashed; opacity: .7; }
+    .menu-toggle { display: none; }
+    .menu-icon { width: 18px; display: grid; gap: 4px; }
+    .menu-icon span { display: block; height: 1px; background: currentColor; transition: transform 180ms ease, opacity 180ms ease; }
+    .menu-toggle[aria-expanded="true"] .menu-icon span:first-child { transform: translateY(5px) rotate(45deg); }
+    .menu-toggle[aria-expanded="true"] .menu-icon span:nth-child(2) { opacity: 0; }
+    .menu-toggle[aria-expanded="true"] .menu-icon span:last-child { transform: translateY(-5px) rotate(-45deg); }
 
     main { overflow: clip; }
     .story-section { min-height: 100svh; position: relative; display: grid; align-items: center; padding: 130px max(28px, calc((100vw - 1224px) / 2)) 80px; }
     .story-copy { position: relative; z-index: 2; width: min(680px, 100%); padding: clamp(24px, 4vw, 46px); border: 1px solid var(--line); background: linear-gradient(145deg, #08110f, #0f1c18); box-shadow: 0 28px 100px rgba(0, 0, 0, 0.35); }
-    .story-section:nth-of-type(even) .story-copy { margin-left: auto; }
+    .story-section[data-geometry-side="left"] .story-copy { margin-left: auto; }
+    .story-section[data-geometry-side="right"] .story-copy { margin-right: auto; }
     .eyebrow { color: var(--emerald); font: 600 11px/1.4 var(--mono); letter-spacing: 0.13em; text-transform: uppercase; }
     h1 { max-width: 11ch; margin: 18px 0 24px; font: 500 clamp(48px, 7.3vw, 94px)/0.93 var(--serif); letter-spacing: -0.05em; }
     h1 em { color: var(--gold); font-weight: 400; }
@@ -105,14 +119,18 @@
     .outcome h3 { font: 500 21px/1.25 var(--serif); }
     .outcome p { margin-top: 6px; color: var(--parchment-dim); font-size: 14px; }
 
-    .verse-section { min-height: 100svh; position: relative; z-index: 2; display: grid; place-items: center; padding: 110px 28px; }
+    .verse-section { min-height: 100svh; position: relative; z-index: 2; display: grid; align-items: center; padding: 110px max(28px, calc((100vw - 1224px) / 2)); }
     .verse-card { position: relative; z-index: 2; width: min(930px, 100%); padding: clamp(28px, 7vw, 82px); border: 1px solid rgba(224, 183, 91, 0.38); background: radial-gradient(circle at 50% 10%, rgba(224, 183, 91, 0.12), transparent 42%), #08110f; box-shadow: 0 30px 140px rgba(224, 183, 91, 0.1); text-align: center; }
+    .verse-section[data-geometry-side="right"] .verse-card { margin-right: auto; }
+    .verse-section[data-geometry-side="left"] .verse-card { margin-left: auto; }
     .verse-card blockquote { color: #fff5d9; font: 400 clamp(23px, 3.5vw, 39px)/2 var(--serif); }
     .verse-card figcaption { margin-top: 28px; color: var(--gold); font: 600 12px/1.5 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
-    .verse-note { max-width: 62ch; margin: 24px auto 0; color: var(--parchment-dim); }
 
     .content-section { position: relative; z-index: 2; padding: 110px max(28px, calc((100vw - 1224px) / 2)); background: var(--ink); border-top: 1px solid var(--line); }
+    .content-section.geometry-content { min-height: 100svh; background: linear-gradient(90deg, rgba(8, 17, 15, 0.1) 0 42%, rgba(8, 17, 15, 0.86) 78%); }
     .content-head { max-width: 780px; }
+    .geometry-content .content-head, .geometry-content .card-grid { width: min(900px, 74vw); }
+    .geometry-content[data-geometry-side="left"] .content-head, .geometry-content[data-geometry-side="left"] .card-grid { margin-left: auto; }
     .card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 44px; }
     .card { min-width: 0; padding: 26px; border: 1px solid var(--line); background: linear-gradient(150deg, #10231d, #0b1412); }
     .card h3 { margin: 10px 0 12px; font: 500 24px/1.2 var(--serif); }
@@ -133,22 +151,35 @@
     .footer-inner { width: min(1224px, 100%); margin: 0 auto; display: flex; justify-content: space-between; gap: 24px; }
 
     @media (max-width: 840px) {
-      .nav-shell { padding-inline: 16px; }
-      .nav-links a:not(.nav-account) { display: none; }
-      .geometry-stage { position: absolute; top: 72px; right: 0; width: 100%; height: 58vh; border-inline: 0; opacity: 0.75; }
-      .motion-control { display: none !important; }
+      .nav-shell { position: relative; padding-inline: 16px; gap: 8px; }
+      .nav-actions { margin-left: auto; }
+      .menu-toggle { display: inline-flex; }
+      .nav-shell:not([data-menu-ready="true"]) { flex-wrap: wrap; }
+      .nav-shell:not([data-menu-ready="true"]) .nav-links { width: 100%; display: grid; gap: 0; }
+      .nav-shell:not([data-menu-ready="true"]) .nav-links a { min-height: 48px; padding-inline: 12px; }
+      .nav-shell[data-menu-ready="true"] .nav-links { display: none; }
+      .nav-shell[data-menu-open="true"] .nav-links { position: absolute; inset: 100% 0 auto; display: grid; gap: 0; margin: 0; padding: 10px 16px 16px; border-bottom: 1px solid var(--line); background: var(--ink); box-shadow: 0 20px 50px rgba(0,0,0,.36); }
+      .nav-shell[data-menu-open="true"] .nav-links a { display: flex; min-height: 48px; padding-inline: 12px; }
+      .nav-shell[data-menu-open="true"] .nav-account { margin-top: 6px; justify-content: center; }
+      .geometry-stage { opacity: 0.68; }
+      .geometry-static { top: 42vh; width: min(78vw, 390px); opacity: 0.44; --geometry-scale: .88; }
+      .geometry-stage[data-side="right"] { --geometry-x: 42vw; }
+      .geometry-stage[data-side="left"] { --geometry-x: -42vw; }
+      #geometryCanvas { display: none; }
       .story-section { align-items: end; padding: 110px 16px 40px; }
       .story-copy { width: 100%; }
-      .story-section:nth-of-type(even) .story-copy { margin-left: 0; }
+      .story-section[data-geometry-side] .story-copy, .verse-section[data-geometry-side] .verse-card { margin-inline: 0; }
+      .geometry-content .content-head, .geometry-content .card-grid { width: 100%; }
+      .content-section.geometry-content { background: rgba(8, 17, 15, 0.62); }
       .card-grid { grid-template-columns: 1fr; }
       .footer-inner { flex-direction: column; }
     }
 
     @media (max-width: 480px) {
-      .nav-shell { min-height: 64px; padding: 7px 8px; gap: 4px; flex-wrap: wrap; }
+      .nav-shell { min-height: 64px; padding: 7px 8px; gap: 4px; }
       .brand { font-size: 18px; }
       .nav-links { width: 100%; }
-      .nav-account { width: 100%; justify-content: center; padding-inline: 11px; }
+      .nav-control-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
       .story-section { padding-inline: 8px; }
       .story-copy { padding: 24px 16px; }
       h1 { font-size: clamp(42px, 15vw, 62px); }
@@ -160,6 +191,10 @@
       .card { padding: 20px 16px; }
       .story-copy, .card, .verse-card, .footer-inner, .nav-shell { min-width: 0; overflow-wrap: anywhere; }
     }
+    @media (max-width: 240px) {
+      .brand { min-width: 44px; justify-content: center; }
+      .brand-label { display: none; }
+    }
 
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
@@ -167,40 +202,42 @@
       #geometryCanvas { display: none; }
     }
     @media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
-      .geometry-stage { background: var(--ink); }
+      .geometry-stage { background: transparent; }
       #geometryCanvas { display: none; }
       .geometry-static { opacity: 0.32; }
       .story-copy, .verse-card { background: var(--ink); backdrop-filter: none; }
     }
     @media (forced-colors: active) {
-      .geometry-stage, .motion-control { display: none !important; }
+      .geometry-stage, .motion-toggle { display: none !important; }
       .story-copy, .verse-card, .card { background: Canvas; color: CanvasText; }
     }
   </style>
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to main content</a>
-  <div class="geometry-stage" aria-hidden="true">
+  <div class="geometry-stage" data-side="right" aria-hidden="true">
     <div class="geometry-static"></div>
     <canvas id="geometryCanvas"></canvas>
     <div class="geometry-vignette"></div>
   </div>
-  <label id="motionControl" class="motion-control" hidden><input id="motionToggle" type="checkbox" checked> Decorative motion</label>
-
   <header class="site-header">
     <nav class="nav-shell" aria-label="Primary navigation">
-      <a class="brand" href="#top" aria-label="Taawun home"><span class="brand-mark" aria-hidden="true"></span><span>Taawun</span></a>
-      <div class="nav-links">
+      <a class="brand" href="#top" aria-label="Taawun home"><span class="brand-mark" aria-hidden="true"></span><span class="brand-label">Taawun</span></a>
+      <div id="primaryNavigation" class="nav-links">
         <a href="#possibilities">What you can make</a>
         <a href="#how">How it works</a>
         <a href="#trust">Trust and limits</a>
         <a class="nav-account" href="/account#login">Sign in</a>
       </div>
+      <div class="nav-actions">
+        <button id="motionToggle" class="nav-control motion-toggle" type="button" aria-pressed="true" aria-label="Decorative motion" hidden><span class="motion-mark" aria-hidden="true"></span><span class="nav-control-label">Motion</span></button>
+        <button id="menuToggle" class="nav-control menu-toggle" type="button" aria-expanded="false" aria-controls="primaryNavigation" aria-label="Navigation menu" hidden><span class="menu-icon" aria-hidden="true"><span></span><span></span><span></span></span><span class="nav-control-label">Menu</span></button>
+      </div>
     </nav>
   </header>
 
   <main id="mainContent">
-    <section id="top" class="story-section" data-geometry-state="0" aria-labelledby="heroTitle">
+    <section id="top" class="story-section" data-geometry-state="0" data-geometry-side="right" aria-labelledby="heroTitle">
       <div class="story-copy">
         <p class="eyebrow">Private beta · Built for Muslim community organizations</p>
         <h1 id="heroTitle">Many hands. One <em>clear</em> community effort.</h1>
@@ -217,7 +254,7 @@
       </div>
     </section>
 
-    <section id="possibilities" class="story-section" data-geometry-state="1" aria-labelledby="possibilitiesTitle">
+    <section id="possibilities" class="story-section" data-geometry-state="1" data-geometry-side="right" aria-labelledby="possibilitiesTitle">
       <div class="story-copy">
         <p class="eyebrow">A pattern made from purposeful parts</p>
         <h2 id="possibilitiesTitle">Shape the tool around the work—not the other way around.</h2>
@@ -231,7 +268,7 @@
       </div>
     </section>
 
-    <section id="how" class="story-section" data-geometry-state="2" aria-labelledby="howTitle">
+    <section id="how" class="story-section" data-geometry-state="2" data-geometry-side="left" aria-labelledby="howTitle">
       <div class="story-copy">
         <p class="eyebrow">From idea to protected preview</p>
         <h2 id="howTitle">See the whole become clearer as each person contributes.</h2>
@@ -240,15 +277,14 @@
       </div>
     </section>
 
-    <section class="verse-section" data-geometry-state="3" aria-labelledby="verseCaption">
+    <section class="verse-section" data-geometry-state="3" data-geometry-side="right" aria-labelledby="verseCaption">
       <figure class="verse-card">
-        <blockquote lang="ar" dir="rtl">اللَّهُ نُورُ السَّمَاوَاتِ وَالْأَرْضِ ۚ مَثَلُ نُورِهِ كَمِشْكَاةٍ فِيهَا مِصْبَاحٌ ۖ الْمِصْبَاحُ فِي زُجَاجَةٍ ۖ الزُّجَاجَةُ كَأَنَّهَا كَوْكَبٌ دُرِّيٌّ يُوقَدُ مِنْ شَجَرَةٍ مُبَارَكَةٍ زَيْتُونَةٍ لَا شَرْقِيَّةٍ وَلَا غَرْبِيَّةٍ يَكَادُ زَيْتُهَا يُضِيءُ وَلَوْ لَمْ تَمْسَسْهُ نَارٌ ۚ نُورٌ عَلَىٰ نُورٍ ۗ يَهْدِي اللَّهُ لِنُورِهِ مَنْ يَشَاءُ ۚ وَيَضْرِبُ اللَّهُ الْأَمْثَالَ لِلنَّاسِ ۗ وَاللَّهُ بِكُلِّ شَيْءٍ عَلِيمٌ</blockquote>
-        <figcaption id="verseCaption">Sūrat an-Nūr · 24:35</figcaption>
-        <p class="verse-note">The visual language of this page takes inspiration from the verse’s image of light through glass: layers becoming luminous without losing their distinct form. The verse is not a product claim, certification or ruling.</p>
+        <blockquote lang="ar" dir="rtl">وَتَعَاوَنُواْ عَلَى ٱلۡبِرِّ وَٱلتَّقۡوَىٰۖ وَلَا تَعَاوَنُواْ عَلَى ٱلۡإِثۡمِ وَٱلۡعُدۡوَٰنِۚ</blockquote>
+        <figcaption id="verseCaption">Sūrat al-Māʾidah · 5:2 (excerpt)</figcaption>
       </figure>
     </section>
 
-    <section id="trust" class="story-section" data-geometry-state="4" aria-labelledby="trustTitle">
+    <section id="trust" class="story-section" data-geometry-state="4" data-geometry-side="right" aria-labelledby="trustTitle">
       <div class="story-copy">
         <p class="eyebrow">Cooperation with visible responsibility</p>
         <h2 id="trustTitle">Review what was made—not a vague promise about it.</h2>
@@ -257,7 +293,7 @@
       </div>
     </section>
 
-    <section id="templates" class="content-section" aria-labelledby="templatesTitle">
+    <section id="templates" class="content-section geometry-content" data-geometry-state="5" data-geometry-side="left" aria-labelledby="templatesTitle">
       <div class="content-head">
         <p class="eyebrow">Three honest starting points</p>
         <h2 id="templatesTitle">Begin with a real community need. Make it unmistakably yours.</h2>

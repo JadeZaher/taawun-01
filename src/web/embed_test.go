@@ -21,7 +21,7 @@ func TestHandlerSeparatesLandingAndAccountDocuments(t *testing.T) {
 		{
 			path:        "/",
 			wantStatus:  http.StatusOK,
-			wantBody:    []string{"id=\"heroTitle\"", "id=\"geometryCanvas\"", "/account#register", "Sūrat an-Nūr"},
+			wantBody:    []string{"id=\"heroTitle\"", "id=\"geometryCanvas\"", "/account#register", "Sūrat al-Māʾidah"},
 			rejectBody:  []string{"id=\"loginForm\"", "id=\"appView\"", "Authorization"},
 			contentType: "text/html; charset=utf-8",
 		},

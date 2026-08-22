@@ -16,32 +16,38 @@ const shaderSource = `
   fn lattice(point: vec2f, scale: f32, turn: f32) -> vec3f {
     let cell = fract(rotate2(point, turn) * scale) - vec2f(0.5);
     let line = min(starDistance(cell), abs(abs(cell.x) + abs(cell.y) - 0.49) * 0.62);
-    return vec3f(smoothstep(0.055, 0.004, line), smoothstep(0.018, 0.002, line), line);
+    return vec3f(1.0 - smoothstep(0.004, 0.055, line), 1.0 - smoothstep(0.002, 0.018, line), line);
   }
   @fragment fn fragmentMain(@builtin(position) position: vec4f) -> @location(0) vec4f {
     let resolution = max(u.viewportScroll.xy, vec2f(1.0));
     let scroll = u.viewportScroll.z;
     let phase = u.viewportScroll.w;
     let section = u.stageMotion.x;
+    let side = u.stageMotion.y;
+    let transition = u.stageMotion.z;
     var uv = (position.xy * 2.0 - resolution) / resolution.y;
-    uv /= 1.0 + 0.10 * sin(uv.y * 2.2 + section * 0.7);
-    let turn = (section - 2.0) * 0.026 + phase * 0.045;
-    let baseLayer = lattice(uv + vec2f(scroll * 0.035, -scroll * 0.02), 3.4 + section * 0.12, turn);
+    uv.x -= side * (0.48 - transition * 0.14);
+    uv /= 1.0 + (0.10 + transition * 0.09) * sin(uv.y * 2.2 + section * 0.7);
+    let turn = (section - 2.0) * 0.052 + phase * 0.055 + transition * 0.2;
+    let baseLayer = lattice(uv + vec2f(scroll * 0.055, -scroll * 0.03), 3.25 + section * 0.12 - transition * 0.3, turn);
     let deepLayer = lattice(uv * 1.12 + vec2f(0.08, -0.05), 4.3, -turn * 0.7);
-    let lensCenter = vec2f(0.28 * sin(scroll * 3.4), -0.18 + phase * 0.26);
+    let lensCenter = vec2f(side * 0.08 + 0.32 * sin(scroll * 3.4 + transition), -0.18 + phase * 0.34);
     let lensDistance = length(uv - lensCenter);
-    let lens = smoothstep(0.66, 0.04, lensDistance);
+    let lens = 1.0 - smoothstep(0.04, 0.66, lensDistance);
     let refractedPoint = uv + normalize(uv - lensCenter + vec2f(0.001)) * lens * 0.04;
     let refracted = lattice(refractedPoint, 3.4 + section * 0.12, turn + lens * 0.045);
     let refractionEdge = abs(refracted.x - baseLayer.x);
     let caustic = 0.5 + 0.5 * sin(uv.x * 5.0 - uv.y * 3.0 - phase * 5.0);
-    var color = vec3f(0.018, 0.052, 0.045);
+    var color = vec3f(0.012, 0.04, 0.034);
     color += vec3f(0.16, 0.57, 0.45) * mix(baseLayer.x, refracted.x, lens) * (0.42 + caustic * 0.28);
     color += vec3f(0.95, 0.68, 0.24) * baseLayer.y * (0.44 + lens * 0.72);
     color += vec3f(0.16, 0.57, 0.45) * deepLayer.x * 0.2;
     color += vec3f(0.78, 0.24, 0.08) * refractionEdge * 1.1;
     color += vec3f(0.95, 0.68, 0.24) * pow(max(0.0, 1.0 - lensDistance), 5.0) * 0.14;
-    return vec4f(color, 0.96);
+    let field = clamp(baseLayer.x * 0.34 + baseLayer.y * 0.72 + deepLayer.x * 0.18 + lens * 0.08 + refractionEdge * 0.35, 0.0, 1.0);
+    let edgeFade = 1.0 - smoothstep(0.16, 1.65, length(uv));
+    let alpha = clamp(field * edgeFade * (0.54 + transition * 0.28) * u.stageMotion.w, 0.0, 0.82);
+    return vec4f(color * alpha, alpha);
   }
 `;
 
@@ -122,18 +128,33 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       const started = performance.now();
       const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
       const scroll = Math.min(1, Math.max(0, window.scrollY / maxScroll));
-      let nearest = 0;
-      let nearestDistance = Number.POSITIVE_INFINITY;
-      for (const section of sections) {
-        const rect = section.getBoundingClientRect();
-        const distance = Math.abs(rect.top + rect.height * 0.5 - window.innerHeight * 0.5);
-        if (distance < nearestDistance) { nearestDistance = distance; nearest = Number(section.dataset.geometryState || 0); }
-      }
-      const sectionRect = sections.find((section) => Number(section.dataset.geometryState || 0) === nearest)?.getBoundingClientRect();
-      const phase = sectionRect ? Math.min(1, Math.max(0, 1 - sectionRect.top / Math.max(1, window.innerHeight))) : scroll;
-      device.queue.writeBuffer(uniformBuffer, 0, new Float32Array([canvas.width, canvas.height, scroll, phase, nearest, 0, 0, 0]));
+      const anchor = window.scrollY + window.innerHeight * 0.68;
+      const centers = sections.map((section) => section.offsetTop + section.offsetHeight * 0.5);
+      let nextIndex = centers.findIndex((center) => center > anchor);
+      if (nextIndex < 0) nextIndex = centers.length;
+      nextIndex = Math.min(Math.max(nextIndex, 1), Math.max(0, centers.length - 1));
+      const currentIndex = Math.max(0, nextIndex - 1);
+      const span = Math.max(1, (centers[nextIndex] || anchor) - (centers[currentIndex] || anchor));
+      const rawProgress = currentIndex === nextIndex ? 0 : Math.min(1, Math.max(0, (anchor - centers[currentIndex]) / span));
+      const earlyProgress = Math.min(1, Math.max(0, (rawProgress - 0.08) / 0.84));
+      const progress = earlyProgress * earlyProgress * (3 - 2 * earlyProgress);
+      const current = sections[currentIndex] || sections[0];
+      const next = sections[nextIndex] || current;
+      const currentState = Number(current?.dataset.geometryState || 0);
+      const nextState = Number(next?.dataset.geometryState || currentState);
+      const currentSide = current?.dataset.geometrySide === 'left' ? -1 : 1;
+      const nextSide = next?.dataset.geometrySide === 'left' ? -1 : 1;
+      const section = currentState + (nextState - currentState) * progress;
+      const side = currentSide + (nextSide - currentSide) * progress;
+      const transition = Math.sin(Math.PI * earlyProgress);
+      const phase = currentIndex + progress;
+      const selected = progress < 0.5 ? current : next;
+      stage.dataset.state = selected?.dataset.geometryState || String(Math.round(section));
+      stage.dataset.side = (progress < 0.5 ? currentSide : nextSide) < 0 ? 'left' : 'right';
+      if (transition > 0.24) stage.dataset.transition = 'true'; else stage.removeAttribute('data-transition');
+      device.queue.writeBuffer(uniformBuffer, 0, new Float32Array([canvas.width, canvas.height, scroll, phase, section, side, transition, 0.94]));
       const encoder = device.createCommandEncoder();
-      const pass = encoder.beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(), clearValue: { r: 0.02, g: 0.055, b: 0.045, a: 1 }, loadOp: 'clear', storeOp: 'store' }] });
+      const pass = encoder.beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }] });
       pass.setPipeline(pipeline);
       pass.setBindGroup(0, bindGroup);
       pass.draw(3);

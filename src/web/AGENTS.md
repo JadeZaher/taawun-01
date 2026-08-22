@@ -176,10 +176,21 @@ the current Railway service hostname. Structured data never adds pricing,
 ratings, testimonials, organization facts, or availability that is absent from
 the visible page.
 
-The Islamic geometric scene is progressive decoration. The static HTML and CSS
-fallback carry the complete product story. WebGPU may enhance only on capable
-desktop devices after idle, never moves text or captures scrolling, and submits
-one frame only when scroll state changes. Reduced motion, forced colors,
-increased contrast, reduced transparency, reduced data, low-power, small-screen,
-shader, and device-loss paths stay on the still design. Sacred text remains
-semantic, selectable, and separate from the decorative renderer.
+The Islamic geometric scene is progressive decoration. It occupies one
+transparent full-viewport layer rather than a framed object. Six authored scene
+states alternate right, right, left, right, right, left while readable content
+uses the inverse side; interpolation begins before a section reaches the center
+so the geometry visibly crosses adjacent whitespace rather than snapping at a
+threshold. Small screens keep only restrained static edge peeks that fade beyond
+the viewport. The static HTML and CSS fallback carry the complete product story.
+
+WebGPU may enhance only on capable desktop devices after idle, never moves text
+or captures scrolling, and submits one frame only when scroll state changes. The
+subtle navigation motion button uses `aria-pressed` and keeps a reversible user
+preference. The progressively enhanced mobile menu remains readable without
+JavaScript, uses 44px controls, and restores focus when Escape closes it. Reduced
+motion, forced colors, increased contrast, reduced transparency, reduced data,
+low-power, small-screen, shader, and device-loss paths stay on the still design.
+Sacred text remains semantic, selectable, and separate from the decorative
+renderer. The public excerpt is Qur'an 5:2 with its exact citation; adjacent copy
+does not interpret the verse as a visual metaphor or product claim.
