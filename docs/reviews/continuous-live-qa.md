@@ -1523,3 +1523,66 @@ contains an error and there is no panic, exit or restart signal.
 domain, publication, Bazaar, finance or reviewer fixture. Workspace `47`,
 controlled DNS/reviewer/Bazaar proof, the genuine five-person study, and deferred
 federation/TURN/E2EE remain unchanged and unclaimed.
+
+## Scroll-lit geometric landing checkpoint — 2026-08-22
+
+Application commit `0b13e505c444a406c336300b4aa27f4ed8b9dd96` moved the
+account cockpit to `/account` and made `/` a dedicated public story. The root
+contains no login, registration, application state or bearer-token code. The
+account document is `noindex,nofollow,noarchive`, remains the same document after
+login, and selects its register or login tab from the ordinary
+`/account#register` and `/account#login` links. Published customer Hosts do not
+inherit the control-site account route; the exact Host boundary is covered by a
+404 regression.
+
+The landing retains the Swiss dark-emerald system and adds a progressively
+enhanced Islamic geometric tessellation. A real in-app Browser at 1,280 px
+observed `renderer=webgpu` and `data-enhanced=true`, five scroll states, a state
+`0` to `1` transition, reversible decorative motion and no console warnings or
+errors. The renderer requests a low-power non-fallback adapter, caps resolution
+and frame rate, redraws only for scroll/resize/resume events, and tears down on
+device loss or sustained frame cost. Reduced motion, forced colors, increased
+contrast, reduced transparency, data-saving, small-screen and modest-device
+gates keep the CSS tessellation instead of requesting WebGPU. At 320 px the live
+source used that static fallback with one H1, no horizontal overflow and sampled
+account controls at or above 44 px.
+
+The full Arabic text of Sūrat an-Nūr 24:35 is static, marked `lang=ar` and
+`dir=rtl`, and attributed in visible text. Its adjacent note limits the
+relationship to visual inspiration from light through glass and explicitly says
+the verse is not a product claim, certification or ruling. The page makes no
+claim of scholar approval or religious authority.
+
+The exact commit passed all Go package and command tests and both production
+builds. A source/runtime sweep passed 14/14. An unrestricted promoted
+Node/Chromium sweep passed 18/19; its sole late domain-revocation wait then passed
+on one focused rerun, classifying it as an isolated timing failure rather than a
+product finding. The new real-WebGPU lifecycle, route-continuity, responsive,
+keyboard and existing Viewer/Maintainer journeys were green. Independent code
+and accessibility reviewers returned APPROVE with no P0/P1.
+
+Railway deployment `05d22d21-e442-4676-be51-0936c72fbb49` reached terminal
+`SUCCESS` with runtime image
+`sha256:4973e15b240407a67293a87a12f71d679ae3715d958163815f62fc85f4260c28`.
+Fresh `/api/health`, `/`, `/account` and `/robots.txt` checks returned `200`;
+root exposed the aligned search title and WebGPU loader without an auth form,
+while `/account` exposed the noindexed account document and a 12-character
+password minimum. The deployed in-app Browser again observed real WebGPU,
+five scroll states, the attributed Arabic verse, no overflow and zero console
+warnings or errors. Three final low-rate health/root pairs were 6/6 `200`.
+
+The first bounded production snapshot recorded eight `2xx`, zero `4xx`, zero
+`5xx`, p95 28 ms, CPU average/max 0.000108/0.00243 vCPU, and memory average/max
+24.23/25.28 MB. Runtime logs show one volume mount, one database initialization
+and one server start, with no panic, exit or restart. Railway categorizes the two
+Go standard-logger startup lines as error-stream records; their text is normal
+startup information and deployment-scoped HTTP `500..599` is empty.
+
+**Verdict:** ACCEPT application commit
+`0b13e505c444a406c336300b4aa27f4ed8b9dd96` / Railway deployment
+`05d22d21-e442-4676-be51-0936c72fbb49`. This release created no user,
+workspace, domain, publication, Bazaar, finance, reviewer or participant fixture.
+It does not add evidence for controlled DNS/public Host serving, Bazaar review or
+purchase, or the genuine five-person study. Workspace `47` remains the supported
+application-admin cleanup backlog; federation, TURN and complete E2EE key
+lifecycle remain deferred.
