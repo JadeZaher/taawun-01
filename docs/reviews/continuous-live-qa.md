@@ -1709,3 +1709,64 @@ publication, Bazaar, finance, reviewer or participant fixture was created.
 Controlled DNS/reviewer/Bazaar proof, the genuine five-person study, workspace
 `47`, federation, TURN and complete E2EE key lifecycle remain unchanged and
 unclaimed.
+
+## Interlocked tessellation and two-sway landing checkpoint — 2026-08-22
+
+Application commit `023c667f73bb2bc7c6c54aa4a58b835b2c8645eb` sharpens the
+landing geometry into repeated eight-point stars, nested rosettes, interlocking
+diamond straps and shared octagonal junctions. Paired bridge rails now begin at
+the real star-arm boundary and meet the octagonal outline without crossing the
+negative-space interiors. The emerald and rust refraction samples remain tightly
+stacked beside the exact base path in cell space, with a smaller perpendicular
+mirrored rail instead of a displaced duplicate lattice.
+
+The six desktop scenes now group geometry right, right, left, left, right,
+right, so the full landing performs exactly two lateral crossings and readable
+content uses the inverse placement. Same-side section changes send zero travel
+transition and retain one invariant resting lattice orientation. A critically
+damped fixed-step response and explicit target-crossing guard remove reverse
+swing and overshoot. Only the two real side crossings receive the restrained
+travel rotation, 0.002-cell shimmer and inverse 3.5% outer-star / 4.5%
+inner-rosette kaleidoscope overlap; all three return to their exact resting
+geometry on settlement. The CSS fallback uses the same side grouping with a
+non-overshooting 1.2-second curve and a 3.5% maximum scale pulse.
+
+The exact source passed all Go packages and both production binary builds.
+The elevated combined Node/runtime sweep passed 18/19; its sole failure was a
+new shader-source probe that searched for a non-literal signature fragment. A
+focused promoted-Chromium rerun then exposed that the new same-side assertion's
+scroll target actually landed on the first real side crossing. After correcting
+those two test-only probes, the focused real-Chromium WebGPU lifecycle passed.
+Taken together, every promoted test is green on the exact application source.
+Independent code review closed both the original bridge-interior finding and the
+hidden per-section whole-field rotation finding. Accessibility review returned
+APPROVE with no P0/P1/P2 regression.
+
+Railway deployment `20818f11-623c-46d7-9848-d9ea91334261` reached terminal
+`SUCCESS` with runtime image
+`sha256:b1ecbaac5343d7dcce49de1c5672be7a308c038dd09197921f9aa9996784a7a0`.
+Independent public GETs returned `200` for `/api/health`, `/` and
+`/geometric-renderer.js`. The served shader contained the exact octagonal
+connector, corrected bridge gate, tight rail, invariant-rest and side-gated
+kaleidoscope contracts. Deployment-scoped HTTP `500..599` was empty. Railway's
+bounded 15-minute snapshot reported CPU average/max
+`0.0001072`/`0.0023663` vCPU and memory average/max `12.998`/`14.902` MB.
+Runtime output contains one database initialization and one server start; the
+platform labels those normal Go standard-logger startup lines as error-stream
+records, with no panic, exit, restart or application error.
+
+A fresh deployed in-app Browser at 1,440 px observed `renderer=webgpu`,
+`data-enhanced=true`, settled motion, the exact six-state sequence with two side
+changes, one H1, the separate account route and no horizontal overflow. At
+390 px it observed the intended static fallback, adjacent 44 px motion/menu
+controls, no navigation overlap and no horizontal overflow. No account, user,
+workspace, domain, publication, Bazaar, finance, reviewer or participant fixture
+was created.
+
+**Verdict:** ACCEPT application commit
+`023c667f73bb2bc7c6c54aa4a58b835b2c8645eb` / Railway deployment
+`20818f11-623c-46d7-9848-d9ea91334261`. Rollback remains application
+`f1c427a8732b19f9f6b48698c6e2f7d8abc4aea4` / Railway deployment
+`b946bcc0-3eef-4c78-989e-3a5d932a37b0`. Controlled DNS/reviewer/Bazaar proof,
+the genuine five-person study, workspace `47`, federation, TURN and complete
+E2EE key lifecycle remain unchanged and unclaimed.
