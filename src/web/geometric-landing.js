@@ -80,6 +80,7 @@
   let sceneVisible = false;
   let initializing = false;
   let pageLoaded = document.readyState === 'complete';
+  let disposed = false;
 
   const userPaused = () => {
     try { return localStorage.getItem('taawun-decorative-motion') === 'off'; } catch { return false; }
@@ -198,13 +199,38 @@
   else sections.forEach((section) => observer.observe(section));
   if (!pageLoaded) window.addEventListener('load', () => { pageLoaded = true; reconcilePreference(); }, { once: true });
 
-  window.addEventListener('pagehide', () => {
+  const cancelPendingFrames = () => {
     if (idleHandle) {
       if ('cancelIdleCallback' in window) window.cancelIdleCallback(idleHandle); else window.clearTimeout(idleHandle);
     }
     if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
     if (sceneFrame) window.cancelAnimationFrame(sceneFrame);
+    idleHandle = 0;
+    resizeFrame = 0;
+    sceneFrame = 0;
+  };
+
+  window.addEventListener('pagehide', (event) => {
+    cancelPendingFrames();
+    if (event.persisted) {
+      renderer?.pause();
+      return;
+    }
+    disposed = true;
     observer.disconnect();
     stop();
-  }, { once: true });
+  });
+
+  window.addEventListener('pageshow', (event) => {
+    if (!event.persisted || disposed) return;
+    pageLoaded = true;
+    updateStaticScene();
+    const visibleRegions = landingMain ? [landingMain] : sections;
+    sceneVisible = visibleRegions.some((region) => {
+      const rect = region.getBoundingClientRect();
+      return rect.bottom > 0 && rect.top < window.innerHeight;
+    });
+    if (renderer && capable() && !document.hidden) renderer.resume();
+    else reconcilePreference();
+  });
 })();

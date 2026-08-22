@@ -11,12 +11,27 @@ not copy a track ID, creator, signer, lifecycle, origin, publication, or
 idempotency authority. Viewer access is inspect-only; Maintainer and Architect
 editing still results in a new server-authorized track.
 
+Server-confirmed preview expiry keeps the immutable build record but removes its
+iframe, receipt, and active trust presentation. For Maintainer and Architect,
+the existing curated restore control becomes “Prepare fresh preview”; it remains
+a zero-network local draft action and then focuses the separate explicit staging
+preview submit. Current workspace and approved origins must be reviewed before
+that submit creates a distinct signature. Viewer guidance remains inspect-only,
+and no path extends or rewrites the old authorization. Once exact expiry is
+established, the old record's reopen control becomes a disabled “Signed preview
+expired” state rather than inviting another request that must fail.
+
 All async workspace evidence uses principal/workspace generation guards.
 Same-workspace domain and publication operations additionally bind the exact
 claim, origin, track, version, draft, and verified-preview generation. A stale
 response may not replace a newer draft, receipt, claim selection, or publication
 state. Failures retain the last valid draft and verified preview while showing a
 specific retry/recovery state.
+
+Signed-preview reopen also binds the captured selected track ID and track-record
+epoch before any trust-surface commit or expiry neutralization. Inspecting a new
+track invalidates an older delayed reopen, including a delayed server-confirmed
+expiry, so one record can never apply its status or recovery guidance to another.
 
 ## Signed starter derivation
 
@@ -253,3 +268,13 @@ separate from the decorative renderer. The public excerpt is Qur'an 5:2 with its
 exact citation and a visibly labeled English translation attributed to Dr.
 Mustafa Khattab, The Clear Quran; adjacent copy does not interpret the verse as
 a visual metaphor or product claim.
+
+A persisted `pagehide` is a back/forward-cache suspension, not an unload: pending
+loader frames are cancelled and the existing renderer pauses without destroying
+its observer, preference, or device. The matching persisted `pageshow`
+recomputes main-region visibility and resumes that one renderer or re-enters the
+same eligibility gate if initialization was pending. A non-persisted pagehide
+still disconnects and destroys normally. No restoration path registers a second
+observer or duplicate listener. The signed-in cockpit brand is a 44px semantic
+link back to the public `/` story; the account document itself remains noindex
+and contains no decorative renderer.

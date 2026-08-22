@@ -289,6 +289,8 @@ test('public landing exposes aligned, truthful search metadata and crawl guidanc
   assert.match(account, /<meta name="robots" content="noindex,nofollow,noarchive">/u);
   assert.match(account, /id="authPanel"[^>]*data-nosnippet/u);
   assert.match(account, /id="appView"[\s\S]*?hidden[\s\S]*?data-nosnippet/u);
+  assert.match(account, /<header class="topbar">[\s\S]*?<a class="brand cockpit-home" href="\/" aria-label="Taawun public home">/u);
+  assert.match(account, /\.landing-brand, \.cockpit-home \{[^}]*min-width: 44px; min-height: 44px;[^}]*text-decoration: none;/u);
   assert.equal(structured['@type'], 'WebSite');
   assert.equal(structured.name, 'Taawun');
   assert.equal(structured.url, 'https://taawun-production.up.railway.app/');
@@ -338,6 +340,10 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(loader, /const landingMain = document\.querySelector\('main'\)/u);
   assert.match(loader, /if \(landingMain\) observer\.observe\(landingMain\)/u);
   assert.match(loader, /sceneVisible = entries\.some\(\(entry\) => entry\.isIntersecting\) \|\| \[landingMain\]\.some/u);
+  assert.match(loader, /window\.addEventListener\('pagehide', \(event\) => \{[\s\S]*?if \(event\.persisted\) \{\s*renderer\?\.pause\(\);\s*return;/u);
+  assert.match(loader, /window\.addEventListener\('pageshow', \(event\) => \{[\s\S]*?if \(!event\.persisted \|\| disposed\) return;[\s\S]*?renderer\.resume\(\)/u);
+  assert.match(loader, /disposed = true;\s*observer\.disconnect\(\);\s*stop\(\);/u);
+  assert.doesNotMatch(loader, /addEventListener\('pagehide',[\s\S]*?\}, \{ once: true \}\)/u);
   assert.match(loader, /const sideChanges = currentSide !== nextSide/u);
   assert.match(loader, /if \(sideChanges && progress > 0\.12 && progress < 0\.88\)/u);
   assert.match(html, /--geometry-x: 22vw/u);
@@ -556,6 +562,19 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     await wait(250);
     assert.equal(await evaluate(client, `window.__gpuQA.submissions`), settled.submissions, 'settled spring must stop submitting frames');
 
+    const beforeBackForwardCache = await evaluate(client, `({ submissions: window.__gpuQA.submissions, adapters: window.__gpuQA.adapterRequests })`);
+    await evaluate(client, `(() => {
+      const hidden = new Event('pagehide');
+      Object.defineProperty(hidden, 'persisted', { value: true });
+      window.dispatchEvent(hidden);
+      document.querySelector('[data-geometry-state="2"]').scrollIntoView({ block: 'center', behavior: 'instant' });
+    })()`);
+    await wait(120);
+    assert.equal(await evaluate(client, `window.__gpuQA.submissions`), beforeBackForwardCache.submissions, 'persisted pagehide pauses the retained renderer');
+    await evaluate(client, `(() => { const shown = new Event('pageshow'); Object.defineProperty(shown, 'persisted', { value: true }); window.dispatchEvent(shown); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.spring === 'settled' && window.__gpuQA.submissions > ${beforeBackForwardCache.submissions + 2}`), 'back-forward cache pageshow resumes and settles the retained renderer');
+    assert.equal(await evaluate(client, `window.__gpuQA.adapterRequests`), beforeBackForwardCache.adapters, 'back-forward cache recovery reuses one renderer without duplicate initialization');
+
     const beforeContinuationScroll = settled.submissions;
     await evaluate(client, `document.querySelector('.geometry-continuation:last-of-type').scrollIntoView({ block: 'center', behavior: 'instant' })`);
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.state === '5' && document.querySelector('.geometry-stage').dataset.side === 'right' && document.querySelector('.geometry-stage').dataset.spring === 'settled' && window.__gpuQA.submissions > ${beforeContinuationScroll + 3}`), 'final right-side scene remains active through post-template main content');
@@ -636,6 +655,7 @@ test('account hash registration stays on the account document and signs out to l
       set('registerUsername', 'Route QA'); set('registerEmail', 'route@example.test'); set('registerPassword', 'correct horse battery staple'); document.querySelector('#registerForm').requestSubmit();
     })()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#appView').hidden && location.pathname === '/account' && location.hash === ''`), 'registration auto-login preserves account document');
+    assert.deepEqual(await evaluate(client, `(() => { const link = document.querySelector('.topbar .cockpit-home'); return { href: link.getAttribute('href'), label: link.getAttribute('aria-label'), height: Math.round(link.getBoundingClientRect().height) }; })()`), { href: '/', label: 'Taawun public home', height: 44 }, 'signed-in cockpit brand returns to the public landing with an accessible target');
     assert.deepEqual(requests.filter((entry) => entry === 'POST /api/register' || entry === 'POST /api/login'), ['POST /api/register', 'POST /api/login']);
     await evaluate(client, `document.querySelector('#logoutButton').click()`);
     await waitFor(() => evaluate(client, `!document.querySelector('#authView').hidden && !document.querySelector('#loginForm').hidden && document.querySelector('#registerForm').hidden`), 'sign-out normalizes to login');
@@ -2373,6 +2393,40 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     assert.equal(trackRestore.status, 'Verified staging ready', `track restore status: ${JSON.stringify(trackRestore)}`);
     assert.equal(trackRestore.stale, 'false');
     assert.match(trackRestore.document, /students/u, 'verified track restores exact component document');
+    const trustedBeforeDelayedTrackSwitch = await evaluate(client, `({ receipt: document.querySelector('#manifestList').textContent, raw: document.querySelector('#rawManifest').textContent, srcdoc: document.querySelector('#previewFrame').srcdoc })`);
+    const alternateTrack = structuredClone(activeTrackResponse.track);
+    alternateTrack.id = 'track_alternate';
+    alternateTrack.updatedAt = '2026-08-18T04:24:00Z';
+    extraTracks.set(alternateTrack.id, alternateTrack);
+    trackEvents.set(alternateTrack.id, [{ type: 'PREVIEW_READY', toStatus: 'PREVIEW_READY', trackVersion: 6, createdAt: alternateTrack.updatedAt }]);
+    Object.assign(activeTrackResponse.verification, { authorizationState: 'expired', serverTime: '2100-01-01T00:00:00Z' });
+    delayTrackResponse = true;
+    const delayedExpiredReopenStart = requests.length;
+    await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
+    await waitFor(() => requests.slice(delayedExpiredReopenStart).some((request) => request.method === 'GET' && request.path === '/api/conductor/tracks/track_browser' && request.search === '?includeVerifiedPreview=true'), 'delayed expired track A reopen request');
+    await evaluate(client, `(() => { document.querySelector('#trackLookup').value = 'track_alternate'; document.querySelector('#loadTrackButton').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTrackID').value === 'track_alternate'`), 'track B becomes the authoritative selected record');
+    await wait(240);
+    const delayedExpiredTrackBoundary = await evaluate(client, `({
+      selected: document.querySelector('#buildRecordTrackID').value,
+      title: document.querySelector('#buildRecordTitle').textContent,
+      receipt: document.querySelector('#manifestList').textContent,
+      raw: document.querySelector('#rawManifest').textContent,
+      srcdoc: document.querySelector('#previewFrame').srcdoc,
+      previewStatus: document.querySelector('#previewStatus').textContent,
+      recordAlert: document.querySelector('#buildRecordAlert').textContent,
+      restoreLabel: document.querySelector('#restoreBuildDraftButton').textContent,
+      reopenLabel: document.querySelector('#reopenBuildPreviewButton').textContent,
+      reopenDisabled: document.querySelector('#reopenBuildPreviewButton').disabled,
+    })`);
+    assert.deepEqual({ selected: delayedExpiredTrackBoundary.selected, title: delayedExpiredTrackBoundary.title, receipt: delayedExpiredTrackBoundary.receipt, raw: delayedExpiredTrackBoundary.raw, srcdoc: delayedExpiredTrackBoundary.srcdoc, previewStatus: delayedExpiredTrackBoundary.previewStatus }, { selected: 'track_alternate', title: 'community-iftar · PREVIEW_READY', ...trustedBeforeDelayedTrackSwitch, previewStatus: 'Verified staging ready' }, 'delayed expired track A cannot replace track B or neutralize the prior trusted preview and receipt');
+    assert.deepEqual({ restoreLabel: delayedExpiredTrackBoundary.restoreLabel, reopenLabel: delayedExpiredTrackBoundary.reopenLabel, reopenDisabled: delayedExpiredTrackBoundary.reopenDisabled }, { restoreLabel: 'Start new draft from build', reopenLabel: 'Reopen signed preview', reopenDisabled: false }, 'track B receives no expired marker or disabled recovery control from delayed track A');
+    assert.doesNotMatch(delayedExpiredTrackBoundary.recordAlert, /expired|Prepare fresh preview/iu, 'track B receives no delayed expiry guidance from track A');
+    Object.assign(activeTrackResponse.verification, { authorizationState: 'active', serverTime: '2026-08-18T04:23:28Z' });
+    extraTracks.delete(alternateTrack.id);
+    trackEvents.delete(alternateTrack.id);
+    await evaluate(client, `(() => { document.querySelector('#trackLookup').value = 'track_browser'; document.querySelector('#loadTrackButton').click(); })()`);
+    await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTrackID').value === 'track_browser'`), 'return to track A after delayed expiry isolation');
     const trustedPairBeforeTrackSubstitution = await evaluate(client, `({ receipt: document.querySelector('#manifestList').textContent, raw: document.querySelector('#rawManifest').textContent, srcdoc: document.querySelector('#previewFrame').srcdoc })`);
     activeTrackResponse.track.id = 'track_substituted';
     await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').click()`);
@@ -2634,8 +2688,23 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
       && document.querySelector('#manifestList').hidden
       && document.querySelector('#rawManifest').textContent === ''
       && document.querySelector('#buildRecordAlert').textContent.includes('Authorization expired · not serving')
+      && document.querySelector('#restoreBuildDraftButton').textContent === 'Prepare fresh preview'
+      && document.querySelector('#reopenBuildPreviewButton').disabled
+      && document.querySelector('#reopenBuildPreviewButton').textContent === 'Signed preview expired'
       && !document.querySelector('#previewFrame').getAttribute('srcdoc')`), 'automatic exact server-clock expiry presentation');
     automaticPublicationExpiry = false;
+    assert.match(await evaluate(client, `document.querySelector('#reopenBuildPreviewButton').title`), /cannot be reopened or extended/u, 'Architect expired record disables the doomed reopen action with an honest explanation');
+    const previewPostsBeforeExpiredDraft = requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview').length;
+    await evaluate(client, `document.querySelector('#restoreBuildDraftButton').click()`);
+    const preparedFreshPreview = await evaluate(client, `({
+      focused: document.activeElement === document.querySelector('#previewButton'),
+      submitLabel: document.querySelector('#previewButton').textContent,
+      alert: document.querySelector('#builderAlert').textContent,
+      selectedTrack: document.querySelector('#buildRecordTrackID').value,
+    })`);
+    assert.deepEqual({ focused: preparedFreshPreview.focused, submitLabel: preparedFreshPreview.submitLabel, selectedTrack: preparedFreshPreview.selectedTrack }, { focused: true, submitLabel: 'Create staging preview', selectedTrack: 'track_browser' }, 'expired build prepares a separate explicit preview action without rewriting history');
+    assert.match(preparedFreshPreview.alert, /No network request has been sent.*current workspace and approved origins.*old track and expiry were not changed/isu);
+    assert.equal(requests.filter((request) => request.method === 'POST' && request.path === '/api/artifacts/preview').length, previewPostsBeforeExpiredDraft, 'preparing an expired build is a zero-network local draft action');
     assert.ok(requests.filter((request) => request.method === 'GET' && request.path.endsWith('/domains/claim_browser/publications') && request.search === '?publicationId=publication_browser').length >= exactReadsBeforeAutomaticExpiry + 2, 'monotonic deadline triggers its own exact authoritative re-read without a manual Recheck action');
     const expiredPresentation = await evaluate(client, `[
       document.querySelector('#previewTitle').innerText,
@@ -4168,8 +4237,9 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     await waitFor(() => evaluate(client, `document.querySelector('#buildHistoryList').textContent.includes('track_role_handoff')`), 'Viewer authorized build-history read');
     await evaluate(client, `document.querySelector('#buildHistoryList button').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTrackID').value === 'track_role_handoff'`), 'Viewer build inspection');
-    const viewerBuildControls = await evaluate(client, `({ draft: document.querySelector('#restoreBuildDraftButton').disabled, resumeHidden: document.querySelector('#resumeBuildButton').hidden, domain: document.querySelector('#domainOrigin').disabled, issue: document.querySelector('#claimDomainButton').disabled })`);
-    assert.deepEqual(viewerBuildControls, { draft: true, resumeHidden: true, domain: true, issue: true }, 'Viewer history is inspect-only and domain mutation remains unavailable');
+    const viewerBuildControls = await evaluate(client, `({ draft: document.querySelector('#restoreBuildDraftButton').disabled, reopenLabel: document.querySelector('#reopenBuildPreviewButton').textContent, resumeHidden: document.querySelector('#resumeBuildButton').hidden, domain: document.querySelector('#domainOrigin').disabled, issue: document.querySelector('#claimDomainButton').disabled })`);
+    assert.deepEqual(viewerBuildControls, { draft: true, reopenLabel: 'Reopen signed preview', resumeHidden: true, domain: true, issue: true }, 'Viewer history remains inspect-only while a still-active record retains its honest reopen label');
+    assert.match(await evaluate(client, `document.querySelector('#restoreBuildDraftButton').title`), /Viewer access is inspect-only/u);
     assert.match(await evaluate(client, `document.querySelector('#domainClaimsState').textContent`), /Domain evidence is unavailable.*no mutation controls are enabled/isu, 'Viewer domain authorization failure is honest while history remains independently inspectable');
     assert.deepEqual(await evaluate(client, `({ refresh: document.querySelector('#refreshDomainPublication').disabled, replace: document.querySelector('#replaceDomainPublication').hidden, rollback: document.querySelector('#rollbackDomainPublication').hidden, records: document.querySelectorAll('#domainPublicationList li').length })`), { refresh: true, replace: true, rollback: true, records: 0 }, 'Viewer receives no publication-history action or retained Architect context');
     assert.doesNotMatch(await evaluate(client, `document.querySelector('#buildTimeline').innerText`), /never-render-role-detail/u, 'Viewer timeline excludes event detail');
@@ -4203,6 +4273,7 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     await waitFor(() => evaluate(client, `document.querySelector('#buildHistoryList').textContent.includes('track_role_handoff')`), 'Maintainer authorized build-history read');
     await evaluate(client, `document.querySelector('#buildHistoryList button').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#buildRecordTrackID').value === 'track_role_handoff' && !document.querySelector('#restoreBuildDraftButton').disabled`), 'Maintainer build inspection and draft permission');
+    assert.deepEqual(await evaluate(client, `({ restore: document.querySelector('#restoreBuildDraftButton').textContent, reopen: document.querySelector('#reopenBuildPreviewButton').textContent, reopenDisabled: document.querySelector('#reopenBuildPreviewButton').disabled })`), { restore: 'Start new draft from build', reopen: 'Reopen signed preview', reopenDisabled: false }, 'Maintainer retains active-track actions until an exact server expiry is established');
     await evaluate(client, `document.querySelector('#restoreBuildDraftButton').click()`);
     await waitFor(() => evaluate(client, `document.querySelector('#templateSelect').value === 'bazaar-cooperative' && document.querySelectorAll('#moduleList input:checked').length === 2 && !document.querySelector('[data-component-id="announcements"] .field input').disabled`), 'Maintainer exact request becomes an editable new local draft');
     await evaluate(client, `(() => { const input = document.querySelector('[data-component-id="announcements"] .field input'); input.value = 'Maintainer-owned revision'; input.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#builderForm').requestSubmit(); })()`);

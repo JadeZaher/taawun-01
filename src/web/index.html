@@ -107,7 +107,7 @@
     .auth-view { min-height: 100vh; overflow-x: clip; }
     .landing-header { position: sticky; top: 0; z-index: 30; border-bottom: 1px solid var(--line); background: rgba(17, 22, 26, 0.94); backdrop-filter: blur(14px); }
     .landing-header-inner { width: min(1240px, 100%); min-height: 68px; margin: 0 auto; padding: 10px 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-    .landing-brand { min-width: 44px; min-height: 44px; text-decoration: none; }
+    .landing-brand, .cockpit-home { min-width: 44px; min-height: 44px; color: inherit; text-decoration: none; }
     .landing-nav { display: flex; align-items: center; justify-content: flex-end; gap: 6px 22px; }
     .landing-nav a { min-height: 44px; display: inline-flex; align-items: center; color: var(--parchment-dim); font-size: 13px; text-decoration: none; }
     .landing-nav a:hover { color: var(--parchment); }
@@ -753,7 +753,7 @@
   >
     <header class="topbar">
       <div class="topbar-left">
-        <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>Taawun</span></div>
+        <a class="brand cockpit-home" href="/" aria-label="Taawun public home"><span class="brand-mark" aria-hidden="true"></span><span>Taawun</span></a>
         <span class="beta-tag">Private beta</span>
       </div>
       <div class="topbar-right">
@@ -1263,6 +1263,7 @@
       starterCustomizationInteracted: false,
       announcementEpoch: 0,
       selectedTrack: null,
+      expiredPreviewTrackId: '',
       trackEvents: [],
       domainClaims: [],
       domainPublications: [],
@@ -1439,6 +1440,7 @@
       state.starterComponentsInteracted = false;
       state.starterCustomizationInteracted = false;
       state.selectedTrack = null;
+      state.expiredPreviewTrackId = '';
       state.trackEvents = [];
       state.domainClaims = [];
       state.domainPublications = [];
@@ -1637,6 +1639,7 @@
     }
 
     class StaleWorkspaceView extends Error {}
+    class PreviewAuthorizationExpired extends Error {}
 
     function ignoreStaleWorkspace(error) {
       return error instanceof StaleWorkspaceView;
@@ -2249,6 +2252,7 @@
 
     function clearSelectedBuildRecord() {
       state.selectedTrack = null;
+      state.expiredPreviewTrackId = '';
       state.trackEvents = [];
       element('buildRecord').hidden = true;
       element('buildRecordTrackID').value = '';
@@ -2318,15 +2322,35 @@
         ? `Preview authorization expires ${formatCockpitTime(track.preview.authorizationExpiresAt)}`
         : 'No preview authorization expiry is present on this record.';
       element('buildRecordTrackID').value = String(track.id || '');
-      element('reopenBuildPreviewButton').disabled = !track.preview || !track.artifact;
-      element('restoreBuildDraftButton').disabled = !canBuildWorkspace() || !track.request || Number(track.workspaceId) !== currentWorkspaceID();
-      element('restoreBuildDraftButton').title = canBuildWorkspace() ? 'Creates a new local draft from curated request data only; signer and creator authority are never copied.' : 'Viewer access is inspect-only.';
+      const canBuild = canBuildWorkspace();
+      const authorizationExpired = state.expiredPreviewTrackId === String(track.id || '');
+      const reopenButton = element('reopenBuildPreviewButton');
+      reopenButton.disabled = authorizationExpired || !track.preview || !track.artifact;
+      reopenButton.textContent = authorizationExpired ? 'Signed preview expired' : 'Reopen signed preview';
+      reopenButton.title = authorizationExpired ? 'This signed authorization expired. The old preview cannot be reopened or extended.' : 'Fetches and verifies the exact signed preview without changing the local draft.';
+      const restoreButton = element('restoreBuildDraftButton');
+      restoreButton.disabled = !canBuild || !track.request || Number(track.workspaceId) !== currentWorkspaceID();
+      restoreButton.textContent = authorizationExpired && canBuild ? 'Prepare fresh preview' : 'Start new draft from build';
+      restoreButton.title = canBuild
+        ? 'Creates a new local draft from curated request data only; signer, creator, lifecycle, origins, and idempotency authority are never copied.'
+        : (authorizationExpired ? 'Viewer access is inspect-only. Ask an Architect for Maintainer access to prepare a fresh signed preview.' : 'Viewer access is inspect-only.');
       const resumable = RESUMABLE_TRACK_STATUSES.has(String(track.status || '').toUpperCase());
       const ownTrack = Number(track.createdBy) === Number(state.user && state.user.id);
       element('resumeBuildButton').disabled = !canBuildWorkspace() || !resumable || !ownTrack;
       element('resumeBuildButton').hidden = !resumable;
       element('resumeBuildButton').title = ownTrack ? 'The server rechecks creator, workspace capability, status, and version.' : 'Only the original authenticated creator may resume this partial track.';
       renderBuildEvents();
+    }
+
+    function presentExpiredBuildRecovery(trackID, copy = 'Signed authorization expired · preview unavailable') {
+      if (!trackID || !state.selectedTrack || String(state.selectedTrack.id || '') !== String(trackID)) return false;
+      state.expiredPreviewTrackId = String(trackID);
+      renderSelectedBuild();
+      const guidance = canBuildWorkspace()
+        ? 'The old signed preview cannot be reopened. Use Prepare fresh preview to copy its exact curated documents into a new local draft, then review the current workspace and approved origins before creating a new signature.'
+        : 'Viewer access is inspect-only. Ask an Architect for Maintainer access to prepare a fresh signed preview.';
+      setNotice(element('buildRecordAlert'), `${copy} ${guidance}`, 'gold');
+      return true;
     }
 
     async function loadBuildHistory({ append = false } = {}) {
@@ -2414,6 +2438,7 @@
         state.selectedTrack = track;
         state.trackEvents = [];
         element('trackLookup').value = trackID;
+        setNotice(element('buildRecordAlert'), '');
         renderSelectedBuild();
         try {
           const payload = await api(`/conductor/tracks/${encodeURIComponent(trackID)}/events`);
@@ -3845,7 +3870,7 @@
       if (!publication || !publication.active || publication.servingState !== 'expired') return;
       const exactCopy = 'Authorization expired · not serving — activation record retained';
       neutralizeExpiredPreview(exactCopy);
-      setNotice(element('buildRecordAlert'), exactCopy, 'gold');
+      if (!presentExpiredBuildRecovery(publication.trackBinding && publication.trackBinding.trackId, exactCopy)) setNotice(element('buildRecordAlert'), exactCopy, 'gold');
       element('starterPreviewStatus').textContent = exactCopy;
       element('starterPathStatus').textContent = exactCopy;
       element('starterRecoveryState').textContent = exactCopy;
@@ -4625,7 +4650,8 @@
       requirePreviewGuard(requestGuard);
       if (!receipt.active && requireActive) {
         if (receipt.expired) neutralizeExpiredPreview();
-        throw new Error(receipt.expired ? 'The signed track authorization has expired.' : 'The signed track receipt could not be verified.');
+        if (receipt.expired) throw new PreviewAuthorizationExpired('The signed track authorization has expired.');
+        throw new Error('The signed track receipt could not be verified.');
       }
       if (!receipt.active) {
         state.previewReady = false;
@@ -4697,9 +4723,13 @@
       const sessionEpoch = state.sessionEpoch;
       const workspaceEpoch = state.workspaceEpoch;
       const workspaceID = currentWorkspaceID();
+      const selectedTrackID = String(selected.id);
+      const trackRecordEpoch = state.trackRecordEpoch;
       const previewEpoch = ++state.previewEpoch;
       const marker = draftMarker();
-      const operationCurrent = () => currentSession(sessionEpoch) && workspaceEpoch === state.workspaceEpoch && workspaceID === currentWorkspaceID() && previewEpoch === state.previewEpoch;
+      const operationCurrent = () => currentSession(sessionEpoch) && workspaceEpoch === state.workspaceEpoch && workspaceID === currentWorkspaceID()
+        && trackRecordEpoch === state.trackRecordEpoch && selectedTrackID === String(state.selectedTrack && state.selectedTrack.id || '')
+        && previewEpoch === state.previewEpoch;
       const guard = () => operationCurrent() && currentDraft(marker);
       const button = element('reopenBuildPreviewButton');
       setBusy(button, true, 'Verifying…', 'Reopen signed preview');
@@ -4709,13 +4739,14 @@
         if (!guard()) return;
         const active = await applyVerifiedPreview(result, guard, { restoreDraft: false, expectedTrackID: selected.id });
         if (!active) throw new Error('The signed preview is not actively verified.');
+        if (state.expiredPreviewTrackId === String(selected.id)) state.expiredPreviewTrackId = '';
         state.selectedTrack = state.track;
         renderSelectedBuild();
         setNotice(element('buildRecordAlert'), 'Verified preview reopened. The local component draft was not replaced.', 'success');
       } catch (error) {
         if (!operationCurrent()) return;
         const frame = element('previewFrame');
-        const authorizationExpired = !frame.srcdoc && frame.title.startsWith('Authorization expired;');
+        const authorizationExpired = error instanceof PreviewAuthorizationExpired;
         state.previewReady = false;
         if (!frame.srcdoc) element('previewEmpty').hidden = false;
         else frame.dataset.stale = 'true';
@@ -4723,9 +4754,13 @@
         element('deployStateText').textContent = authorizationExpired ? 'Authorization expired · not serving' : 'Not ready · verified reload required';
         element('deployStateHelp').textContent = authorizationExpired ? 'Signed authorization expired; staging content is unavailable.' : 'The selected track must exactly bind the signed artifact, preview authorization, workspace, origins, and expiry.';
         updateDeploymentAvailability();
-        setNotice(element('buildRecordAlert'), authorizationExpired ? 'Signed authorization expired · preview unavailable' : `${error.message || 'The signed preview could not be reopened.'} Your current draft and last trusted iframe/receipt were not replaced.`, authorizationExpired ? 'gold' : 'error');
+        if (authorizationExpired) presentExpiredBuildRecovery(selected.id);
+        else setNotice(element('buildRecordAlert'), `${error.message || 'The signed preview could not be reopened.'} Your current draft and last trusted iframe/receipt were not replaced.`, 'error');
       } finally {
-        if (operationCurrent()) setBusy(button, false, 'Verifying…', 'Reopen signed preview');
+        if (operationCurrent()) {
+          setBusy(button, false, 'Verifying…', 'Reopen signed preview');
+          renderSelectedBuild();
+        }
       }
     }
 
@@ -4749,8 +4784,11 @@
     }
 
     function restoreSelectedBuildAsDraft() {
+      const preparingFreshPreview = Boolean(state.selectedTrack && state.expiredPreviewTrackId === String(state.selectedTrack.id || ''));
       if (!canBuildWorkspace()) {
-        setNotice(element('buildRecordAlert'), 'Viewer access is inspect-only. Ask an Architect for Maintainer access to start a new draft.', 'error');
+        setNotice(element('buildRecordAlert'), preparingFreshPreview
+          ? 'Viewer access is inspect-only. Ask an Architect for Maintainer access to prepare a fresh signed preview.'
+          : 'Viewer access is inspect-only. Ask an Architect for Maintainer access to start a new draft.', 'error');
         return;
       }
       try {
@@ -4771,8 +4809,15 @@
         renderComponentEditors();
         markPreviewDirty();
         saveComponentDraft();
-        setNotice(element('builderAlert'), 'New local draft created from exact curated request components. Creator, signer, lifecycle, origins, and idempotency authority were not copied.', 'success');
-        element('templateSelect').focus();
+        if (preparingFreshPreview) {
+          element('previewButton').textContent = 'Create staging preview';
+          setNotice(element('builderAlert'), 'Fresh preview draft prepared from exact curated request components. No network request has been sent. Review the current workspace and approved origins, then choose Create staging preview for a new signed authorization. The old track and expiry were not changed.', 'success');
+          element('previewButton').focus();
+          announce('Fresh preview draft prepared. Review the current workspace and approved origins, then create the new signed preview explicitly.');
+        } else {
+          setNotice(element('builderAlert'), 'New local draft created from exact curated request components. Creator, signer, lifecycle, origins, and idempotency authority were not copied.', 'success');
+          element('templateSelect').focus();
+        }
       } catch (error) {
         setNotice(element('buildRecordAlert'), `${error.message || 'The build request could not start a new draft.'} The current draft and verified preview were retained.`, 'error');
       }
