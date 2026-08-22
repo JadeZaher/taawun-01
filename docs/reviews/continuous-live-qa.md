@@ -1770,3 +1770,54 @@ was created.
 `b946bcc0-3eef-4c78-989e-3a5d932a37b0`. Controlled DNS/reviewer/Bazaar proof,
 the genuine five-person study, workspace `47`, federation, TURN and complete
 E2EE key lifecycle remain unchanged and unclaimed.
+
+## Continuous same-side geometric motion checkpoint — 2026-08-22
+
+Application commit `e1826d1cbd818fe1525d879a7dffcf7d87272221` keeps the
+landing tessellation visibly alive throughout an unsettled scroll without adding
+another whole-field sway. A fixed-step internal phase advances only while the
+critically damped scroll spring is moving and freezes when it settles. Same-side
+scenes retain zero lateral travel and the invariant resting orientation while
+the nested star, rosette, tight refracted rails and mirrored depth breathe within
+strict sub-three-percent bounds. The two real side crossings retain the full
+approved rotation and kaleidoscope amplitude, so the six-state path remains
+right, right, left, left, right, right.
+
+The exact source passed every Go package, both production builds and all 12 Node
+contracts with Chromium serialized on Windows. Production binary SHA-256 values
+were `B9A549852330F3B82199698CEA848C089158D2A70F053E614EB771B6A1D5B970`
+and `4E59164B86924898C8BB5150484674A45514DF29BDCDFA3D87D69B5113E82943`.
+The promoted WebGPU test sampled phase changes during a right-to-right scroll,
+proved lateral transition stayed zero, bounded every fixed-step phase delta, and
+proved animation frames stop after settlement. Independent review returned
+APPROVE with no finding.
+
+Railway deployment `d82c182d-2fa9-46df-819a-9f9b1fb2ad8c` reached terminal
+`SUCCESS` with runtime image
+`sha256:a10b24cc1d84c7e8ba34e9d77d16d04cea05a57e085839bd319198545cdad990`.
+Independent GETs returned `200` for `/api/health`, `/` and
+`/geometric-renderer.js`; Railway request IDs were
+`v0SJtyN4RAm6mFXmxtoGcA`, `1shYxKzBRay603Xs0_TJvA` and
+`PGCCgwgcRKG_vO5e0_TJvA`, with total durations 28 ms, 29 ms and 3 ms.
+Deployment-scoped HTTP `500..599` was empty. The bounded 15-minute snapshot
+reported CPU average/max `0.000115`/`0.002608` vCPU and memory average/max
+`23.964`/`25.501` MB. Runtime output contains one volume mount, one database
+initialization, one server start and one container start with no panic, exit,
+restart or application error; Railway labels the two normal Go standard-logger
+startup lines as error-stream records.
+
+A fresh deployed in-app Browser at 1,280 px observed the expected title and H1,
+one WebGPU canvas and `data-enhanced=true`. The first scroll advanced state 0 to
+state 1 while remaining on the right with no transition flag. Continued and
+reverse scrolling observed the left state 2/3 grouping and right state 4/5
+grouping, then settled with the transition flag cleared and the canvas intact.
+No account, user, workspace, domain, publication, Bazaar, finance, reviewer or
+participant fixture was created.
+
+**Verdict:** ACCEPT application commit
+`e1826d1cbd818fe1525d879a7dffcf7d87272221` / Railway deployment
+`d82c182d-2fa9-46df-819a-9f9b1fb2ad8c`. Rollback remains application
+`023c667f73bb2bc7c6c54aa4a58b835b2c8645eb` / Railway deployment
+`20818f11-623c-46d7-9848-d9ea91334261`. Controlled DNS/reviewer/Bazaar proof,
+the genuine five-person study, workspace `47`, federation, TURN and complete
+E2EE key lifecycle remain unchanged and unclaimed.
