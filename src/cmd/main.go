@@ -362,8 +362,8 @@ func main() {
 	api.HandleFunc("/dashboard/stats", dashboardHandler.GetDashboardStats).Methods("GET")
 	api.HandleFunc("/dashboard/recent", dashboardHandler.GetRecentActivity).Methods("GET")
 
-	// Public cards resolve by Host; only configured control hosts fall back to the builder UI.
-	publicCards, err := domains.NewPublicHandler(domainService, appOrigins, http.FileServer(http.FS(web.FS)))
+	// Public cards resolve by Host; only configured control hosts reach the landing or account cockpit.
+	publicCards, err := domains.NewPublicHandler(domainService, appOrigins, web.Handler())
 	if err != nil {
 		log.Fatalf("Failed to configure public signed-card delivery: %v", err)
 	}

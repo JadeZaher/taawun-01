@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08110f">
+  <meta name="description" content="Taawun helps mosques, charities and Muslim groups shape community apps together, review every detail and prepare them for trusted sharing.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="https://taawun-production.up.railway.app/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Taawun">
+  <meta property="og:title" content="Community App Builder for Muslim Organizations | Taawun">
+  <meta property="og:description" content="Shape useful community apps together, review every detail and prepare them for trusted sharing—without needing to code.">
+  <meta property="og:url" content="https://taawun-production.up.railway.app/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Community App Builder for Muslim Organizations | Taawun">
+  <meta name="twitter:description" content="Shape useful community apps together, review every detail and prepare them for trusted sharing—without needing to code.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <title>Community App Builder for Muslim Organizations | Taawun</title>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": "https://taawun-production.up.railway.app/#website",
+      "name": "Taawun",
+      "url": "https://taawun-production.up.railway.app/",
+      "description": "A private-beta community app builder for mosques, Muslim charities, student groups and grassroots organizations.",
+      "inLanguage": ["en", "ar"]
+    }
+  </script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #08110f;
+      --ink-soft: #101a17;
+      --parchment: #f2ead8;
+      --parchment-dim: #cec3aa;
+      --emerald: #63b89b;
+      --emerald-deep: #1d604f;
+      --gold: #e0b75b;
+      --rust: #d66832;
+      --line: rgba(242, 234, 216, 0.18);
+      --glass: rgba(8, 17, 15, 0.72);
+      --serif: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--ink); scroll-behavior: smooth; }
+    body { margin: 0; min-width: 0; background: var(--ink); color: var(--parchment); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+    body::before { content: ""; position: fixed; inset: 0; z-index: -3; background: radial-gradient(circle at 60% 20%, rgba(29, 96, 79, 0.32), transparent 34%), linear-gradient(150deg, #07100e, #111714 66%, #0a1110); }
+    a { color: inherit; }
+    h1, h2, h3, p, blockquote, figure { margin: 0; }
+    ul { margin: 0; }
+    ::selection { background: var(--emerald-deep); color: var(--parchment); }
+    :focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+    .skip-link { position: fixed; z-index: 100; top: 8px; left: 8px; min-height: 44px; display: flex; align-items: center; padding: 10px 14px; background: var(--parchment); color: var(--ink); transform: translateY(-160%); }
+    .skip-link:focus { transform: translateY(0); }
+
+    .geometry-stage { position: fixed; top: 20vh; right: 4vw; z-index: 0; width: min(46vw, 680px); height: min(62vh, 720px); overflow: hidden; border: 1px solid rgba(224, 183, 91, 0.24); background: #0a1713; box-shadow: 0 36px 140px rgba(0, 0, 0, 0.48); pointer-events: none; }
+    .geometry-static { position: absolute; inset: 0; opacity: 0.78; background-image: radial-gradient(circle at 64% 28%, rgba(224, 183, 91, 0.3), transparent 24%), repeating-conic-gradient(from 22.5deg at 50% 50%, rgba(99, 184, 155, 0.25) 0 2deg, transparent 2deg 22.5deg), repeating-radial-gradient(circle at 50% 50%, transparent 0 28px, rgba(224, 183, 91, 0.16) 29px 30px, transparent 31px 56px); transform: scale(1.3) rotate(2deg); }
+    #geometryCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 220ms ease; }
+    .geometry-stage[data-enhanced="true"] #geometryCanvas { opacity: 0.94; }
+    .geometry-stage[data-enhanced="true"] .geometry-static { opacity: 0; }
+    .geometry-vignette { position: absolute; inset: 0; background: radial-gradient(circle at 58% 38%, transparent 0 28%, rgba(8, 17, 15, 0.5) 78%), linear-gradient(0deg, rgba(8, 17, 15, 0.62), transparent 46%); }
+    .motion-control { position: fixed; right: 4vw; top: calc(20vh + min(62vh, 720px) + 10px); z-index: 12; min-height: 44px; display: inline-flex; align-items: center; gap: 9px; padding: 8px 11px; border: 1px solid var(--line); background: var(--ink); color: var(--parchment-dim); font-size: 12px; }
+    .motion-control input { width: 20px; height: 20px; accent-color: var(--emerald); }
+
+    .site-header { position: fixed; inset: 0 0 auto; z-index: 20; border-bottom: 1px solid var(--line); background: var(--ink); }
+    .nav-shell { width: min(1280px, 100%); min-height: 72px; margin: 0 auto; padding: 10px 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { min-height: 44px; display: inline-flex; align-items: center; gap: 11px; color: var(--parchment); font: 600 21px/1 var(--serif); text-decoration: none; }
+    .brand-mark { width: 24px; height: 24px; position: relative; transform: rotate(45deg); border: 1px solid var(--emerald); }
+    .brand-mark::before, .brand-mark::after { content: ""; position: absolute; inset: 5px -7px; border: 1px solid rgba(224, 183, 91, 0.75); }
+    .brand-mark::after { transform: rotate(90deg); }
+    .nav-links { display: flex; align-items: center; gap: 8px 22px; }
+    .nav-links a { min-height: 44px; display: inline-flex; align-items: center; color: var(--parchment-dim); font-size: 13px; text-decoration: none; }
+    .nav-links a:hover { color: var(--parchment); }
+    .nav-account { padding: 8px 15px; border: 1px solid var(--line); color: var(--parchment) !important; }
+
+    main { overflow: clip; }
+    .story-section { min-height: 100svh; position: relative; display: grid; align-items: center; padding: 130px max(28px, calc((100vw - 1224px) / 2)) 80px; }
+    .story-copy { position: relative; z-index: 2; width: min(680px, 100%); padding: clamp(24px, 4vw, 46px); border: 1px solid var(--line); background: linear-gradient(145deg, #08110f, #0f1c18); box-shadow: 0 28px 100px rgba(0, 0, 0, 0.35); }
+    .story-section:nth-of-type(even) .story-copy { margin-left: auto; }
+    .eyebrow { color: var(--emerald); font: 600 11px/1.4 var(--mono); letter-spacing: 0.13em; text-transform: uppercase; }
+    h1 { max-width: 11ch; margin: 18px 0 24px; font: 500 clamp(48px, 7.3vw, 94px)/0.93 var(--serif); letter-spacing: -0.05em; }
+    h1 em { color: var(--gold); font-weight: 400; }
+    .lede { max-width: 57ch; color: var(--parchment-dim); font-size: clamp(18px, 2vw, 22px); }
+    .lede strong { color: var(--parchment); font-weight: 650; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+    .button { min-height: 48px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 11px 18px; border: 1px solid var(--emerald); background: var(--emerald-deep); color: #fff8e9; font-weight: 700; text-decoration: none; }
+    .button:hover { background: var(--emerald); color: var(--ink); }
+    .button.secondary { border-color: var(--line); background: rgba(8, 17, 15, 0.4); color: var(--parchment); }
+    .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin-top: 34px; border: 1px solid var(--line); background: var(--line); }
+    .fact { min-width: 0; padding: 16px; background: rgba(8, 17, 15, 0.9); }
+    .fact strong, .fact span { display: block; }
+    .fact strong { color: var(--gold); font: 500 27px/1 var(--serif); }
+    .fact span { margin-top: 7px; color: var(--parchment-dim); font-size: 12px; }
+
+    .story-copy h2, .content-head h2 { margin: 14px 0 20px; font: 500 clamp(35px, 5vw, 62px)/1.02 var(--serif); letter-spacing: -0.035em; }
+    .story-copy > p:not(.eyebrow), .content-head p { color: var(--parchment-dim); font-size: clamp(16px, 1.7vw, 20px); }
+    .outcome-list { display: grid; gap: 1px; margin-top: 28px; padding: 1px; background: var(--line); }
+    .outcome { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 14px; padding: 18px; background: rgba(8, 17, 15, 0.92); }
+    .outcome-index { color: var(--gold); font: 600 12px/1.5 var(--mono); }
+    .outcome h3 { font: 500 21px/1.25 var(--serif); }
+    .outcome p { margin-top: 6px; color: var(--parchment-dim); font-size: 14px; }
+
+    .verse-section { min-height: 100svh; position: relative; z-index: 2; display: grid; place-items: center; padding: 110px 28px; }
+    .verse-card { position: relative; z-index: 2; width: min(930px, 100%); padding: clamp(28px, 7vw, 82px); border: 1px solid rgba(224, 183, 91, 0.38); background: radial-gradient(circle at 50% 10%, rgba(224, 183, 91, 0.12), transparent 42%), #08110f; box-shadow: 0 30px 140px rgba(224, 183, 91, 0.1); text-align: center; }
+    .verse-card blockquote { color: #fff5d9; font: 400 clamp(23px, 3.5vw, 39px)/2 var(--serif); }
+    .verse-card figcaption { margin-top: 28px; color: var(--gold); font: 600 12px/1.5 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
+    .verse-note { max-width: 62ch; margin: 24px auto 0; color: var(--parchment-dim); }
+
+    .content-section { position: relative; z-index: 2; padding: 110px max(28px, calc((100vw - 1224px) / 2)); background: var(--ink); border-top: 1px solid var(--line); }
+    .content-head { max-width: 780px; }
+    .card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 44px; }
+    .card { min-width: 0; padding: 26px; border: 1px solid var(--line); background: linear-gradient(150deg, #10231d, #0b1412); }
+    .card h3 { margin: 10px 0 12px; font: 500 24px/1.2 var(--serif); }
+    .card p, .card li { color: var(--parchment-dim); }
+    .card ul { padding-left: 19px; }
+    .card li + li { margin-top: 7px; }
+    .boundary { margin-top: 42px; padding: 24px; border-left: 4px solid var(--gold); background: rgba(224, 183, 91, 0.09); color: var(--parchment-dim); }
+    .boundary strong { color: var(--parchment); }
+
+    .faq { display: grid; gap: 10px; margin-top: 38px; }
+    .faq details { border: 1px solid var(--line); background: rgba(16, 26, 23, 0.8); }
+    .faq summary { min-height: 52px; display: flex; align-items: center; padding: 14px 18px; cursor: pointer; font-weight: 700; }
+    .faq p { max-width: 78ch; padding: 0 18px 20px; color: var(--parchment-dim); }
+    .final { text-align: center; }
+    .final .content-head { margin-inline: auto; }
+    .final .actions { justify-content: center; }
+    footer { padding: 30px 28px; border-top: 1px solid var(--line); background: var(--ink); color: var(--parchment-dim); font-size: 12px; }
+    .footer-inner { width: min(1224px, 100%); margin: 0 auto; display: flex; justify-content: space-between; gap: 24px; }
+
+    @media (max-width: 840px) {
+      .nav-shell { padding-inline: 16px; }
+      .nav-links a:not(.nav-account) { display: none; }
+      .geometry-stage { position: absolute; top: 72px; right: 0; width: 100%; height: 58vh; border-inline: 0; opacity: 0.75; }
+      .motion-control { display: none !important; }
+      .story-section { align-items: end; padding: 110px 16px 40px; }
+      .story-copy { width: 100%; }
+      .story-section:nth-of-type(even) .story-copy { margin-left: 0; }
+      .card-grid { grid-template-columns: 1fr; }
+      .footer-inner { flex-direction: column; }
+    }
+
+    @media (max-width: 480px) {
+      .nav-shell { min-height: 64px; padding: 7px 8px; gap: 4px; flex-wrap: wrap; }
+      .brand { font-size: 18px; }
+      .nav-links { width: 100%; }
+      .nav-account { width: 100%; justify-content: center; padding-inline: 11px; }
+      .story-section { padding-inline: 8px; }
+      .story-copy { padding: 24px 16px; }
+      h1 { font-size: clamp(42px, 15vw, 62px); }
+      .facts { grid-template-columns: 1fr; }
+      .fact { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 10px; align-items: center; }
+      .fact span { margin: 0; }
+      .verse-section, .content-section { padding-inline: 8px; }
+      .verse-card { padding: 28px 16px; }
+      .card { padding: 20px 16px; }
+      .story-copy, .card, .verse-card, .footer-inner, .nav-shell { min-width: 0; overflow-wrap: anywhere; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+      #geometryCanvas { display: none; }
+    }
+    @media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
+      .geometry-stage { background: var(--ink); }
+      #geometryCanvas { display: none; }
+      .geometry-static { opacity: 0.32; }
+      .story-copy, .verse-card { background: var(--ink); backdrop-filter: none; }
+    }
+    @media (forced-colors: active) {
+      .geometry-stage, .motion-control { display: none !important; }
+      .story-copy, .verse-card, .card { background: Canvas; color: CanvasText; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#mainContent">Skip to main content</a>
+  <div class="geometry-stage" aria-hidden="true">
+    <div class="geometry-static"></div>
+    <canvas id="geometryCanvas"></canvas>
+    <div class="geometry-vignette"></div>
+  </div>
+  <label id="motionControl" class="motion-control" hidden><input id="motionToggle" type="checkbox" checked> Decorative motion</label>
+
+  <header class="site-header">
+    <nav class="nav-shell" aria-label="Primary navigation">
+      <a class="brand" href="#top" aria-label="Taawun home"><span class="brand-mark" aria-hidden="true"></span><span>Taawun</span></a>
+      <div class="nav-links">
+        <a href="#possibilities">What you can make</a>
+        <a href="#how">How it works</a>
+        <a href="#trust">Trust and limits</a>
+        <a class="nav-account" href="/account#login">Sign in</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="mainContent">
+    <section id="top" class="story-section" data-geometry-state="0" aria-labelledby="heroTitle">
+      <div class="story-copy">
+        <p class="eyebrow">Private beta · Built for Muslim community organizations</p>
+        <h1 id="heroTitle">Many hands. One <em>clear</em> community effort.</h1>
+        <p class="lede"><strong>Taawun helps mosques, charities, student groups and local organizers shape useful community apps together.</strong> Begin with a real need, make every part your own and let the right people review the exact result before it is shared.</p>
+        <div class="actions">
+          <a class="button" href="/account#register">Create a private-beta account</a>
+          <a class="button secondary" href="/account#login">Sign in</a>
+        </div>
+        <div class="facts" aria-label="Current private-beta catalog">
+          <div class="fact"><strong>3</strong><span>guided starting templates</span></div>
+          <div class="fact"><strong>11</strong><span>parts you can customize</span></div>
+          <div class="fact"><strong>3</strong><span>clear team responsibilities</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="possibilities" class="story-section" data-geometry-state="1" aria-labelledby="possibilitiesTitle">
+      <div class="story-copy">
+        <p class="eyebrow">A pattern made from purposeful parts</p>
+        <h2 id="possibilitiesTitle">Shape the tool around the work—not the other way around.</h2>
+        <p>Choose a starting point, add the parts your community needs, change their words and fields, and leave out what does not belong. No coding is required.</p>
+        <div class="outcome-list">
+          <article class="outcome"><span class="outcome-index">01</span><div><h3>Events and registration plans</h3><p>Prepare schedules, announcements, questions and volunteer details for an iftar or gathering.</p></div></article>
+          <article class="outcome"><span class="outcome-index">02</span><div><h3>Community information</h3><p>Bring campaign details, eligibility notes, notices and your own fields into one clear page.</p></div></article>
+          <article class="outcome"><span class="outcome-index">03</span><div><h3>People and decisions</h3><p>Invite teammates with clear responsibilities, prepare proposals and preserve decisions.</p></div></article>
+          <article class="outcome"><span class="outcome-index">04</span><div><h3>Cooperative planning</h3><p>Rehearse review and no-money finance steps without implying settlement or a religious ruling.</p></div></article>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" class="story-section" data-geometry-state="2" aria-labelledby="howTitle">
+      <div class="story-copy">
+        <p class="eyebrow">From idea to protected preview</p>
+        <h2 id="howTitle">See the whole become clearer as each person contributes.</h2>
+        <p>Make a private team space. Choose Community Iftar, Community Workspace or Bazaar Cooperative. Combine useful parts, add your own details and create a protected preview. A Viewer can inspect it; a Maintainer can improve it; the workspace owner controls access and any future sharing step.</p>
+        <div class="actions"><a class="button" href="#templates">Explore the starting points</a></div>
+      </div>
+    </section>
+
+    <section class="verse-section" data-geometry-state="3" aria-labelledby="verseCaption">
+      <figure class="verse-card">
+        <blockquote lang="ar" dir="rtl">اللَّهُ نُورُ السَّمَاوَاتِ وَالْأَرْضِ ۚ مَثَلُ نُورِهِ كَمِشْكَاةٍ فِيهَا مِصْبَاحٌ ۖ الْمِصْبَاحُ فِي زُجَاجَةٍ ۖ الزُّجَاجَةُ كَأَنَّهَا كَوْكَبٌ دُرِّيٌّ يُوقَدُ مِنْ شَجَرَةٍ مُبَارَكَةٍ زَيْتُونَةٍ لَا شَرْقِيَّةٍ وَلَا غَرْبِيَّةٍ يَكَادُ زَيْتُهَا يُضِيءُ وَلَوْ لَمْ تَمْسَسْهُ نَارٌ ۚ نُورٌ عَلَىٰ نُورٍ ۗ يَهْدِي اللَّهُ لِنُورِهِ مَنْ يَشَاءُ ۚ وَيَضْرِبُ اللَّهُ الْأَمْثَالَ لِلنَّاسِ ۗ وَاللَّهُ بِكُلِّ شَيْءٍ عَلِيمٌ</blockquote>
+        <figcaption id="verseCaption">Sūrat an-Nūr · 24:35</figcaption>
+        <p class="verse-note">The visual language of this page takes inspiration from the verse’s image of light through glass: layers becoming luminous without losing their distinct form. The verse is not a product claim, certification or ruling.</p>
+      </figure>
+    </section>
+
+    <section id="trust" class="story-section" data-geometry-state="4" aria-labelledby="trustTitle">
+      <div class="story-copy">
+        <p class="eyebrow">Cooperation with visible responsibility</p>
+        <h2 id="trustTitle">Review what was made—not a vague promise about it.</h2>
+        <p>Every completed private preview comes with a receipt that identifies the team space, the chosen parts, the content and the approved places and time in which it may be used. When that proof is missing, changed or expired, Taawun stops describing the preview as verified.</p>
+        <p class="boundary"><strong>Private beta boundary:</strong> Taawun does not hold funds or settle payments. Decision records are not religious rulings or evidence of scholar approval. Public sharing on a community-owned web address still requires external domain control and authorized review.</p>
+      </div>
+    </section>
+
+    <section id="templates" class="content-section" aria-labelledby="templatesTitle">
+      <div class="content-head">
+        <p class="eyebrow">Three honest starting points</p>
+        <h2 id="templatesTitle">Begin with a real community need. Make it unmistakably yours.</h2>
+        <p>These are guided starting points—not locked designs and not an open-ended promise that a machine will invent the right app for you.</p>
+      </div>
+      <div class="card-grid">
+        <article class="card"><p class="eyebrow">Community Iftar</p><h3>Welcome people to a gathering</h3><ul><li>Event details and announcements</li><li>Registration questions</li><li>Campaign information</li><li>Volunteer coordination</li></ul></article>
+        <article class="card"><p class="eyebrow">Community Workspace</p><h3>Coordinate ongoing community work</h3><ul><li>People and responsibilities</li><li>Proposals and decisions</li><li>Reference review</li><li>No-money finance practice</li></ul></article>
+        <article class="card"><p class="eyebrow">Bazaar Cooperative</p><h3>Rehearse a cooperative offering</h3><ul><li>Offering information</li><li>Community review stages</li><li>Decision records</li><li>Practice-only financial flows</li></ul></article>
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="betaTitle">
+      <div class="content-head">
+        <p class="eyebrow">What the private beta can do today</p>
+        <h2 id="betaTitle">A useful path now, with clear limits around what comes next.</h2>
+      </div>
+      <div class="card-grid">
+        <article class="card"><p class="eyebrow">Available now</p><h3>Build and review together</h3><p>Customize eleven parts, create exact private previews, invite teammates, record decisions and rehearse seven no-money finance flows.</p></article>
+        <article class="card"><p class="eyebrow">Prepared, still gated</p><h3>Public sharing</h3><p>Taawun can prepare a community-owned web address for checking. A real public launch still needs control of that address and an authorized reviewer.</p></article>
+        <article class="card"><p class="eyebrow">Not claimed</p><h3>Payments, rulings or a live marketplace</h3><p>The beta does not move money, provide religious rulings, promise scholar approval or sell templates in a live marketplace.</p></article>
+      </div>
+      <p class="boundary"><strong>Information and custody:</strong> Day-to-day community page records are designed to live in community members’ browsers first. Taawun centrally keeps account details, created previews and the history needed to protect and operate the service. Some required audit and control records can remain after account deletion.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="questionsTitle">
+      <div class="content-head"><p class="eyebrow">Questions from organizers</p><h2 id="questionsTitle">Understand Taawun before creating an account.</h2></div>
+      <div class="faq">
+        <details><summary>What is Taawun?</summary><p>Taawun is a guided community app builder for mosques, charities, Muslim student groups and grassroots organizers. It combines customizable starting points, clear team responsibilities, decision records and a protected review step.</p></details>
+        <details><summary>Do I need to know how to code?</summary><p>No. Choose a template, select the parts you need, edit ordinary fields, add your own information and review the result.</p></details>
+        <details><summary>Can it replace our public mosque website today?</summary><p>Not yet. You can prepare and review community pages privately. A public launch still needs a community-controlled web address and authorized review.</p></details>
+        <details><summary>Can it collect registrations or move money?</summary><p>You can design registration questions and rehearse financial review steps. The current beta does not provide a shared public response database, hold funds or settle payments.</p></details>
+        <details><summary>How does Taawun help a team review safely?</summary><p>A completed preview includes server-checked proof of the exact workspace, content, approved uses and expiry. Team roles limit who may inspect, change or prepare future sharing.</p></details>
+      </div>
+    </section>
+
+    <section class="content-section final" aria-labelledby="finalTitle">
+      <div class="content-head">
+        <p class="eyebrow">Cooperation begins with a clear first step</p>
+        <h2 id="finalTitle">Shape something useful for your community.</h2>
+        <p>Create a private-beta account, open a team space and begin with one of three guided templates.</p>
+        <div class="actions"><a class="button" href="/account#register">Create an account</a><a class="button secondary" href="/account#login">Sign in</a></div>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="footer-inner"><span>Taawun · Cooperation shaped with care</span><span>Private beta · Public community-domain launches are not yet generally available</span></div></footer>
+  <noscript><style>#geometryCanvas{display:none}.geometry-stage{background:radial-gradient(circle at 70% 25%,rgba(224,183,91,.22),transparent 25%),repeating-conic-gradient(from 22.5deg at 70% 35%,rgba(99,184,155,.12) 0 11.25deg,transparent 11.25deg 22.5deg)}</style></noscript>
+  <script src="/geometric-landing.js" defer></script>
+</body>
+</html>

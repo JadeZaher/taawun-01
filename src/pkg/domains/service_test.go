@@ -254,6 +254,13 @@ func TestDomainLifecycleAuthorizationAndPublicRollback(t *testing.T) {
 	if runtimeResponse.Code != http.StatusOK || runtimeResponse.Body.String() != "pinned runtime" {
 		t.Fatalf("published runtime response = %d %q", runtimeResponse.Code, runtimeResponse.Body.String())
 	}
+	accountRequest := httptest.NewRequest(http.MethodGet, "http://app.example.com/account", nil)
+	accountRequest.Host = "app.example.com"
+	accountResponse := httptest.NewRecorder()
+	public.ServeHTTP(accountResponse, accountRequest)
+	if accountResponse.Code != http.StatusNotFound {
+		t.Fatalf("published host account path = %d, want 404 without control-site fallback", accountResponse.Code)
+	}
 	controlRequest := httptest.NewRequest(http.MethodGet, "http://localhost:8080/", nil)
 	controlRequest.Host = "localhost:8080"
 	controlResponse := httptest.NewRecorder()

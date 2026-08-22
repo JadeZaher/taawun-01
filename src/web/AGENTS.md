@@ -143,18 +143,20 @@ owned workspace is gone.
 
 Component editor rerenders explicitly restore focus for JSON Apply, custom-field
 Add/Remove, selection changes, and template-switch Apply/Cancel. Invalid or
-reserved JSON never replaces the last valid document. The logged-out landing
-keeps account access immediate while describing outcomes before the later trust,
-custody, and retention caveats; its claims remain bounded to existing primitives.
+reserved JSON never replaces the last valid document. The dedicated account
+document keeps login, registration, and the authenticated cockpit in one page so
+the in-memory bearer never crosses a navigation boundary.
 
 ## Public landing and search contract
 
-The logged-out document is both the account entrance and the crawlable public
-explanation. Its title, description, visible H1, social metadata, and JSON-LD
-must describe the same current private-beta capability. Search language may name
-a community app or mosque page builder, but visible copy must immediately bound
-that promise to the three curated templates, eleven customizable building
-blocks, authorized workspace collaboration, and an exact private preview.
+The control-host root is a dedicated crawlable public explanation. Its title,
+description, visible H1, social metadata, and JSON-LD must describe the same
+current private-beta capability. Ordinary links lead to `/account#register` and
+`/account#login`; the account document is `noindex` and retains the exact
+same-document auth and cockpit lifecycle. Search language may name a community
+app or mosque page builder, but visible copy must immediately bound that promise
+to the three curated templates, eleven customizable building blocks, authorized
+workspace collaboration, and an exact private preview.
 
 Do not imply arbitrary generated applications, live shared registration data,
 generally available customer-domain serving, money movement or settlement,
@@ -164,11 +166,20 @@ religious-reference copy always says practice/reference-only. Information copy
 retains the browser-first community-record boundary plus centrally retained
 identity, preview, audit, and control records.
 
-All indexable content stays in the initial HTML with one visible H1, ordered
-headings, working fragment navigation, and account access at the top of the
-journey. Auth forms and their dynamic messages are `data-nosnippet`. The robots
-file is crawl guidance only and never a security boundary. Canonical, sitemap,
-Open Graph, and structured-data URLs move together when a controlled branded
-hostname replaces the current Railway service hostname. Structured data never
-adds pricing, ratings, testimonials, organization facts, or availability that
-is absent from the visible page.
+All indexable content stays in the root HTML with one visible H1, ordered
+headings, working fragment navigation, and account links at the top of the
+journey. The account forms and dynamic messages remain `data-nosnippet`, and the
+account response also carries `X-Robots-Tag: noindex`. The robots file is crawl
+guidance only and never a security boundary. Canonical, sitemap, Open Graph, and
+structured-data URLs move together when a controlled branded hostname replaces
+the current Railway service hostname. Structured data never adds pricing,
+ratings, testimonials, organization facts, or availability that is absent from
+the visible page.
+
+The Islamic geometric scene is progressive decoration. The static HTML and CSS
+fallback carry the complete product story. WebGPU may enhance only on capable
+desktop devices after idle, never moves text or captures scrolling, and submits
+one frame only when scroll state changes. Reduced motion, forced colors,
+increased contrast, reduced transparency, reduced data, low-power, small-screen,
+shader, and device-loss paths stay on the still design. Sacred text remains
+semantic, selectable, and separate from the decorative renderer.

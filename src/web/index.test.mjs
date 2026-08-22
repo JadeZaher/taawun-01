@@ -269,7 +269,8 @@ test('cockpit inline modules parse before they are embedded in the server binary
 });
 
 test('public landing exposes aligned, truthful search metadata and crawl guidance', async () => {
-  const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const html = await readFile(new URL('./landing.html', import.meta.url), 'utf8');
+  const account = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const robots = await readFile(new URL('./robots.txt', import.meta.url), 'utf8');
   const sitemap = await readFile(new URL('./sitemap.xml', import.meta.url), 'utf8');
   const title = html.match(/<title>([^<]+)<\/title>/u)?.[1] || '';
@@ -277,28 +278,227 @@ test('public landing exposes aligned, truthful search metadata and crawl guidanc
   const structuredSource = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/u)?.[1] || '';
   const structured = JSON.parse(structuredSource);
 
-  assert.equal(title, 'Community Page Builder for Muslim Organizations | Taawun');
+  assert.equal(title, 'Community App Builder for Muslim Organizations | Taawun');
   assert.ok(title.length <= 60, `title should remain concise: ${title.length}`);
   assert.ok(description.length > 100 && description.length <= 160, `description should be useful and concise: ${description.length}`);
   assert.match(description, /mosques, charities and Muslim groups/iu);
   assert.match(html, /<link rel="canonical" href="https:\/\/taawun-production\.up\.railway\.app\/">/u);
-  assert.match(html, /<meta property="og:title" content="Community Page Builder for Muslim Organizations \| Taawun">/u);
+  assert.match(html, /<meta property="og:title" content="Community App Builder for Muslim Organizations \| Taawun">/u);
   assert.match(html, /<meta name="twitter:card" content="summary">/u);
-  assert.match(html, /id="authPanel"[^>]*data-nosnippet/u);
-  assert.match(html, /id="appView"[\s\S]*?hidden[\s\S]*?data-nosnippet/u);
+  assert.doesNotMatch(html, /id="authPanel"|id="loginForm"|id="appView"|Authorization/u);
+  assert.match(account, /<meta name="robots" content="noindex,nofollow,noarchive">/u);
+  assert.match(account, /id="authPanel"[^>]*data-nosnippet/u);
+  assert.match(account, /id="appView"[\s\S]*?hidden[\s\S]*?data-nosnippet/u);
   assert.equal(structured['@type'], 'WebSite');
   assert.equal(structured.name, 'Taawun');
   assert.equal(structured.url, 'https://taawun-production.up.railway.app/');
-  assert.match(structured.description || '', /private-beta community page builder.*protected private previews/iu);
+  assert.match(structured.description || '', /private-beta community app builder/iu);
   assert.doesNotMatch(structuredSource, /"(?:aggregateRating|review|offers?|price(?:Currency)?)"\s*:/iu);
   assert.match(robots, /Disallow: \/api\//u);
+  assert.match(robots, /Disallow: \/account/u);
   assert.match(robots, /Sitemap: https:\/\/taawun-production\.up\.railway\.app\/sitemap\.xml/u);
   assert.match(sitemap, /<loc>https:\/\/taawun-production\.up\.railway\.app\/<\/loc>/u);
   assert.doesNotMatch(html, /<script[^>]+src="https?:\/\/|<link[^>]+rel="stylesheet"[^>]+href="https?:\/\//iu);
   assert.match(html, /private preview/iu);
   assert.match(html, /does not hold funds or settle payments/iu);
-  assert.match(html, /not religious rulings|not religious determinations/iu);
+  assert.match(html, /not religious rulings|not a product claim, certification or ruling/iu);
+  assert.match(html, /Sūrat an-Nūr · 24:35/u);
+  assert.match(html, /<blockquote lang="ar" dir="rtl">اللَّهُ نُورُ السَّمَاوَاتِ وَالْأَرْضِ[\s\S]*?وَاللَّهُ بِكُلِّ شَيْءٍ عَلِيمٌ<\/blockquote>/u);
+  assert.match(html, /href="\/account#register"/u);
+  assert.match(html, /href="\/account#login"/u);
   assert.doesNotMatch(html, /Taawun is Shariah[- ]certified|scholar[- ]approved (?:platform|software)|launch your app today|start free/iu);
+});
+
+test('geometric enhancement is bounded, optional, and scroll-driven', async () => {
+  const html = await readFile(new URL('./landing.html', import.meta.url), 'utf8');
+  const loader = await readFile(new URL('./geometric-landing.js', import.meta.url), 'utf8');
+  const renderer = await readFile(new URL('./geometric-renderer.js', import.meta.url), 'utf8');
+
+  assert.match(html, /class="geometry-stage" aria-hidden="true"/u);
+  assert.match(html, /id="motionToggle"[^>]*type="checkbox"[^>]*checked/u);
+  assert.match(html, /prefers-reduced-motion: reduce/u);
+  assert.match(html, /forced-colors: active/u);
+  assert.match(loader, /prefers-reduced-motion: reduce/u);
+  assert.match(loader, /prefers-contrast: more/u);
+  assert.match(loader, /prefers-reduced-transparency: reduce/u);
+  assert.match(loader, /connection && connection\.saveData/u);
+  assert.match(loader, /connection\?\.addEventListener\?\.\('change', reconcilePreference\)/u);
+  assert.match(loader, /window\.innerWidth > 840/u);
+  assert.ok(loader.indexOf('if (!capable()') < loader.indexOf("import('/geometric-renderer.js')"), 'capability checks must precede the renderer request');
+  assert.match(renderer, /powerPreference: 'low-power'/u);
+  assert.match(renderer, /adapter\.isFallbackAdapter/u);
+  assert.match(renderer, /1_500_000/u);
+  assert.match(renderer, /window\.addEventListener\('scroll', onScroll, \{ passive: true \}\)/u);
+  assert.doesNotMatch(renderer, /requestAnimationFrame\(render\)|preventDefault\(\)|setInterval\(/u);
+  assert.match(renderer, /device\.lost/u);
+  assert.match(renderer, /refractionEdge/u);
+});
+
+test('promoted browser proves WebGPU enhancement, reversible pause, failure fallback, and reduced motion', { timeout: 90_000 }, async () => {
+  const browser = await installedChromium();
+  assert.ok(browser, 'Chromium is required; the WebGPU lifecycle regression cannot be skipped');
+  const landingHTML = await readFile(new URL('./landing.html', import.meta.url), 'utf8');
+  const loader = await readFile(new URL('./geometric-landing.js', import.meta.url), 'utf8');
+  const renderer = await readFile(new URL('./geometric-renderer.js', import.meta.url), 'utf8');
+  const server = createServer((request, response) => {
+    const requestPath = new URL(request.url, 'http://localhost').pathname;
+    const sources = new Map([
+      ['/', ['text/html; charset=utf-8', landingHTML]],
+      ['/geometric-landing.js', ['text/javascript; charset=utf-8', loader]],
+      ['/geometric-renderer.js', ['text/javascript; charset=utf-8', renderer]],
+    ]);
+    const source = sources.get(requestPath);
+    if (request.method === 'GET' && source) {
+      response.writeHead(200, { 'Content-Type': source[0], 'Cache-Control': 'no-store' });
+      response.end(source[1]);
+      return;
+    }
+    response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    response.end('Not found.');
+  });
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const tempDirectory = await mkdtemp(path.join(tmpdir(), 'taawun-webgpu-browser-'));
+  let chromium;
+  try {
+    chromium = await launchChromium(browser, path.join(tempDirectory, 'profile'));
+    const { client } = chromium;
+    await client.send('Page.enable');
+    await client.send('Runtime.enable');
+    await client.send('Emulation.setDeviceMetricsOverride', { width: 1_200, height: 900, deviceScaleFactor: 1, mobile: false });
+    await client.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+      let loseDevice;
+      const lost = new Promise((resolve) => { loseDevice = resolve; });
+      window.__gpuQA = { adapterRequests: 0, submissions: 0, destroys: 0, lose: () => loseDevice({ reason: 'destroyed' }) };
+      Object.defineProperty(navigator, 'hardwareConcurrency', { configurable: true, value: 8 });
+      Object.defineProperty(navigator, 'deviceMemory', { configurable: true, value: 8 });
+      const connectionListeners = [];
+      const connection = { saveData: false, addEventListener(type, listener) { if (type === 'change') connectionListeners.push(listener); } };
+      window.__setSaveData = (value) => { connection.saveData = value; connectionListeners.forEach((listener) => listener()); };
+      Object.defineProperty(navigator, 'connection', { configurable: true, value: connection });
+      const pass = { setPipeline() {}, setBindGroup() {}, draw() {}, end() {} };
+      const device = {
+        lost,
+        queue: { writeBuffer() {}, submit() { window.__gpuQA.submissions += 1; } },
+        createShaderModule() { return { getCompilationInfo: async () => ({ messages: [] }) }; },
+        createRenderPipeline() { return { getBindGroupLayout() { return {}; } }; },
+        createBuffer() { return { destroy() {} }; },
+        createBindGroup() { return {}; },
+        createCommandEncoder() { return { beginRenderPass() { return pass; }, finish() { return {}; } }; },
+        destroy() { window.__gpuQA.destroys += 1; },
+      };
+      Object.defineProperty(navigator, 'gpu', { configurable: true, value: {
+        async requestAdapter() { window.__gpuQA.adapterRequests += 1; return { isFallbackAdapter: false, async requestDevice() { return device; } }; },
+        getPreferredCanvasFormat() { return 'bgra8unorm'; },
+      } });
+      Object.defineProperty(window, 'GPUBufferUsage', { configurable: true, value: { UNIFORM: 1, COPY_DST: 2 } });
+      const original = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function(type, ...args) {
+        if (type === 'webgpu') return { configure() {}, getCurrentTexture() { return { createView() { return {}; } }; } };
+        return original.call(this, type, ...args);
+      };
+      window.requestIdleCallback = (callback) => window.setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 50 }), 0);
+      window.cancelIdleCallback = (id) => window.clearTimeout(id);
+    })();` });
+    await client.send('Page.navigate', { url: origin });
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage')?.dataset.enhanced === 'true' && !document.querySelector('#motionControl').hidden`), 'mocked WebGPU enhancement');
+    const initial = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, submissions: window.__gpuQA.submissions, renderer: document.querySelector('#geometryCanvas').dataset.renderer || '', controlHeight: Math.round(document.querySelector('#motionControl').getBoundingClientRect().height) })`);
+    assert.equal(initial.requests, 1);
+    assert.ok(initial.submissions >= 1);
+    assert.equal(initial.renderer, 'webgpu');
+    assert.ok(initial.controlHeight >= 44);
+
+    await evaluate(client, `document.querySelector('#motionToggle').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && !document.querySelector('#motionControl').hidden && !document.querySelector('#motionToggle').checked`), 'reversible user pause');
+    assert.equal(await evaluate(client, `localStorage.getItem('taawun-decorative-motion')`), 'off');
+    await evaluate(client, `document.querySelector('#motionToggle').click()`);
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage')?.dataset.enhanced === 'true' && document.querySelector('#motionToggle').checked`), 'motion resume');
+    assert.equal(await evaluate(client, `localStorage.getItem('taawun-decorative-motion')`), null);
+
+    const beforeScroll = await evaluate(client, `window.__gpuQA.submissions`);
+    await evaluate(client, `window.scrollTo({ top: window.innerHeight * 1.2, behavior: 'instant' })`);
+    await waitFor(() => evaluate(client, `window.__gpuQA.submissions > ${beforeScroll}`), 'scroll-threshold redraw');
+    await evaluate(client, `window.__gpuQA.lose()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && document.querySelector('#motionControl').hidden`), 'device-loss static fallback');
+
+    await client.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+    await client.send('Page.navigate', { url: origin });
+    await waitFor(() => evaluate(client, `document.readyState === 'complete'`), 'reduced-motion landing');
+    await wait(200);
+    const reduced = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, canvasDisplay: getComputedStyle(document.querySelector('#geometryCanvas')).display, controlHidden: document.querySelector('#motionControl').hidden })`);
+    assert.equal(reduced.requests, 0, 'reduced motion must not request a GPU adapter');
+    assert.equal(reduced.canvasDisplay, 'none');
+    assert.equal(reduced.controlHidden, true);
+
+    await client.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }, { name: 'forced-colors', value: 'active' }] });
+    await client.send('Page.navigate', { url: origin });
+    await waitFor(() => evaluate(client, `document.readyState === 'complete'`), 'forced-colors landing');
+    await wait(200);
+    const forced = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, stageDisplay: getComputedStyle(document.querySelector('.geometry-stage')).display })`);
+    assert.equal(forced.requests, 0, 'forced colors must not request a GPU adapter');
+    assert.equal(forced.stageDisplay, 'none');
+
+    await client.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }, { name: 'forced-colors', value: 'none' }] });
+    await client.send('Page.navigate', { url: origin });
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage')?.dataset.enhanced === 'true'`), 'save-data live gate setup');
+    await evaluate(client, `window.__setSaveData(true)`);
+    await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && document.querySelector('#motionControl').hidden`), 'save-data live fallback');
+  } finally {
+    await closeChromium(chromium, 'webgpu-lifecycle');
+    server.closeAllConnections?.();
+    await new Promise((resolve) => server.close(resolve));
+    await rm(tempDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+});
+
+test('account hash registration stays on the account document and signs out to login', { timeout: 90_000 }, async () => {
+  const browser = await installedChromium();
+  assert.ok(browser, 'Chromium is required; account-route continuity cannot be skipped');
+  const cockpitHTML = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const user = { id: 901, username: 'Route QA', email: 'route@example.test', role: 'user' };
+  const requests = [];
+  const server = createServer(async (request, response) => {
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    const requestPath = new URL(request.url, 'http://localhost').pathname;
+    requests.push(`${request.method} ${requestPath}`);
+    const send = (status, type, payload) => { response.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store' }); response.end(payload); };
+    const json = (status, payload) => send(status, 'application/json; charset=utf-8', JSON.stringify(payload));
+    if (request.method === 'GET' && requestPath === '/account') return send(200, 'text/html; charset=utf-8', cockpitHTML);
+    if (request.method === 'POST' && requestPath === '/api/register') return json(201, { user });
+    if (request.method === 'POST' && requestPath === '/api/login') return json(200, { token: 'route-token', user });
+    if (request.method === 'GET' && requestPath === '/api/profile') return json(200, user);
+    if (request.method === 'GET' && requestPath === '/api/workspaces') return json(200, { workspaces: [] });
+    if (request.method === 'GET' && requestPath === '/api/templates') return json(200, { templates: [] });
+    if (request.method === 'GET' && requestPath === '/api/modules') return json(200, { modules: [], componentDocumentPolicy: { version: 2, fields: { maxComponents: 12 } } });
+    if (request.method === 'GET' && requestPath === '/api/bazaar/listings') return json(200, { listings: [] });
+    return json(404, { error: { code: 'not_found', message: 'Not found.' } });
+  });
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const tempDirectory = await mkdtemp(path.join(tmpdir(), 'taawun-account-route-browser-'));
+  let chromium;
+  try {
+    chromium = await launchChromium(browser, path.join(tempDirectory, 'profile'));
+    const { client } = chromium;
+    await client.send('Page.enable');
+    await client.send('Runtime.enable');
+    await client.send('Page.navigate', { url: `${origin}/account#register` });
+    await waitFor(() => evaluate(client, `document.readyState === 'complete' && !document.querySelector('#registerForm').hidden`), 'register hash selects registration');
+    await evaluate(client, `(() => {
+      const set = (id, value) => { const input = document.getElementById(id); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); };
+      set('registerUsername', 'Route QA'); set('registerEmail', 'route@example.test'); set('registerPassword', 'correct horse battery staple'); document.querySelector('#registerForm').requestSubmit();
+    })()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#appView').hidden && location.pathname === '/account' && location.hash === ''`), 'registration auto-login preserves account document');
+    assert.deepEqual(requests.filter((entry) => entry === 'POST /api/register' || entry === 'POST /api/login'), ['POST /api/register', 'POST /api/login']);
+    await evaluate(client, `document.querySelector('#logoutButton').click()`);
+    await waitFor(() => evaluate(client, `!document.querySelector('#authView').hidden && !document.querySelector('#loginForm').hidden && document.querySelector('#registerForm').hidden`), 'sign-out normalizes to login');
+  } finally {
+    await closeChromium(chromium, 'account-route-continuity');
+    server.closeAllConnections?.();
+    await new Promise((resolve) => server.close(resolve));
+    await rm(tempDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
 });
 
 test('publication expiry and successor trust stay server-clock and principal bound', async () => {
@@ -364,6 +564,7 @@ test('bounded UI safety mutations stay self/workspace scoped and version guarded
 test('successful registration signs in with ephemeral local credentials', async () => {
   const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const handler = html.match(/element\('registerForm'\)\.addEventListener\('submit',[\s\S]*?(?=\n\s*element\('logoutButton'\))/u)?.[0];
+  const showAuth = html.match(/function showAuth\([\s\S]*?(?=\n\s*async function enterBuilder)/u)?.[0] || '';
 
   assert.ok(handler, 'registration submit handler must exist');
   assert.match(handler, /const email = element\('registerEmail'\)\.value\.trim\(\);/u);
@@ -376,16 +577,30 @@ test('successful registration signs in with ephemeral local credentials', async 
   assert.match(handler, /if \(accountCreated\) \{[\s\S]*?showAuth\(\);[\s\S]*?switchAuthTab\('login'\);[\s\S]*?element\('loginPassword'\)\.value = '';/u);
   assert.match(handler, /finally \{\s*password = '';/u);
   assert.doesNotMatch(handler, /localStorage|sessionStorage|document\.cookie/u);
+  assert.ok(showAuth.indexOf("switchAuthTab('login')") < showAuth.indexOf("setNotice(element('authAlert')"), 'all sign-out and expiry paths must select login before preserving their notice');
 });
 
-test('mobile auth shell preserves its value and custody explanation with accessible keyboard tabs', async () => {
+test('public landing and account shell remain distinct, responsive, and keyboard accessible', async () => {
   const browser = await installedChromium();
   assert.ok(browser, 'Chromium is required; the mobile accessibility regression cannot be skipped');
 
   const cockpitHTML = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const landingHTML = await readFile(new URL('./landing.html', import.meta.url), 'utf8');
+  const landingScript = await readFile(new URL('./geometric-landing.js', import.meta.url), 'utf8');
   const server = createServer((request, response) => {
-    if (request.method === 'GET' && new URL(request.url, 'http://localhost').pathname === '/') {
+    const requestPath = new URL(request.url, 'http://localhost').pathname;
+    if (request.method === 'GET' && requestPath === '/') {
       response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      response.end(landingHTML);
+      return;
+    }
+    if (request.method === 'GET' && requestPath === '/geometric-landing.js') {
+      response.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
+      response.end(landingScript);
+      return;
+    }
+    if (request.method === 'GET' && requestPath === '/account') {
+      response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow, noarchive' });
       response.end(cockpitHTML);
       return;
     }
@@ -411,6 +626,47 @@ test('mobile auth shell preserves its value and custody explanation with accessi
       mobile: true,
     });
     await client.send('Page.navigate', { url: origin });
+    await waitFor(() => evaluate(client, `document.readyState === 'complete' && Boolean(document.querySelector('#heroTitle'))`), 'mobile public landing');
+    const landingSemantics = await evaluate(client, `(() => ({
+      h1: document.querySelector('#heroTitle')?.innerText.trim(),
+      visibleH1s: [...document.querySelectorAll('h1')].filter((heading) => getComputedStyle(heading).display !== 'none').length,
+      registerHref: document.querySelector('a[href="/account#register"]')?.getAttribute('href'),
+      loginHref: document.querySelector('a[href="/account#login"]')?.getAttribute('href'),
+      canvasHidden: document.querySelector('#geometryCanvas')?.parentElement?.getAttribute('aria-hidden'),
+      geometryStates: document.querySelectorAll('[data-geometry-state]').length,
+      hasAuthForm: Boolean(document.querySelector('#loginForm, #registerForm, #appView')),
+      copy: document.querySelector('main').innerText.replace(/\\s+/g, ' ').trim(),
+      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      controlHeights: [...document.querySelectorAll('a.button, .nav-account')].map((item) => Math.round(item.getBoundingClientRect().height)),
+    }))()`);
+    assert.equal(landingSemantics.h1, 'Many hands. One clear community effort.');
+    assert.equal(landingSemantics.visibleH1s, 1);
+    assert.equal(landingSemantics.registerHref, '/account#register');
+    assert.equal(landingSemantics.loginHref, '/account#login');
+    assert.equal(landingSemantics.canvasHidden, 'true');
+    assert.equal(landingSemantics.geometryStates, 5);
+    assert.equal(landingSemantics.hasAuthForm, false);
+    assert.match(landingSemantics.copy, /does not hold funds or settle payments/iu);
+    assert.match(landingSemantics.copy, /community-owned web address/iu);
+    assert.equal(landingSemantics.overflow, false);
+    assert.ok(landingSemantics.controlHeights.every((height) => height >= 44), `landing controls must be at least 44 CSS px: ${landingSemantics.controlHeights}`);
+
+    for (const layoutWidth of [160, 200, 320, 400]) {
+      await client.send('Emulation.setDeviceMetricsOverride', { width: layoutWidth, height: 1_000, deviceScaleFactor: 1, mobile: false });
+      await waitFor(() => evaluate(client, `window.innerWidth === ${layoutWidth}`), `${layoutWidth}px public landing`);
+      const layout = await evaluate(client, `({
+        overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+        visibleH1s: [...document.querySelectorAll('h1')].filter((heading) => getComputedStyle(heading).display !== 'none').length,
+        canvasEnhanced: document.querySelector('.geometry-stage').hasAttribute('data-enhanced'),
+        targets: [...document.querySelectorAll('a.button, .nav-account')].map((item) => Math.round(item.getBoundingClientRect().height)),
+      })`);
+      assert.equal(layout.overflow, false, `${layoutWidth}px public landing must not overflow horizontally`);
+      assert.equal(layout.visibleH1s, 1, `${layoutWidth}px public landing must keep one H1`);
+      assert.equal(layout.canvasEnhanced, false, `${layoutWidth}px public landing must remain static`);
+      assert.ok(layout.targets.every((height) => height >= 44), `${layoutWidth}px public targets must remain at least 44px: ${layout.targets}`);
+    }
+
+    await client.send('Page.navigate', { url: `${origin}/account#login` });
     await waitFor(() => evaluate(client, `document.readyState === 'complete' && !document.querySelector('#authView').hidden`), 'mobile auth shell');
 
     const semantics = await evaluate(client, `(() => {
@@ -440,7 +696,7 @@ test('mobile auth shell preserves its value and custody explanation with accessi
       loginPanelRole: 'tabpanel',
       registerPanelRole: 'tabpanel',
       passwordDescription: 'registerPasswordHelp',
-      h1Text: 'Build a trusted community page—together.',
+      h1Text: 'Continue your community work.',
       navTargetsValid: true,
       mainSectionCount: 9,
       authNoSnippet: true,
@@ -474,11 +730,6 @@ test('mobile auth shell preserves its value and custody explanation with accessi
     assert.equal(await evaluate(client, `document.activeElement?.id`), 'loginTab');
     assert.equal(await evaluate(client, `document.querySelector('#loginForm').hidden`), false);
 
-    await evaluate(client, `document.querySelector('#landingRegisterButton').click()`);
-    await waitFor(() => evaluate(client, `document.activeElement?.id === 'registerUsername' && !document.querySelector('#registerForm').hidden`), 'landing register CTA');
-    await evaluate(client, `document.querySelector('#landingLoginButton').click()`);
-    await waitFor(() => evaluate(client, `document.activeElement?.id === 'loginEmail' && !document.querySelector('#loginForm').hidden`), 'landing sign-in CTA');
-
     for (const width of [320, 400]) {
       for (const scale of [1, 2]) {
         const layoutWidth = Math.round(width / scale);
@@ -493,7 +744,7 @@ test('mobile auth shell preserves its value and custody explanation with accessi
         const authLayout = await evaluate(client, `(() => {
           document.querySelector('#authView').hidden = false;
           document.querySelector('#appView').hidden = true;
-          const copy = document.querySelector('.auth-caveat');
+          const copy = document.querySelector('#authPanel');
           const style = getComputedStyle(copy);
           const rect = copy.getBoundingClientRect();
           return {
@@ -506,19 +757,15 @@ test('mobile auth shell preserves its value and custody explanation with accessi
             }).slice(0, 8).map((candidate) => candidate.tagName.toLowerCase() + '#' + candidate.id + '.' + candidate.className),
             layoutWidth: window.innerWidth,
             visibleH1s: [...document.querySelectorAll('h1')].filter((heading) => !heading.closest('[hidden]') && getComputedStyle(heading).display !== 'none').length,
-            outcomes: document.querySelectorAll('.auth-outcome').length,
-            controlHeights: ['skipLink', 'landingBrand', 'landingRegisterButton', 'landingLoginButton', 'loginTab', 'registerTab', 'loginEmail', 'loginPassword'].map((id) => Math.round(document.getElementById(id).getBoundingClientRect().height)),
+            controlHeights: ['skipLink', 'landingBrand', 'loginTab', 'registerTab', 'loginEmail', 'loginPassword'].map((id) => Math.round(document.getElementById(id).getBoundingClientRect().height)),
           };
         })()`);
-        assert.match(authLayout.copy, /centrally keeps account details, created previews/u);
-        assert.match(authLayout.copy, /community page records are designed to live in community members’ browsers first/u);
-        assert.match(authLayout.copy, /does not hold funds or settle payments/u);
-        assert.match(authLayout.copy, /required history can remain after account deletion/u);
-        assert.equal(authLayout.visible, true, `${width}px at ${scale * 100}% must show the concrete product and custody explanation`);
+        assert.match(authLayout.copy, /Sign in or create an account/u);
+        assert.match(authLayout.copy, /session stays in this browser tab/u);
+        assert.equal(authLayout.visible, true, `${width}px at ${scale * 100}% must show account access`);
         assert.equal(authLayout.overflow, false, `${width}px at ${scale * 100}% must reflow without horizontal document overflow: ${authLayout.overflowElements.join(', ')}`);
         assert.equal(authLayout.layoutWidth, layoutWidth, `${width}px at ${scale * 100}% must use the expected reflow width`);
-        assert.equal(authLayout.visibleH1s, 1, `${width}px at ${scale * 100}% must expose one visible landing H1`);
-        assert.equal(authLayout.outcomes, 4, 'the landing must retain four plain-language outcome cards');
+        assert.equal(authLayout.visibleH1s, 1, `${width}px at ${scale * 100}% must expose one visible account H1`);
         assert.ok(authLayout.controlHeights.every((height) => height >= 44), `${width}px at ${scale * 100}% account controls must be at least 44 CSS px: ${authLayout.controlHeights}`);
 
         const railLayout = await evaluate(client, `(() => {
@@ -770,7 +1017,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     };
     const json = (status, body) => send(status, 'application/json; charset=utf-8', JSON.stringify(body));
 
-    if (record.method === 'GET' && record.path === '/') return send(200, 'text/html; charset=utf-8', cockpitHTML);
+    if (record.method === 'GET' && record.path === '/account') return send(200, 'text/html; charset=utf-8', cockpitHTML);
     if (record.method === 'GET' && record.path === '/public-host') {
       const serving = request.headers.host === 'app.community.example'
         && domainPublications.some((publication) => publication.claimId === 'claim_browser' && publication.active && publication.servingState === 'serving');
@@ -1431,7 +1678,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     const { client } = chromium;
     await client.send('Page.enable');
     await client.send('Runtime.enable');
-    await client.send('Page.navigate', { url: origin });
+    await client.send('Page.navigate', { url: `${origin}/account#login` });
     await waitFor(() => evaluate(client, `document.readyState === 'complete' && !document.querySelector('#loginForm').hidden`), 'cockpit login');
 
     let releaseInitialPeopleResponse;
@@ -1551,7 +1798,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
     extraTracks.set(selectionTrack.id, selectionTrack);
     delayTrackResponse = true;
     const delayedRecoveryRequestStart = requests.length;
-    await within(client.send('Page.navigate', { url: origin }), 'delayed recovery navigation');
+    await within(client.send('Page.navigate', { url: `${origin}/account` }), 'delayed recovery navigation');
     await waitFor(() => evaluate(client, `document.readyState === 'complete' && !document.querySelector('#loginForm').hidden`), 'delayed recovery login');
     await evaluate(client, `(() => {
       for (const [id, value] of [['loginEmail', 'qa@example.test'], ['loginPassword', 'correct horse battery staple']]) {
@@ -1569,7 +1816,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
 
     includeInapplicableNewest = true;
     const reloadRequestStart = requests.length;
-    await within(client.send('Page.navigate', { url: origin }), 'starter reload navigation');
+    await within(client.send('Page.navigate', { url: `${origin}/account` }), 'starter reload navigation');
     await waitFor(() => evaluate(client, `document.readyState === 'complete' && !document.querySelector('#loginForm').hidden`), 'starter reload login');
     await evaluate(client, `(() => {
       for (const [id, value] of [['loginEmail', 'qa@example.test'], ['loginPassword', 'correct horse battery staple']]) {
@@ -1876,7 +2123,7 @@ test('customer cockpit renders an authenticated signed preview in the exact sand
 
     const frameTarget = await waitFor(async () => {
       const { targetInfos } = await client.send('Target.getTargets');
-      const pageTarget = targetInfos.find((target) => target.type === 'page' && target.url === `${origin}/`);
+      const pageTarget = targetInfos.find((target) => target.type === 'page' && target.url === `${origin}/account`);
       return targetInfos.find((target) => target.type === 'iframe'
         && target.parentId === pageTarget?.targetId
         && target.url === 'about:srcdoc');
@@ -3380,7 +3627,7 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
       response.end(payload);
     };
     const json = (status, payload) => send(status, 'application/json; charset=utf-8', JSON.stringify(payload));
-    if (request.method === 'GET' && pathName === '/') return send(200, 'text/html; charset=utf-8', cockpitHTML);
+    if (request.method === 'GET' && pathName === '/account') return send(200, 'text/html; charset=utf-8', cockpitHTML);
     if (request.method === 'POST' && pathName === '/api/login') {
       const login = users[body.email];
       return login ? json(200, login) : json(401, { error: 'Unauthorized' });
@@ -3543,7 +3790,7 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     const { client } = chromium;
     await client.send('Page.enable');
     await client.send('Runtime.enable');
-    await client.send('Page.navigate', { url: origin });
+    await client.send('Page.navigate', { url: `${origin}/account#login` });
     await waitFor(() => evaluate(client, `document.readyState === 'complete' && !document.querySelector('#loginForm').hidden`), 'role journey login');
 
     await login(client, 'architect@example.test');
@@ -3628,7 +3875,7 @@ test('workspace tools guide organizer, invited Viewer, and Maintainer through re
     assert.equal(decidedProposal.financeDecision, 'decision_browser', 'the selected-workspace approved decision must flow into Finance');
     assert.equal(decidedProposal.selectedDecision, 'decision_browser');
 
-    await within(client.send('Page.navigate', { url: origin }), 'session refresh navigation');
+    await within(client.send('Page.navigate', { url: `${origin}/account` }), 'session refresh navigation');
     await waitFor(() => evaluate(client, `document.readyState === 'complete' && !document.querySelector('#loginForm').hidden`), 'session refresh login');
     await login(client, 'architect@example.test');
     await waitFor(() => evaluate(client, `document.querySelector('#workspaceRole').textContent === 'Architect'`), 'architect after refresh');
