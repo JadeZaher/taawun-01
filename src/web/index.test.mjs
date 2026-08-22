@@ -321,6 +321,10 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
 
   assert.match(html, /class="geometry-stage"[^>]*aria-hidden="true"/u);
   assert.match(html, /\.geometry-stage \{ position: fixed; inset: 0;[^}]*background: transparent;/u);
+  const geometryCanvasRule = html.match(/#geometryCanvas \{[^}]+\}/u)?.[0] || '';
+  assert.match(geometryCanvasRule, /opacity: 0;/u);
+  assert.doesNotMatch(geometryCanvasRule, /transition:/u, 'enhanced canvas visibility must not depend on an initial opacity transition');
+  assert.match(html, /\.geometry-stage\[data-enhanced="true"\] #geometryCanvas \{ opacity: 0\.9; \}/u);
   assert.match(html, /id="motionToggle"[^>]*type="button"[^>]*aria-pressed="true"/u);
   assert.match(html, /id="motionToggle"[^>]*aria-label="Decorative motion"/u);
   assert.match(html, /id="menuToggle"[^>]*aria-expanded="false"[^>]*aria-controls="primaryNavigation"/u);
@@ -517,10 +521,12 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     })();` });
     await client.send('Page.navigate', { url: origin });
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage')?.dataset.enhanced === 'true' && !document.querySelector('#motionToggle').hidden`), 'mocked WebGPU enhancement');
-    const initial = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, submissions: window.__gpuQA.submissions, renderer: document.querySelector('#geometryCanvas').dataset.renderer || '', controlHeight: Math.round(document.querySelector('#motionToggle').getBoundingClientRect().height), state: document.querySelector('.geometry-stage').dataset.state, side: document.querySelector('.geometry-stage').dataset.side, connector: window.__gpuQA.shaderSource.includes('junctionInterior') && window.__gpuQA.shaderSource.includes('overUnder'), connectedOctagon: window.__gpuQA.shaderSource.includes('bridgePairDistance') && window.__gpuQA.shaderSource.includes('bridgeConnectorGate'), stableCrossing: window.__gpuQA.shaderSource.includes('verticalCrossingID') && window.__gpuQA.shaderSource.includes('horizontalCrossingID'), adjacentBands: window.__gpuQA.shaderSource.includes('bandCellOffset / latticeScale') && window.__gpuQA.shaderSource.includes('basePoint + bandOffset') && window.__gpuQA.shaderSource.includes('basePoint - bandOffset'), nestedTravel: window.__gpuQA.shaderSource.includes('outerStarScale') && window.__gpuQA.shaderSource.includes('innerRosetteScale') && window.__gpuQA.shaderSource.includes('travel: f32'), internalMotion: window.__gpuQA.shaderSource.includes('internalPulse') && window.__gpuQA.shaderSource.includes('kaleidoscopeTravel') })`);
+    const initial = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, submissions: window.__gpuQA.submissions, renderer: document.querySelector('#geometryCanvas').dataset.renderer || '', canvasOpacity: getComputedStyle(document.querySelector('#geometryCanvas')).opacity, canvasTransitionDuration: getComputedStyle(document.querySelector('#geometryCanvas')).transitionDuration, controlHeight: Math.round(document.querySelector('#motionToggle').getBoundingClientRect().height), state: document.querySelector('.geometry-stage').dataset.state, side: document.querySelector('.geometry-stage').dataset.side, connector: window.__gpuQA.shaderSource.includes('junctionInterior') && window.__gpuQA.shaderSource.includes('overUnder'), connectedOctagon: window.__gpuQA.shaderSource.includes('bridgePairDistance') && window.__gpuQA.shaderSource.includes('bridgeConnectorGate'), stableCrossing: window.__gpuQA.shaderSource.includes('verticalCrossingID') && window.__gpuQA.shaderSource.includes('horizontalCrossingID'), adjacentBands: window.__gpuQA.shaderSource.includes('bandCellOffset / latticeScale') && window.__gpuQA.shaderSource.includes('basePoint + bandOffset') && window.__gpuQA.shaderSource.includes('basePoint - bandOffset'), nestedTravel: window.__gpuQA.shaderSource.includes('outerStarScale') && window.__gpuQA.shaderSource.includes('innerRosetteScale') && window.__gpuQA.shaderSource.includes('travel: f32'), internalMotion: window.__gpuQA.shaderSource.includes('internalPulse') && window.__gpuQA.shaderSource.includes('kaleidoscopeTravel') })`);
     assert.equal(initial.requests, 1);
     assert.ok(initial.submissions >= 1);
     assert.equal(initial.renderer, 'webgpu');
+    assert.equal(initial.canvasOpacity, '0.9', 'fresh enhancement makes the canvas visible immediately');
+    assert.equal(initial.canvasTransitionDuration, '0s', 'fresh visibility does not depend on transition timing');
     assert.ok(initial.controlHeight >= 44);
     assert.equal(initial.state, '0');
     assert.equal(initial.side, 'right');

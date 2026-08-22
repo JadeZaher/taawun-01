@@ -282,3 +282,8 @@ override so future transitions remain CSS-owned. Every stop, capability fallback
 pause, and device-loss path clears both inline properties. The signed-in cockpit brand is a 44px semantic
 link back to the public `/` story; the account document itself remains noindex
 and contains no decorative renderer.
+
+Canvas visibility changes immediately with the authoritative enhanced state; it
+does not use an opacity fade that a reload or browser history restoration can
+strand at its initial value. Decorative movement remains exclusively driven by
+the bounded scroll response and renderer settlement model.
