@@ -1586,3 +1586,64 @@ It does not add evidence for controlled DNS/public Host serving, Bazaar review o
 purchase, or the genuine five-person study. Workspace `47` remains the supported
 application-admin cleanup backlog; federation, TURN and complete E2EE key
 lifecycle remain deferred.
+
+## Full-surface geometric landing and navigation checkpoint — 2026-08-22
+
+Application commit `6499c872a7e5d41f0bc08a27ba78013985fa2ae7` removes the
+framed decorative viewport and lets one transparent WebGPU or CSS tessellation
+occupy the landing surface behind the story. Six authored scroll states follow
+right, right, left, right, right, left, while desktop content uses the inverse
+side. The renderer interpolates before each section center, strengthens the
+depth/refraction transition, uses premultiplied transparency, and preserves the
+low-power adapter, 1.5-million-pixel, event-driven frame, sustained-cost and
+device-loss bounds. Small screens use restrained off-screen edge peeks instead
+of WebGPU.
+
+The former detached checkbox is now a subtle 44 px navigation toggle with a
+stable `Decorative motion` name and `aria-pressed` state. It controls the static
+mobile scene as well as WebGPU and remains available on fallback-adapter,
+device-loss and reduced-data paths. At mobile widths it sits directly beside a
+44 px disclosure button. Opening that menu focuses the first revealed link;
+Escape and link activation return focus to the visible menu control. The brand
+compacts below 240 px, and promoted Chromium proves no brand/control overlap or
+horizontal overflow at 160, 200, 320 and 400 px.
+
+The landing now presents only the requested excerpt from Sūrat al-Māʾidah 5:2,
+marked `lang=ar`, `dir=rtl`, and visibly attributed as an excerpt. The former
+visual-inspiration explanation and the Sūrat an-Nūr 24:35 block are absent. The
+verse remains selectable semantic content outside the decorative renderer and
+is not used as a product, certification, scholar-approval or religious-ruling
+claim.
+
+The exact source passed `go test ./src/web ./src/pkg/... ./src/cmd/...`, both
+production binary builds, and 19/19 Node/runtime tests with promoted real
+Chromium. The browser suite covers WebGPU pause/resume, null-adapter and device
+loss fallbacks, reduced motion, forced colors, reduced data, menu focus,
+narrow-width reflow and the existing authenticated product journeys.
+Independent code and accessibility reviewers returned APPROVE after the final
+shader, fallback-control, accessible-name, focus-order and 160 px corrections.
+
+Railway deployment `1ba31e17-8b40-49e0-a576-71164e80cba8` reached terminal
+`SUCCESS` with runtime image
+`sha256:13bdca9e46932afc86aa36b8b303e1bc4d64bf6d59ba0fc6d9b7c57909c599f9`.
+Railway's first `/api/health` check succeeded. Independent public GETs returned
+`200` for `/api/health` in 0.296 seconds and `/` in 0.511 seconds with
+`text/html; charset=utf-8`. Deployment-scoped HTTP `500..599` was empty; the
+bounded runtime readback contains one database initialization and one server
+start with no panic, exit or restart. The one-hour service snapshot reported CPU
+average/max `0.0001`/`0.0012` vCPU and memory average/max `0.0203`/`0.0376` GB.
+
+A fresh deployed in-app Browser at 1,440 px observed the exact six-side sequence,
+`renderer=webgpu`, `data-enhanced=true`, reversible motion and the exact 5:2
+excerpt with zero console errors. At 390 px it observed the static edge treatment,
+adjacent 44 px motion/menu controls, no horizontal overflow, first-link focus on
+open and menu-button focus after Escape. No account, user, workspace, domain,
+publication, Bazaar, finance, reviewer or participant fixture was created.
+
+**Verdict:** ACCEPT application commit
+`6499c872a7e5d41f0bc08a27ba78013985fa2ae7` / Railway deployment
+`1ba31e17-8b40-49e0-a576-71164e80cba8`. Rollback remains application
+`0b13e505c444a406c336300b4aa27f4ed8b9dd96` / Railway deployment
+`05d22d21-e442-4676-be51-0936c72fbb49`. Controlled DNS/reviewer/Bazaar proof,
+the genuine five-person study, workspace `47`, federation, TURN and complete
+E2EE key lifecycle remain unchanged and unclaimed.
