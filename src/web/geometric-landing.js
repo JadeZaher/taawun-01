@@ -121,7 +121,6 @@
     canvasRecoveryFrame = window.requestAnimationFrame(() => {
       canvasRecoveryFrame = 0;
       canvas.style.removeProperty('transition');
-      canvas.style.removeProperty('opacity');
     });
   };
 

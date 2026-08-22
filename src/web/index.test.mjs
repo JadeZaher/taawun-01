@@ -580,7 +580,7 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
       && getComputedStyle(document.querySelector('#geometryCanvas')).opacity === '0.9'
       && window.__gpuQA.submissions > ${beforeBackForwardCache.submissions + 2}`), 'back-forward cache pageshow restores visible canvas and settles the retained renderer');
     assert.equal(await evaluate(client, `window.__gpuQA.adapterRequests`), beforeBackForwardCache.adapters, 'back-forward cache recovery reuses one renderer without duplicate initialization');
-    assert.deepEqual(await evaluate(client, `({ opacity: document.querySelector('#geometryCanvas').style.opacity, transition: document.querySelector('#geometryCanvas').style.transition })`), { opacity: '', transition: '' }, 'back-forward cache visibility recovery removes temporary inline overrides so later lifecycle transitions remain available');
+    assert.deepEqual(await evaluate(client, `({ opacity: document.querySelector('#geometryCanvas').style.opacity, transition: document.querySelector('#geometryCanvas').style.transition })`), { opacity: '0.9', transition: '' }, 'back-forward cache visibility recovery retains authoritative enhanced opacity while returning transition ownership to CSS');
 
     const beforeContinuationScroll = settled.submissions;
     await evaluate(client, `document.querySelector('.geometry-continuation:last-of-type').scrollIntoView({ block: 'center', behavior: 'instant' })`);
@@ -590,6 +590,7 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     assert.ok(continuationState.backgrounds.every((background) => background.includes('linear-gradient')), 'desktop continuation sections retain translucent right-side geometry lanes');
     await evaluate(client, `window.__gpuQA.lose()`);
     await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && !document.querySelector('#motionToggle').hidden && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'true'`), 'device-loss static fallback');
+    assert.deepEqual(await evaluate(client, `({ opacity: document.querySelector('#geometryCanvas').style.opacity, transition: document.querySelector('#geometryCanvas').style.transition })`), { opacity: '', transition: '' }, 'device-loss fallback clears every back-forward cache visibility override');
     await evaluate(client, `window.__gpuQA.nullAdapter = true; document.querySelector('#motionToggle').click(); document.querySelector('#motionToggle').click()`);
     await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && !document.querySelector('#motionToggle').hidden && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'true' && window.__gpuQA.adapterRequests >= 3`), 'null-adapter static fallback keeps its motion control');
 

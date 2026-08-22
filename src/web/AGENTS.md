@@ -277,7 +277,8 @@ same eligibility gate if initialization was pending. A non-persisted pagehide
 still disconnects and destroys normally. No restoration path registers a second
 observer or duplicate listener. Persisted restoration also cancels the frozen
 canvas opacity transition, applies the already-authoritative enhanced opacity
-for one layout frame, then removes both temporary inline overrides so ordinary
-future transitions remain CSS-owned. The signed-in cockpit brand is a 44px semantic
+for the retained renderer lifetime, then removes only the temporary transition
+override so future transitions remain CSS-owned. Every stop, capability fallback,
+pause, and device-loss path clears both inline properties. The signed-in cockpit brand is a 44px semantic
 link back to the public `/` story; the account document itself remains noindex
 and contains no decorative renderer.
