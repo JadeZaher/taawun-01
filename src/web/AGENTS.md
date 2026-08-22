@@ -212,18 +212,23 @@ WebGPU may enhance only on capable desktop devices after idle, never moves text
 or captures scrolling. Scroll events update only a normalized target. A bounded
 critically damped response advances at a fixed 60Hz physics step with capped
 elapsed time and velocity; an explicit target-crossing guard prevents numerical
-overshoot. Its motion amount fades with remaining distance and velocity. The
-resting lattice orientation is invariant across all six sections. Only while an
-authored side transition and physical settling overlap does it add
-at most 0.018 radians of combined travel-only lattice rotation plus a 0.002-cell
-rail shimmer before returning exactly to the stable scene rotation. While that
-same transition-bound travel amount is nonzero, the outer star contracts by at
-most 3.5%
-and the inner rosette expands by at most 4.5%; both return to their exact authored
-resting geometry on settlement. This restrained kaleidoscope overlap changes
-only the nested star outlines. Lattice scale, octagonal connectors, bridge rails,
-and over/under straps remain fixed spatial anchors, so there is no whole-field
-zoom or added lateral swing. It renders a
+overshoot. A separate internal phase advances at a fixed 0.55 radians per second
+only while that response is moving, then sleeps with it; wheel or swipe speed can
+move the target but cannot set this phase rate. Its bounded envelope evolves the
+rosette scale, perpendicular mirror depth, and at most 0.0008 cell of rail
+separation even through same-side spans, so scroll progress never freezes the
+decoration. The resting lattice orientation remains invariant across all six
+sections. Only while an authored side transition and physical settling overlap
+does it add at most 0.018 radians of combined travel-only lattice rotation plus
+another 0.0012 cell of rail shimmer. At same-side strength the outer star
+contracts by at most 1.575% and the inner rosette expands by at most 2.025%; a
+side crossing may reach the existing 3.5% and 4.5% bounds. Nested scale, extra
+rail separation, and mirror depth return to their exact authored values on
+settlement, while the localized color phase simply freezes until the next scroll.
+This restrained kaleidoscope overlap changes only the nested star outlines.
+Lattice scale, octagonal
+connectors, bridge rails, and over/under straps remain fixed spatial anchors, so
+there is no whole-field zoom or added lateral swing. It renders a
 sharper final tessellation and stops scheduling frames once both displacement and
 velocity settle. The subtle navigation motion button uses `aria-pressed` and
 keeps a reversible user preference. The progressively enhanced mobile menu

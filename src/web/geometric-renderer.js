@@ -63,7 +63,6 @@ const shaderSource = `
   }
   @fragment fn fragmentMain(@builtin(position) position: vec4f) -> @location(0) vec4f {
     let resolution = max(u.viewportScroll.xy, vec2f(1.0));
-    let scroll = u.viewportScroll.z;
     let phase = u.viewportScroll.w;
     let section = u.stageMotion.x;
     let side = u.stageMotion.y;
@@ -73,28 +72,30 @@ const shaderSource = `
     let softness = mix(1.75, 1.0, u.stageMotion.w);
     let travel = 1.0 - u.stageMotion.w;
     let sceneTravel = travel * transition;
+    let internalPulse = travel * (0.58 + 0.42 * sin(phase));
+    let kaleidoscopeTravel = max(sceneTravel, internalPulse * 0.45);
     let stableTurn = 0.018;
     let turn = stableTurn + sceneTravel * 0.012;
     let basePoint = rotate2(uv, sceneTravel * 0.006);
     let latticeScale = 3.45;
-    let baseLayer = lattice(basePoint, latticeScale, turn, softness, sceneTravel);
-    let lensCenter = vec2f(side * 0.08 + 0.32 * sin(scroll * 3.4 + transition), -0.18 + phase * 0.34);
+    let baseLayer = lattice(basePoint, latticeScale, turn, softness, kaleidoscopeTravel);
+    let lensCenter = vec2f(side * 0.08 + 0.26 * sin(phase * 0.72 + transition), -0.18 + 0.12 * cos(phase * 0.54));
     let lensDistance = length(uv - lensCenter);
     let lens = 1.0 - smoothstep(0.04, 0.66, lensDistance);
     let refractionVector = uv - lensCenter + vec2f(0.001);
     let refractionDirection = refractionVector / max(length(refractionVector), 0.0001);
-    let bandCellOffset = 0.010 + lens * 0.010 + sceneTravel * 0.002;
+    let bandCellOffset = 0.010 + lens * 0.010 + internalPulse * 0.0008 + sceneTravel * 0.0012;
     let bandMagnitude = bandCellOffset / latticeScale;
     let bandVector = refractionDirection + vec2f(0.35, -0.2);
     let bandDirection = bandVector / max(length(bandVector), 0.0001);
     let bandOffset = bandDirection * bandMagnitude;
-    let mirrorOffset = vec2f(-bandOffset.y, bandOffset.x) * 0.72;
-    let emeraldBand = lattice(basePoint + bandOffset, latticeScale, turn, softness, sceneTravel);
-    let rustBand = lattice(basePoint - bandOffset, latticeScale, turn, softness, sceneTravel);
-    let mirrorBand = lattice(basePoint + mirrorOffset, latticeScale, turn, softness * 1.05, sceneTravel);
+    let mirrorOffset = vec2f(-bandOffset.y, bandOffset.x) * (0.72 + internalPulse * 0.06);
+    let emeraldBand = lattice(basePoint + bandOffset, latticeScale, turn, softness, kaleidoscopeTravel);
+    let rustBand = lattice(basePoint - bandOffset, latticeScale, turn, softness, kaleidoscopeTravel);
+    let mirrorBand = lattice(basePoint + mirrorOffset, latticeScale, turn, softness * 1.05, kaleidoscopeTravel);
     let refractionEdge = abs(emeraldBand.x - rustBand.x);
     let chromaticEnvelope = 0.07 + lens * 0.68;
-    let caustic = 0.5 + 0.5 * sin(uv.x * 5.0 - uv.y * 3.0 - phase * 5.0);
+    let caustic = 0.5 + 0.5 * sin(uv.x * 5.0 - uv.y * 3.0 - phase * 1.4);
     var color = vec3f(0.012, 0.04, 0.034);
     color += vec3f(0.95, 0.68, 0.24) * baseLayer.x * (0.48 + caustic * 0.18);
     color += vec3f(0.16, 0.57, 0.45) * emeraldBand.x * chromaticEnvelope * 0.48;
@@ -143,6 +144,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
   const MAX_DT_SECONDS = 0.05;
   const SPRING_STIFFNESS = 72;
   const SPRING_DAMPING = 2 * Math.sqrt(SPRING_STIFFNESS);
+  const INTERNAL_PHASE_RATE = 0.55;
   const MAX_VELOCITY = 0.9;
   const SETTLE_DISTANCE = 0.0002;
   const SETTLE_VELOCITY = 0.0005;
@@ -156,6 +158,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
   let physicsAccumulator = 0;
   let lastPhysicsTime = 0;
   let settling = false;
+  let internalPhase = 0;
 
   const teardown = ({ notify = false } = {}) => {
     if (!alive) return;
@@ -204,9 +207,11 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     physicsAccumulator = Math.min(MAX_DT_SECONDS, physicsAccumulator + elapsed);
     while (physicsAccumulator >= FIXED_STEP_SECONDS) {
       const priorDistance = targetScroll - springScroll;
+      const internalMotionActive = Math.abs(priorDistance) > SETTLE_DISTANCE || Math.abs(springVelocity) > SETTLE_VELOCITY;
       const acceleration = SPRING_STIFFNESS * (targetScroll - springScroll) - SPRING_DAMPING * springVelocity;
       springVelocity = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, springVelocity + acceleration * FIXED_STEP_SECONDS));
       springScroll += springVelocity * FIXED_STEP_SECONDS;
+      if (internalMotionActive) internalPhase = (internalPhase + INTERNAL_PHASE_RATE * FIXED_STEP_SECONDS) % (Math.PI * 2);
       physicsAccumulator -= FIXED_STEP_SECONDS;
       if (priorDistance !== 0 && priorDistance * (targetScroll - springScroll) <= 0) {
         springScroll = targetScroll;
@@ -260,7 +265,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       const sideProgress = progress * progress * progress * (progress * (progress * 6 - 15) + 10);
       const side = sideChanges ? currentSide + (nextSide - currentSide) * sideProgress : currentSide;
       const transition = sideChanges ? Math.sin(Math.PI * earlyProgress) : 0;
-      const phase = currentIndex + progress;
+      const phase = internalPhase;
       const selected = progress < 0.5 ? current : next;
       stage.dataset.state = selected?.dataset.geometryState || String(Math.round(section));
       stage.dataset.side = (progress < 0.5 ? currentSide : nextSide) < 0 ? 'left' : 'right';
