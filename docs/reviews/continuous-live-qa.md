@@ -1821,3 +1821,49 @@ participant fixture was created.
 `20818f11-623c-46d7-9848-d9ea91334261`. Controlled DNS/reviewer/Bazaar proof,
 the genuine five-person study, workspace `47`, federation, TURN and complete
 E2EE key lifecycle remain unchanged and unclaimed.
+
+## Uninterrupted landing geometry checkpoint — 2026-08-22
+
+Application commit `50a5e63aaad8e1a2c23941b8ad47ba3492804539` closes three
+independent ways the decorative tessellation could appear cut off. Its internal
+refraction phase now eases from the fixed scroll-motion rate to zero before the
+renderer sleeps, instead of freezing at a nonzero velocity. Renderer eligibility
+follows the full public `main` region, and the three post-Templates sections keep
+the last right-side scene visible through translucent, bounded reading surfaces
+without adding geometry states. A narrow aspect-aware feather derived from
+unshifted canvas coordinates also takes alpha to zero just inside every physical
+viewport edge. The authored six-state right, right, left, left, right, right path
+and exactly two lateral crossings are unchanged.
+
+The exact source passed every Go package, both production builds and all 19 Node
+contracts with real Chromium serialized on Windows. The promoted browser gate
+proved the phase tail terminates, the final continuation still renders state 5
+on the right, no additional state exists, desktop continuation surfaces remain
+translucent, and mobile continuation surfaces retain a readable static fallback.
+Independent review returned APPROVE with no P0/P1/P2 finding.
+
+Railway deployment `7ee525de-af38-4a20-ae59-7b0746b757d2` reached terminal
+`SUCCESS` with runtime image
+`sha256:17c84a78011b463c2769563e5ffb5649a0b4d4e9157639b62627a878dc29543f`.
+Independent GETs returned `200` for `/api/health` and `/`; the health body was
+`status=ok`, and public HTML contained exactly three continuation sections.
+Served `/geometric-landing.js` contained the full-main observer, while served
+`/geometric-renderer.js` contained the phase-velocity tail and viewport feather.
+Railway request IDs for those three public documents were
+`0-x5vl8XTQWM31lYYqVb7A`, `ogUrC2d_SKWXLkswCYBc-A` and
+`UIPw30CtRDOI-Zl0CYBc-A`. Deployment-scoped HTTP `500..599` was empty. The
+bounded 15-minute snapshot reported 9 `2xx`, 2 expected `4xx`, zero `5xx`, p95
+30 ms, CPU average/max `0.000104`/`0.002263` vCPU and memory average/max
+`12.982`/`13.204` MB. Runtime output contains one volume mount, database
+initialization, server start and container start with no panic, exit, restart or
+application error; Railway labels the two normal Go standard-logger startup
+lines as error-stream records.
+
+No account, user, workspace, domain, publication, Bazaar, finance, reviewer or
+participant fixture was created. **Verdict:** ACCEPT application commit
+`50a5e63aaad8e1a2c23941b8ad47ba3492804539` / Railway deployment
+`7ee525de-af38-4a20-ae59-7b0746b757d2`. Rollback remains application
+`e1826d1cbd818fe1525d879a7dffcf7d87272221` / Railway deployment
+`d82c182d-2fa9-46df-819a-9f9b1fb2ad8c`. Controlled DNS/reviewer/Bazaar proof,
+the genuine five-person study, workspace `47`, federation, TURN and complete
+E2EE key lifecycle remain unchanged and unclaimed.
