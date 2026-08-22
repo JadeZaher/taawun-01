@@ -1647,3 +1647,65 @@ publication, Bazaar, finance, reviewer or participant fixture was created.
 `05d22d21-e442-4676-be51-0936c72fbb49`. Controlled DNS/reviewer/Bazaar proof,
 the genuine five-person study, workspace `47`, federation, TURN and complete
 E2EE key lifecycle remain unchanged and unclaimed.
+
+## Sharper tessellation and settled-motion checkpoint — 2026-08-22
+
+Application commit `f1c427a8732b19f9f6b48698c6e2f7d8abc4aea4` replaces the
+soft sinusoidal star boundary with a repeated straight-segment eight-point star,
+rotated inner rosette and interlocking diagonal diamond straps. The base lattice
+is no longer globally warped. Mirrored depth and localized emerald, gold and rust
+refraction remain as displaced layers, so the construction stays legible at rest
+while motion retains its glass-like dimensional character. Moving frames use
+slightly broader antialiasing and the exact settled frame resolves to the sharper
+line treatment.
+
+Scroll input now changes only a normalized target. A fixed 60 Hz underdamped
+spring with capped elapsed time and velocity approaches that target independently
+of wheel or swipe rate, allows a gentle bounded overshoot, snaps to the exact
+destination at finite displacement and velocity thresholds, and then stops
+scheduling frames. The still mobile/CSS treatment uses one fixed-duration gentle
+overshoot curve. User pause, reduced motion and the existing capability fallbacks
+remain nonanimated.
+
+The Sūrat al-Māʾidah 5:2 excerpt now includes the visible English translation
+“Cooperate with one another in goodness and righteousness, and do not cooperate
+in sin and transgression.” directly beneath the Arabic, attributed to Dr. Mustafa
+Khattab, The Clear Quran. Both languages remain selectable semantic content
+outside the decorative renderer; no new religious-authority, certification or
+visual-inspiration claim was added.
+
+The exact source passed all Go package and command tests, both production binary
+builds, 19/19 combined Node/runtime tests, and a focused 12/12 landing/customer
+Chromium run after correcting a test-only `innerText` versus `textContent`
+expectation for CSS-transformed attribution text. The promoted WebGPU regression
+proves that one scroll event produces continued bounded submissions, a real
+overshoot, a sharper final uniform, settlement in fewer than 120 frames and no
+later submissions. Independent code and accessibility reviews returned APPROVE
+with no P0, P1 or P2 finding.
+
+Local and deployed in-app Browser inspection at 1,440 px observed the crisp
+star/rosette/diamond construction, mirrored refracted layers, visibly softer
+transition and sharper settled state. The deployed page reported
+`renderer=webgpu`, `data-spring=settled`, the exact H1 and translation. At 390 px
+it used the intended static fallback with the motion toggle beside the collapsed
+menu, exact translation and no horizontal overflow.
+
+Railway deployment `b946bcc0-3eef-4c78-989e-3a5d932a37b0` reached terminal
+`SUCCESS` with runtime image
+`sha256:7c900c781922d18829b543d8372263ba4041d0fe40735e94a209662721a914f2`.
+Independent public GETs returned `200` for `/api/health` in 0.261 seconds and `/`
+in 0.402 seconds with `text/html; charset=utf-8`. Deployment-scoped HTTP
+`500..599` was empty. The bounded snapshot reported p95 25 ms over the first two
+requests, CPU average/max `0.0001`/`0.0013` vCPU and memory average/max
+`0.0207`/`0.0376` GB. Runtime output contains one database initialization and one
+server start with no panic, exit or restart.
+
+**Verdict:** ACCEPT application commit
+`f1c427a8732b19f9f6b48698c6e2f7d8abc4aea4` / Railway deployment
+`b946bcc0-3eef-4c78-989e-3a5d932a37b0`. Rollback remains application
+`6499c872a7e5d41f0bc08a27ba78013985fa2ae7` / Railway deployment
+`1ba31e17-8b40-49e0-a576-71164e80cba8`. No account, user, workspace, domain,
+publication, Bazaar, finance, reviewer or participant fixture was created.
+Controlled DNS/reviewer/Bazaar proof, the genuine five-person study, workspace
+`47`, federation, TURN and complete E2EE key lifecycle remain unchanged and
+unclaimed.
