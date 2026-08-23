@@ -347,6 +347,7 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(loader, /window\.addEventListener\('pagehide', \(event\) => \{[\s\S]*?if \(event\.persisted\) \{\s*renderer\?\.pause\(\);\s*return;/u);
   assert.match(loader, /window\.addEventListener\('pageshow', \(event\) => \{[\s\S]*?if \(!event\.persisted \|\| disposed\) return;[\s\S]*?renderer\.resume\(\)/u);
   assert.match(loader, /disposed = true;\s*observer\.disconnect\(\);\s*stop\(\);/u);
+  assert.match(loader, /const stop = [\s\S]*?clearCanvasRecovery\(\);\s*updateStaticScene\(\);\s*renderer\?\.destroy\(\)/u);
   assert.doesNotMatch(loader, /addEventListener\('pagehide',[\s\S]*?\}, \{ once: true \}\)/u);
   assert.match(loader, /const sideChanges = currentSide !== nextSide/u);
   assert.match(loader, /if \(sideChanges && progress > 0\.12 && progress < 0\.88\)/u);
@@ -364,6 +365,7 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(renderer, /window\.addEventListener\('scroll', onScroll, \{ passive: true \}\)/u);
   assert.doesNotMatch(renderer, /requestAnimationFrame\(render\)|preventDefault\(\)|setInterval\(/u);
   assert.match(renderer, /device\.lost/u);
+  assert.match(renderer, /if \(notify\) queueMicrotask\(\(\) => \{\s*try \{ onFailure\(\); \} finally \{ stage\.removeAttribute\('data-enhanced'\); \}\s*\}\)/u);
   assert.match(renderer, /refractionEdge/u);
   assert.match(renderer, /fn segmentDistance\(/u);
   assert.match(renderer, /fn starOutline\(/u);
@@ -433,6 +435,7 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(renderer, /const SCROLL_ACTIVITY_SETTLE = 0\.004/u);
   assert.match(renderer, /const SCROLL_ACTIVITY_STRENGTH = 0\.32/u);
   assert.match(renderer, /const MAX_VELOCITY = 0\.9/u);
+  assert.match(renderer, /const landingMain = document\.querySelector\('main'\)/u);
   assert.match(renderer, /while \(physicsAccumulator >= FIXED_STEP_SECONDS\)/u);
   assert.match(renderer, /const internalMotionActive = Math\.abs\(priorDistance\) > SETTLE_DISTANCE \|\| Math\.abs\(springVelocity\) > SETTLE_VELOCITY \|\| scrollActivity > SCROLL_ACTIVITY_SETTLE/u);
   assert.match(renderer, /const internalPhaseTarget = internalMotionActive \? INTERNAL_PHASE_RATE : 0/u);
@@ -444,13 +447,18 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(renderer, /if \(!settling\) \{\s*physicsAccumulator = 0;\s*lastPhysicsTime = 0;/u);
   assert.match(renderer, /priorDistance \* \(targetScroll - springScroll\) <= 0/u);
   assert.match(renderer, /const motionAmount = moving \? Math\.min\(1,[\s\S]*?const settledMix = 1 - motionAmount/u);
-  assert.match(renderer, /const sideChanges = currentSide !== nextSide/u);
-  assert.match(renderer, /const sideProgress = progress \* progress \* progress \* \(progress \* \(progress \* 6 - 15\) \+ 10\)/u);
-  assert.match(renderer, /const side = sideChanges \? currentSide \+ \(nextSide - currentSide\) \* sideProgress : currentSide/u);
-  assert.match(renderer, /const transition = sideChanges \? Math\.sin\(Math\.PI \* earlyProgress\) : 0/u);
+  assert.match(renderer, /const mainProgress = Math\.min\(1, Math\.max\(0, \(scrollTop - mainStart\) \/ mainScrollSpan\)\)/u);
+  assert.match(renderer, /const lateralAngle = Math\.PI \* 2 \* mainProgress/u);
+  assert.match(renderer, /const side = Math\.cos\(lateralAngle\)/u);
+  assert.match(renderer, /const transition = Math\.abs\(Math\.sin\(lateralAngle\)\)/u);
+  assert.doesNotMatch(renderer, /const currentSide|const nextSide|const sideChanges|const sideProgress/u);
   assert.match(renderer, /const phase = internalPhase/u);
-  assert.match(renderer, /if \(sideChanges && transition > 0\.24\) stage\.dataset\.transition = 'true'/u);
-  assert.match(renderer, /if \(moving\) requestDraw\(\)/u);
+  assert.match(renderer, /if \(moving && transition > 0\.24\) stage\.dataset\.transition = 'true'/u);
+  assert.match(renderer, /if \(elapsed > 50 \|\| \(elapsed > 20 && lastFrameCostExceeded\)\)/u);
+  assert.match(renderer, /if \(elapsed > 20\)[^\n]*lastFrameCostExceeded = true[^\n]*\n\s*else lastFrameCostExceeded = false/u);
+  assert.match(renderer, /let replacementDrawRequired = false/u);
+  assert.match(renderer, /if \(elapsed > 20\)[^\n]*replacementDrawRequired = true/u);
+  assert.match(renderer, /if \(moving \|\| replacementDrawRequired\) requestDraw\(\)/u);
   assert.match(scrollHandler, /const nextTarget = readScrollTarget\(\)/u);
   assert.match(scrollHandler, /scrollActivity = 1/u);
   assert.doesNotMatch(scrollHandler, /writeBuffer|window\.scrollY|dataset\.state/u);
@@ -493,7 +501,7 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     await client.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
       let loseDevice;
       const lost = new Promise((resolve) => { loseDevice = resolve; });
-      window.__gpuQA = { adapterRequests: 0, submissions: 0, destroys: 0, uniforms: [], shaderSource: '', nullAdapter: false, lose: () => loseDevice({ reason: 'destroyed' }) };
+      window.__gpuQA = { adapterRequests: 0, submissions: 0, destroys: 0, uniforms: [], shaderSource: '', submitCosts: [], nullAdapter: false, lose: () => loseDevice({ reason: 'destroyed' }) };
       Object.defineProperty(navigator, 'hardwareConcurrency', { configurable: true, value: 8 });
       Object.defineProperty(navigator, 'deviceMemory', { configurable: true, value: 8 });
       const connectionListeners = [];
@@ -503,7 +511,7 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
       const pass = { setPipeline() {}, setBindGroup() {}, draw() {}, end() {} };
       const device = {
         lost,
-        queue: { writeBuffer(_buffer, _offset, data) { window.__gpuQA.uniforms.push(Array.from(data)); }, submit() { window.__gpuQA.submissions += 1; } },
+        queue: { writeBuffer(_buffer, _offset, data) { window.__gpuQA.uniforms.push(Array.from(data)); }, submit() { const cost = window.__gpuQA.submitCosts.shift() || 0; const started = performance.now(); while (performance.now() - started < cost) {} window.__gpuQA.submissions += 1; } },
         createShaderModule({ code }) { window.__gpuQA.shaderSource = code; return { getCompilationInfo: async () => ({ messages: [] }) }; },
         createRenderPipeline() { return { getBindGroupLayout() { return {}; } }; },
         createBuffer() { return { destroy() {} }; },
@@ -549,6 +557,19 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage')?.dataset.enhanced === 'true' && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'true'`), 'motion resume');
     assert.equal(await evaluate(client, `localStorage.getItem('taawun-decorative-motion')`), null);
 
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.spring === 'settled'`), 'renderer is settled before the isolated resize downgrade');
+    const beforeSettledSlowFrame = await evaluate(client, `window.__gpuQA.submissions`);
+    await evaluate(client, `(() => { window.__gpuQA.submitCosts.push(24, 0); window.dispatchEvent(new Event('resize')); })()`);
+    await waitFor(() => evaluate(client, `window.__gpuQA.submissions >= ${beforeSettledSlowFrame + 2}`), 'nonfatal settled-frame downgrade receives one replacement submission');
+    await wait(120);
+    assert.equal(await evaluate(client, `window.__gpuQA.submissions`), beforeSettledSlowFrame + 2, 'a settled downgrade schedules exactly one replacement draw and no loop');
+    assert.deepEqual(await evaluate(client, `({ enhanced: document.querySelector('.geometry-stage').dataset.enhanced, renderer: document.querySelector('#geometryCanvas').dataset.renderer, opacity: getComputedStyle(document.querySelector('#geometryCanvas')).opacity, queuedCosts: window.__gpuQA.submitCosts.length })`), { enhanced: 'true', renderer: 'webgpu', opacity: '0.9', queuedCosts: 0 }, 'replacement draw keeps a settled enhanced canvas visible after reconfiguration');
+
+    const beforeIsolatedSlowFrames = await evaluate(client, `window.__gpuQA.submissions`);
+    await evaluate(client, `(() => { window.__gpuQA.submitCosts.push(24, 0, 24, 0); window.scrollTo({ top: 4, behavior: 'instant' }); })()`);
+    await waitFor(() => evaluate(client, `window.__gpuQA.submissions >= ${beforeIsolatedSlowFrames + 4} && document.querySelector('.geometry-stage').dataset.spring === 'settled'`), 'isolated slow frames separated by a healthy frame remain enhanced');
+    assert.deepEqual(await evaluate(client, `({ enhanced: document.querySelector('.geometry-stage').dataset.enhanced, renderer: document.querySelector('#geometryCanvas').dataset.renderer, queuedCosts: window.__gpuQA.submitCosts.length })`), { enhanced: 'true', renderer: 'webgpu', queuedCosts: 0 }, 'a healthy frame clears the slow-frame strike before a later isolated slow frame');
+
     const beforeMicroScroll = await evaluate(client, `window.__gpuQA.submissions`);
     const microScrollTarget = await evaluate(client, `(() => {
       window.scrollTo({ top: 1, behavior: 'instant' });
@@ -561,7 +582,7 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     assert.ok(microScroll.length > 2 && microScroll.length < 90, `tiny-scroll activity remains bounded: ${microScroll.length}`);
     assert.ok(microScroll.some((sample) => sample.sharp < 0.8), 'the first tiny delta produces a visible fixed-strength tessellation pulse');
     assert.ok(microScroll.slice(1).some((sample, index) => sample.phase > microScroll[index].phase), 'the first tiny delta advances the internal phase');
-    assert.ok(microScroll.every((sample) => sample.side === 1 && sample.transition === 0), 'the tiny same-side pulse adds no lateral crossing or full-field shimmer');
+    assert.ok(microScroll.every((sample) => sample.side > 0.999 && sample.side <= 1 && sample.transition >= 0 && sample.transition < 0.01), 'the tiny scroll begins the continuous page path without a jump or extra crossing');
     assert.equal(microScroll.at(-1)?.sharp, 1, 'the tiny-scroll pulse returns to the exact sharp resting pattern');
 
     const beforeScroll = await evaluate(client, `window.__gpuQA.submissions`);
@@ -570,23 +591,39 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
       const centers = sections.slice(0, 2).map((section) => section.offsetTop + section.offsetHeight * 0.5);
       const target = Math.max(0, (centers[0] + centers[1]) * 0.5 - window.innerHeight * 0.68);
       window.scrollTo({ top: target, behavior: 'instant' });
-      return window.scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const normalized = window.scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const main = document.querySelector('main');
+      const mainProgress = Math.min(1, Math.max(0, (window.scrollY - main.offsetTop) / Math.max(1, main.offsetHeight - window.innerHeight)));
+      return { normalized, mainProgress, expectedSide: Math.cos(Math.PI * 2 * mainProgress) };
     })()`);
     await waitFor(() => evaluate(client, `window.__gpuQA.submissions >= ${beforeScroll + 3}`), 'spring continues after one scroll event');
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.state !== '0'`), 'approaching-section state transition');
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.spring === 'settled'`), 'bounded spring settlement');
     const settled = await evaluate(client, `({ submissions: window.__gpuQA.submissions, samples: window.__gpuQA.uniforms.slice(${beforeScroll}).map((values) => ({ scroll: values[2], phase: values[3], side: values[5], transition: values[6], sharp: values[7] })) })`);
     assert.ok(settled.submissions > beforeScroll + 2 && settled.submissions < beforeScroll + 120, `spring must settle in a bounded number of frames: ${settled.submissions - beforeScroll}`);
-    assert.ok(settled.samples.every((sample) => sample.scroll <= scrollTarget + 0.00001), 'smoothed travel must not overshoot the target');
+    assert.ok(settled.samples.every((sample) => sample.scroll <= scrollTarget.normalized + 0.00001), 'smoothed travel must not overshoot the target');
     assert.ok(settled.samples.every((sample, index, samples) => index === 0 || sample.scroll + 0.00001 >= samples[index - 1].scroll), 'downward travel must settle without a reverse swing');
-    assert.ok(settled.samples.every((sample) => sample.side === 1), 'the first right-to-right scene transition must not interpolate laterally');
-    assert.ok(settled.samples.every((sample) => sample.transition === 0), 'the first right-to-right scene transition must not activate the larger side-crossing rotation or shimmer');
+    assert.ok(settled.samples.some((sample) => sample.side < 0.999) && settled.samples.every((sample, index, samples) => index === 0 || sample.side <= samples[index - 1].side + 0.00001), 'scrolling through same-side content advances the one continuous outbound lateral path without a plateau or reversal');
+    assert.ok(settled.samples.some((sample) => sample.transition > 0) && settled.samples.every((sample) => sample.transition >= 0 && sample.transition <= 1), 'crossing shimmer follows the same bounded page path');
+    assert.ok(Math.abs(settled.samples.at(-1).side - scrollTarget.expectedSide) < 0.0001, 'settled lateral position equals the page-length path rather than a section side');
     const internalPhaseDeltas = settled.samples.slice(1).map((sample, index) => sample.phase - settled.samples[index].phase);
     assert.ok(internalPhaseDeltas.some((delta) => delta > 0) && internalPhaseDeltas.every((delta) => delta >= 0 && delta <= 0.04), 'same-side scrolling advances a small fixed-rate internal phase without wheel-speed-linked jumps');
     assert.ok(internalPhaseDeltas.at(-1) <= 0.001, 'internal phase eases to an imperceptible final step instead of freezing at full velocity');
     assert.ok(settled.samples.some((sample) => sample.sharp < 0.99) && settled.samples.at(-1)?.sharp === 1, 'moving frames soften and the final settled frame sharpens the tessellation');
     await wait(250);
     assert.equal(await evaluate(client, `window.__gpuQA.submissions`), settled.submissions, 'settled spring must stop submitting frames');
+
+    const beforeMidMainPath = await evaluate(client, `window.__gpuQA.submissions`);
+    await evaluate(client, `(() => { const main = document.querySelector('main'); window.scrollTo({ top: main.offsetTop + (main.offsetHeight - window.innerHeight) * 0.5, behavior: 'instant' }); })()`);
+    await waitFor(() => evaluate(client, `window.__gpuQA.submissions > ${beforeMidMainPath} && document.querySelector('.geometry-stage').dataset.spring === 'settled'`), 'continuous path reaches its sole left apex at mid-main');
+    const midMainPath = await evaluate(client, `(() => { const values = window.__gpuQA.uniforms.at(-1); return { side: values[5], transition: values[6] }; })()`);
+    assert.ok(Math.abs(midMainPath.side + 1) < 0.0001 && midMainPath.transition < 0.001, `mid-main is the single stable left apex: ${JSON.stringify(midMainPath)}`);
+
+    const beforeBottomMainPath = await evaluate(client, `window.__gpuQA.submissions`);
+    await evaluate(client, `(() => { const main = document.querySelector('main'); window.scrollTo({ top: main.offsetTop + main.offsetHeight - window.innerHeight, behavior: 'instant' }); })()`);
+    await waitFor(() => evaluate(client, `window.__gpuQA.submissions > ${beforeBottomMainPath} && document.querySelector('.geometry-stage').dataset.spring === 'settled'`), 'continuous path returns to its right apex at main bottom');
+    const bottomMainPath = await evaluate(client, `(() => { const values = window.__gpuQA.uniforms.at(-1); return { side: values[5], transition: values[6] }; })()`);
+    assert.ok(Math.abs(bottomMainPath.side - 1) < 0.0001 && bottomMainPath.transition < 0.001, `main bottom returns to the stable right apex without another cycle: ${JSON.stringify(bottomMainPath)}`);
 
     const beforeBackForwardCache = await evaluate(client, `({ submissions: window.__gpuQA.submissions, adapters: window.__gpuQA.adapterRequests })`);
     await evaluate(client, `(() => {
@@ -614,8 +651,30 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     const continuationState = await evaluate(client, `({ states: document.querySelectorAll('[data-geometry-state]').length, continuations: document.querySelectorAll('.geometry-continuation').length, backgrounds: [...document.querySelectorAll('.geometry-continuation')].map((section) => getComputedStyle(section).backgroundImage) })`);
     assert.deepEqual({ states: continuationState.states, continuations: continuationState.continuations }, { states: 6, continuations: 3 });
     assert.ok(continuationState.backgrounds.every((background) => background.includes('linear-gradient')), 'desktop continuation sections retain translucent right-side geometry lanes');
+
+    const fallbackProbe = await evaluate(client, `(() => {
+      const main = document.querySelector('main');
+      const sections = [...document.querySelectorAll('[data-geometry-state]')];
+      const centers = sections.map((section) => section.offsetTop + section.offsetHeight * 0.5);
+      const span = Math.max(1, main.offsetHeight - window.innerHeight);
+      const progress = 0.5;
+      const top = main.offsetTop + span * progress;
+      const anchor = top + window.innerHeight * 0.68;
+      let index = centers.findIndex((center) => center > anchor);
+      if (index < 0) index = centers.length;
+      const nextIndex = Math.min(Math.max(index, 1), sections.length - 1);
+      const currentIndex = Math.max(0, nextIndex - 1);
+      const sectionSpan = Math.max(1, centers[nextIndex] - centers[currentIndex]);
+      const sectionProgress = currentIndex === nextIndex ? 0 : Math.min(1, Math.max(0, (anchor - centers[currentIndex]) / sectionSpan));
+      const authored = sections[sectionProgress < 0.5 ? currentIndex : nextIndex];
+      return { top, authoredSide: authored.dataset.geometrySide === 'left' ? 'left' : 'right', authoredState: authored.dataset.geometryState, enhancedSide: Math.cos(Math.PI * 2 * progress) < 0 ? 'left' : 'right' };
+    })()`);
+    assert.deepEqual({ authoredSide: fallbackProbe.authoredSide, enhancedSide: fallbackProbe.enhancedSide }, { authoredSide: 'right', enhancedSide: 'left' }, 'exact mid-main derives an authored-right fallback while the continuous enhanced path reaches its left apex');
+    const beforeFallbackProbe = await evaluate(client, `window.__gpuQA.submissions`);
+    await evaluate(client, `window.scrollTo({ top: ${fallbackProbe.top}, behavior: 'instant' })`);
+    await waitFor(() => evaluate(client, `window.__gpuQA.submissions > ${beforeFallbackProbe} && document.querySelector('.geometry-stage').dataset.spring === 'settled' && document.querySelector('.geometry-stage').dataset.side === '${fallbackProbe.enhancedSide}'`), 'enhanced renderer reaches the deliberately divergent continuous side');
     await evaluate(client, `window.__gpuQA.lose()`);
-    await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && !document.querySelector('#motionToggle').hidden && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'true'`), 'device-loss static fallback');
+    await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && !document.querySelector('#motionToggle').hidden && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'true' && document.querySelector('.geometry-stage').dataset.side === '${fallbackProbe.authoredSide}' && document.querySelector('.geometry-stage').dataset.side !== '${fallbackProbe.enhancedSide}' && document.querySelector('.geometry-stage').dataset.state === '${fallbackProbe.authoredState}'`), 'device-loss restores exact authored static state and rejects the pre-loss enhanced side');
     assert.deepEqual(await evaluate(client, `({ opacity: document.querySelector('#geometryCanvas').style.opacity, transition: document.querySelector('#geometryCanvas').style.transition })`), { opacity: '', transition: '' }, 'device-loss fallback clears every back-forward cache visibility override');
     await evaluate(client, `window.__gpuQA.nullAdapter = true; document.querySelector('#motionToggle').click(); document.querySelector('#motionToggle').click()`);
     await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && !document.querySelector('#motionToggle').hidden && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'true' && window.__gpuQA.adapterRequests >= 3`), 'null-adapter static fallback keeps its motion control');

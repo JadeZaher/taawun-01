@@ -126,6 +126,7 @@
 
   const stop = ({ motionActive = motionControlEligible() && !userPaused() } = {}) => {
     clearCanvasRecovery();
+    updateStaticScene();
     renderer?.destroy();
     renderer = null;
     stage.removeAttribute('data-enhanced');

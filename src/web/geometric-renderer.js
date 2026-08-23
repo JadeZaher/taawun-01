@@ -135,6 +135,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
   const uniformBuffer = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const bindGroup = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: uniformBuffer } }] });
   const sections = [...document.querySelectorAll('[data-geometry-state]')];
+  const landingMain = document.querySelector('main');
   let alive = true;
   let paused = false;
   let frame = 0;
@@ -179,12 +180,14 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     if (delayedFrame) window.clearTimeout(delayedFrame);
     frame = 0;
     delayedFrame = 0;
-    stage.removeAttribute('data-enhanced');
     stage.removeAttribute('data-spring');
     delete canvas.dataset.renderer;
     try { uniformBuffer.destroy(); } catch { /* Already unavailable. */ }
     try { device.destroy(); } catch { /* Device loss is already the fallback. */ }
-    if (notify) queueMicrotask(onFailure);
+    if (notify) queueMicrotask(() => {
+      try { onFailure(); } finally { stage.removeAttribute('data-enhanced'); }
+    });
+    else stage.removeAttribute('data-enhanced');
   };
 
   const resize = () => {
@@ -260,7 +263,8 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       const motionAmount = moving ? Math.min(1, Math.max(springMotionAmount, scrollActivity * SCROLL_ACTIVITY_STRENGTH)) : 0;
       const settledMix = 1 - motionAmount;
       const scroll = Math.min(1, Math.max(0, springScroll));
-      const anchor = scroll * maxScroll + window.innerHeight * 0.68;
+      const scrollTop = scroll * maxScroll;
+      const anchor = scrollTop + window.innerHeight * 0.68;
       const centers = sections.map((section) => section.offsetTop + section.offsetHeight * 0.5);
       let nextIndex = centers.findIndex((center) => center > anchor);
       if (nextIndex < 0) nextIndex = centers.length;
@@ -274,18 +278,18 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       const next = sections[nextIndex] || current;
       const currentState = Number(current?.dataset.geometryState || 0);
       const nextState = Number(next?.dataset.geometryState || currentState);
-      const currentSide = current?.dataset.geometrySide === 'left' ? -1 : 1;
-      const nextSide = next?.dataset.geometrySide === 'left' ? -1 : 1;
       const section = currentState + (nextState - currentState) * progress;
-      const sideChanges = currentSide !== nextSide;
-      const sideProgress = progress * progress * progress * (progress * (progress * 6 - 15) + 10);
-      const side = sideChanges ? currentSide + (nextSide - currentSide) * sideProgress : currentSide;
-      const transition = sideChanges ? Math.sin(Math.PI * earlyProgress) : 0;
+      const mainStart = landingMain?.offsetTop || 0;
+      const mainScrollSpan = Math.max(1, (landingMain?.offsetHeight || document.documentElement.scrollHeight) - window.innerHeight);
+      const mainProgress = Math.min(1, Math.max(0, (scrollTop - mainStart) / mainScrollSpan));
+      const lateralAngle = Math.PI * 2 * mainProgress;
+      const side = Math.cos(lateralAngle);
+      const transition = Math.abs(Math.sin(lateralAngle));
       const phase = internalPhase;
       const selected = progress < 0.5 ? current : next;
       stage.dataset.state = selected?.dataset.geometryState || String(Math.round(section));
-      stage.dataset.side = (progress < 0.5 ? currentSide : nextSide) < 0 ? 'left' : 'right';
-      if (sideChanges && transition > 0.24) stage.dataset.transition = 'true'; else stage.removeAttribute('data-transition');
+      stage.dataset.side = side < 0 ? 'left' : 'right';
+      if (moving && transition > 0.24) stage.dataset.transition = 'true'; else stage.removeAttribute('data-transition');
       device.queue.writeBuffer(uniformBuffer, 0, new Float32Array([canvas.width, canvas.height, scroll, phase, section, side, transition, settledMix]));
       const encoder = device.createCommandEncoder();
       const pass = encoder.beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }] });
@@ -299,8 +303,10 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       lastDraw = performance.now();
       const elapsed = performance.now() - started;
       if (elapsed > 50 || (elapsed > 20 && lastFrameCostExceeded)) { teardown({ notify: true }); return; }
-      if (elapsed > 20) { resolutionScale = 0.7; lastFrameCostExceeded = true; configuredWidth = 0; configuredHeight = 0; resize(); }
-      if (moving) requestDraw();
+      let replacementDrawRequired = false;
+      if (elapsed > 20) { resolutionScale = 0.7; lastFrameCostExceeded = true; configuredWidth = 0; configuredHeight = 0; resize(); replacementDrawRequired = true; }
+      else lastFrameCostExceeded = false;
+      if (moving || replacementDrawRequired) requestDraw();
     } catch {
       teardown({ notify: true });
     }

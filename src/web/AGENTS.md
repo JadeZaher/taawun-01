@@ -192,15 +192,16 @@ ratings, testimonials, organization facts, or availability that is absent from
 the visible page.
 
 The Islamic geometric scene is progressive decoration. It occupies one
-transparent full-viewport layer rather than a framed object. Six authored scene
-states group geometry right, right, left, left, right, right while readable
-content uses the inverse left, left, right, right, left, left sequence. Those two
-intentional sways avoid forcing the reader's eye across the screen at every
-section. Same-side section changes perform no lateral interpolation. Only the
-two authored side changes traverse the page, using an additional smootherstep
-inside the fixed-rate critically damped response so the crossings begin and end
-slowly instead of following wheel or swipe speed. The desktop resting offset is
-22vw, keeping those two traversals restrained. Renderer eligibility follows the
+transparent full-viewport layer rather than a framed object. Six authored
+content and static-fallback states place geometry right, right, left, left,
+right, right while readable content uses the inverse sequence. Enhanced WebGPU
+does not inherit those categorical section sides: normalized progress through
+the whole public `main` drives one cosine path from right, to one left apex at
+mid-main, and back right at the bottom. Its absolute-sine crossing envelope
+drives only the two corresponding shimmer/rotation passages. There are no
+same-side plateaus, section-boundary jumps, or additional lateral cycles, while
+the fixed-step critically damped scroll response keeps wheel and swipe speed
+from setting travel speed. Renderer eligibility follows the
 entire public `main` region rather than ending with the sixth marker. The three
 post-Templates sections add no geometry states: they retain state 5 on the right
 and use a left-weighted translucent background so cards and text stay readable
@@ -240,15 +241,15 @@ short fixed-step tail prevents the localized lens and caustic from freezing at a
 nonzero velocity when the scroll spring reaches its target. Its bounded envelope
 evolves the rosette scale, perpendicular mirror depth, and at most 0.0008 cell of
 rail
-separation even through same-side spans, so scroll progress never freezes the
+separation throughout the continuous main-page path, so scroll progress never freezes the
 decoration. Every nonzero scroll-position change also seeds one fixed-strength,
 fixed-decay internal envelope. This closes the sub-settlement first-scroll dead
-zone without linking amplitude to wheel speed, adding another lateral sway, or
+zone without linking amplitude to wheel speed, adding another lateral cycle, or
 keeping the GPU awake after the phase tail settles. The resting lattice
-orientation remains invariant across all six sections. Only while an authored
-side transition and physical settling overlap
+orientation remains invariant across all six sections. Only while the continuous
+path's crossing envelope and physical settling overlap
 does it add at most 0.018 radians of combined travel-only lattice rotation plus
-another 0.0012 cell of rail shimmer. At same-side strength the outer star
+another 0.0012 cell of rail shimmer. At internal-only strength the outer star
 contracts by at most 1.575% and the inner rosette expands by at most 2.025%; a
 side crossing may reach the existing 3.5% and 4.5% bounds. Nested scale, extra
 rail separation, and mirror depth return to their exact authored values on
@@ -262,7 +263,15 @@ coordinates and the actual aspect ratio. Alpha reaches zero just inside every
 physical edge even on square or portrait-capable desktop viewports, so the
 shifted lattice cannot reveal the exact canvas boundary. It renders a
 sharper final tessellation and stops scheduling frames once both displacement and
-velocity settle. The subtle navigation motion button uses `aria-pressed` and
+velocity settle. A draw over 50ms fails directly to the still design; two
+consecutive draws over 20ms also fail, while any intervening healthy draw clears
+the slow-frame strike. A nonfatal resolution reconfiguration schedules exactly
+one replacement draw even when the spring was already settled, so a newly
+configured canvas never remains blank and cannot start an idle redraw loop.
+Every renderer stop restores the current authored static state before exposing
+the fallback, preventing the continuous enhanced side from leaking into the
+categorical still layout. The subtle
+navigation motion button uses `aria-pressed` and
 keeps a reversible user preference. The progressively enhanced mobile menu
 remains readable without JavaScript, uses 44px controls, and restores focus when
 Escape closes it. Reduced motion, forced colors, increased contrast, reduced
