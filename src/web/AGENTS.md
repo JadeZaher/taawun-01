@@ -213,7 +213,9 @@ limited to 3.5% and occurs only for a real side change. Continuation sections us
 a stronger uniform reading surface on mobile, reduced-transparency, increased-
 contrast, and forced-color paths. The resting pattern
 is a disciplined repeated eight-point star and rosette tessellation with narrow
-polygonal straps. Shared rosette corners form an outlined octagonal connector
+polygonal straps. Its static fallback and WebGPU enhancement share a fully
+opaque 2.5 CSS px center core; the surrounding color and field stay muted so
+the line remains crisp without competing with content. Shared rosette corners form an outlined octagonal connector
 with an open center. Paired diagonal bridge rails enter at the real offset
 outer-arm intersection near lattice radius 0.406 and end on that octagon's
 boundary, making the connector part of the strap network without cutting through
@@ -298,5 +300,11 @@ and contains no decorative renderer.
 
 Canvas visibility changes immediately with the authoritative enhanced state; it
 does not use an opacity fade that a reload or browser history restoration can
-strand at its initial value. Decorative movement remains exclusively driven by
-the bounded scroll response and renderer settlement model.
+strand at its initial value. Decorative movement combines the bounded scroll
+response with one separately guarded, slowly eased local pointer/touch input.
+The CSS fallback masks a transformed copy of the same pattern around the input;
+WebGPU applies the same bounded falloff through its existing draw scheduler, so
+neither path transforms the whole field, intercepts touch scrolling, or creates
+another renderer loop. Touch release, pointer leave, blur, hidden-page,
+preference, pause, and pagehide paths clear the local state. Reduced motion keeps
+the crisp static tiling and suppresses all local movement.

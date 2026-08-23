@@ -1,5 +1,10 @@
 const shaderSource = `
-  struct Uniforms { viewportScroll: vec4f, stageMotion: vec4f }
+  struct Uniforms {
+    viewportScroll: vec4f,
+    stageMotion: vec4f,
+    interaction: vec4f,
+    renderMetrics: vec4f,
+  }
   @group(0) @binding(0) var<uniform> u: Uniforms;
 
   @vertex fn vertexMain(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
@@ -30,6 +35,11 @@ const shaderSource = `
     let aa = max(fwidth(distance) * softness, 0.0006);
     return 1.0 - smoothstep(width, width + aa, distance);
   }
+  fn crispCenterStroke(distance: f32, softness: f32) -> f32 {
+    let pixelFootprint = max(fwidth(distance), 0.0002);
+    let halfCore = pixelFootprint * max(u.renderMetrics.x, 1.0) * 1.25;
+    return 1.0 - smoothstep(halfCore, halfCore + pixelFootprint * softness, distance);
+  }
   fn lattice(point: vec2f, scale: f32, turn: f32, softness: f32, travel: f32) -> vec3f {
     let tiledPoint = rotate2(point, turn) * scale;
     let cell = fract(tiledPoint) - vec2f(0.5);
@@ -59,7 +69,12 @@ const shaderSource = `
     let strapB = stroke(diagonalB, 0.008, softness) * strapGate * (1.0 - crossing * overUnder);
     let primary = max(stroke(star, 0.009, softness), max(connector, max(bridgeRails, max(strapA, strapB))));
     let secondary = stroke(innerRosette, 0.004, softness);
-    return vec3f(primary, secondary, min(star, min(diagonalA, diagonalB)));
+    let connectorCore = crispCenterStroke(abs(junctionMetric - 0.145), softness);
+    let bridgeCore = crispCenterStroke(bridgePairDistance, softness) * bridgeStarGate * bridgeConnectorGate;
+    let strapACore = crispCenterStroke(diagonalA, softness) * strapGate * (1.0 - crossing * (1.0 - overUnder));
+    let strapBCore = crispCenterStroke(diagonalB, softness) * strapGate * (1.0 - crossing * overUnder);
+    let centerCore = max(crispCenterStroke(star, softness), max(connectorCore, max(bridgeCore, max(strapACore, max(strapBCore, crispCenterStroke(innerRosette, softness))))));
+    return vec3f(primary, secondary, centerCore);
   }
   @fragment fn fragmentMain(@builtin(position) position: vec4f) -> @location(0) vec4f {
     let resolution = max(u.viewportScroll.xy, vec2f(1.0));
@@ -77,7 +92,14 @@ const shaderSource = `
     let kaleidoscopeTravel = max(sceneTravel, internalPulse * 0.45);
     let stableTurn = 0.018;
     let turn = stableTurn + sceneTravel * 0.012;
-    let basePoint = rotate2(uv, sceneTravel * 0.006);
+    var interactionPoint = u.interaction.xy;
+    interactionPoint.x -= side * 0.34;
+    let interactionDelta = uv - interactionPoint;
+    let interactionDistance = length(interactionDelta);
+    let interactionWave = 0.82 + 0.18 * cos(interactionDistance * 20.0 - u.interaction.w);
+    let interactionEnvelope = (1.0 - smoothstep(0.035, 0.54, interactionDistance)) * u.interaction.z * interactionWave;
+    let localPoint = interactionPoint + rotate2(interactionDelta, interactionEnvelope * 0.035) * (1.0 + interactionEnvelope * 0.018);
+    let basePoint = rotate2(localPoint, sceneTravel * 0.006);
     let latticeScale = 3.45;
     let baseLayer = lattice(basePoint, latticeScale, turn, softness, kaleidoscopeTravel);
     let lensCenter = vec2f(side * 0.08 + 0.26 * sin(phase * 0.72 + transition), -0.18 + 0.12 * cos(phase * 0.54));
@@ -105,12 +127,15 @@ const shaderSource = `
     color += vec3f(0.16, 0.57, 0.45) * mirrorBand.y * (0.03 + lens * 0.14);
     color += vec3f(0.78, 0.24, 0.08) * refractionEdge * (0.05 + lens * 0.4);
     color += vec3f(0.95, 0.68, 0.24) * pow(max(0.0, 1.0 - lensDistance), 5.0) * 0.14;
+    color = mix(color, vec3f(0.38, 0.34, 0.24), baseLayer.z * 0.72);
     let field = clamp(baseLayer.x * 0.4 + baseLayer.y * 0.62 + (emeraldBand.x * 0.18 + rustBand.x * 0.16) * chromaticEnvelope + mirrorBand.y * (0.03 + lens * 0.09) + lens * 0.05 + refractionEdge * (0.04 + lens * 0.14), 0.0, 1.0);
     let edgeFade = 1.0 - smoothstep(0.16, 1.65, length(uv));
     let viewportHalfExtent = vec2f(resolution.x / resolution.y, 1.0);
     let viewportEdgeDistance = min(viewportHalfExtent.x - abs(canvasUV.x), viewportHalfExtent.y - abs(canvasUV.y));
     let viewportFeather = smoothstep(0.015, 0.10, viewportEdgeDistance);
-    let alpha = clamp(field * edgeFade * viewportFeather * (0.52 + transition * 0.22) * mix(0.82, 1.0, u.stageMotion.w), 0.0, 0.82);
+    let fieldAlpha = field * edgeFade * viewportFeather * (0.52 + transition * 0.22) * mix(0.82, 1.0, u.stageMotion.w) * 0.9;
+    let centerAlpha = baseLayer.z * edgeFade * viewportFeather;
+    let alpha = clamp(max(fieldAlpha, centerAlpha), 0.0, 1.0);
     return vec4f(color * alpha, alpha);
   }
 `;
@@ -132,7 +157,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     fragment: { module: shader, entryPoint: 'fragmentMain', targets: [{ format }] },
     primitive: { topology: 'triangle-list' },
   });
-  const uniformBuffer = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const uniformBuffer = device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const bindGroup = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: uniformBuffer } }] });
   const sections = [...document.querySelectorAll('[data-geometry-state]')];
   const landingMain = document.querySelector('main');
@@ -171,6 +196,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
   let internalPhase = 0;
   let internalPhaseVelocity = 0;
   let scrollActivity = 0;
+  const interaction = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5, strength: 0, phase: 0 };
 
   const teardown = ({ notify = false } = {}) => {
     if (!alive) return;
@@ -290,7 +316,16 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       stage.dataset.state = selected?.dataset.geometryState || String(Math.round(section));
       stage.dataset.side = side < 0 ? 'left' : 'right';
       if (moving && transition > 0.24) stage.dataset.transition = 'true'; else stage.removeAttribute('data-transition');
-      device.queue.writeBuffer(uniformBuffer, 0, new Float32Array([canvas.width, canvas.height, scroll, phase, section, side, transition, settledMix]));
+      const canvasRect = canvas.getBoundingClientRect();
+      const interactionX = ((interaction.x - canvasRect.left) * 2 - canvasRect.width) / Math.max(1, canvasRect.height);
+      const interactionY = ((interaction.y - canvasRect.top) * 2 - canvasRect.height) / Math.max(1, canvasRect.height);
+      const cssPixelRatio = canvas.height / Math.max(1, canvasRect.height);
+      device.queue.writeBuffer(uniformBuffer, 0, new Float32Array([
+        canvas.width, canvas.height, scroll, phase,
+        section, side, transition, settledMix,
+        interactionX, interactionY, interaction.strength, interaction.phase,
+        cssPixelRatio, 0, 0, 0,
+      ]));
       const encoder = device.createCommandEncoder();
       const pass = encoder.beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }] });
       pass.setPipeline(pipeline);
@@ -341,6 +376,13 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     pause() { paused = true; if (frame) cancelAnimationFrame(frame); if (delayedFrame) window.clearTimeout(delayedFrame); frame = 0; delayedFrame = 0; lastPhysicsTime = 0; },
     resume() { paused = false; requestDraw(); },
     resize() { targetScroll = readScrollTarget(); settling = Math.abs(targetScroll - springScroll) > SETTLE_DISTANCE; lastPhysicsTime = 0; resize(); requestDraw(); },
+    setInteraction(next = {}) {
+      interaction.x = Number.isFinite(next.x) ? next.x : interaction.x;
+      interaction.y = Number.isFinite(next.y) ? next.y : interaction.y;
+      interaction.strength = Math.min(1, Math.max(0, Number(next.strength) || 0));
+      interaction.phase = Number(next.phase) || 0;
+      requestDraw();
+    },
     destroy() { teardown(); },
   };
   } catch {

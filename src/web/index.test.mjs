@@ -320,11 +320,11 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   const scrollHandler = renderer.match(/const onScroll = \(\) => \{[\s\S]*?\n  \};/u)?.[0] || '';
 
   assert.match(html, /class="geometry-stage"[^>]*aria-hidden="true"/u);
-  assert.match(html, /\.geometry-stage \{ position: fixed; inset: 0;[^}]*background: transparent;/u);
+  assert.match(html, /\.geometry-stage \{\s*position: fixed; inset: 0;[^}]*background: transparent;/u);
   const geometryCanvasRule = html.match(/#geometryCanvas \{[^}]+\}/u)?.[0] || '';
   assert.match(geometryCanvasRule, /opacity: 0;/u);
   assert.doesNotMatch(geometryCanvasRule, /transition:/u, 'enhanced canvas visibility must not depend on an initial opacity transition');
-  assert.match(html, /\.geometry-stage\[data-enhanced="true"\] #geometryCanvas \{ opacity: 0\.9; \}/u);
+  assert.match(html, /\.geometry-stage\[data-enhanced="true"\] #geometryCanvas \{ opacity: 1; \}/u);
   assert.match(html, /id="motionToggle"[^>]*type="button"[^>]*aria-pressed="true"/u);
   assert.match(html, /id="motionToggle"[^>]*aria-label="Decorative motion"/u);
   assert.match(html, /id="menuToggle"[^>]*aria-expanded="false"[^>]*aria-controls="primaryNavigation"/u);
@@ -401,7 +401,9 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(renderer, /let stableTurn = 0\.018/u);
   assert.doesNotMatch(renderer, /stableTurn\s*=\s*[^;]*section/u);
   assert.match(renderer, /let turn = stableTurn \+ sceneTravel \* 0\.012/u);
-  assert.match(renderer, /let basePoint = rotate2\(uv, sceneTravel \* 0\.006\)/u);
+  assert.match(renderer, /let interactionEnvelope = \(1\.0 - smoothstep\(0\.035, 0\.54, interactionDistance\)\) \* u\.interaction\.z \* interactionWave/u);
+  assert.match(renderer, /let localPoint = interactionPoint \+ rotate2\(interactionDelta, interactionEnvelope \* 0\.035\) \* \(1\.0 \+ interactionEnvelope \* 0\.018\)/u);
+  assert.match(renderer, /let basePoint = rotate2\(localPoint, sceneTravel \* 0\.006\)/u);
   assert.match(renderer, /uv\.x -= side \* 0\.34/u);
   assert.match(renderer, /let bandCellOffset = 0\.010 \+ lens \* 0\.010 \+ internalPulse \* 0\.0008 \+ sceneTravel \* 0\.0012/u);
   assert.doesNotMatch(renderer, /scroll \* 0\.045|scroll \* 0\.025/u);
@@ -534,11 +536,11 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     })();` });
     await client.send('Page.navigate', { url: origin });
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage')?.dataset.enhanced === 'true' && !document.querySelector('#motionToggle').hidden`), 'mocked WebGPU enhancement');
-    const initial = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, submissions: window.__gpuQA.submissions, renderer: document.querySelector('#geometryCanvas').dataset.renderer || '', canvasOpacity: getComputedStyle(document.querySelector('#geometryCanvas')).opacity, canvasTransitionDuration: getComputedStyle(document.querySelector('#geometryCanvas')).transitionDuration, controlHeight: Math.round(document.querySelector('#motionToggle').getBoundingClientRect().height), state: document.querySelector('.geometry-stage').dataset.state, side: document.querySelector('.geometry-stage').dataset.side, connector: window.__gpuQA.shaderSource.includes('junctionInterior') && window.__gpuQA.shaderSource.includes('overUnder'), connectedOctagon: window.__gpuQA.shaderSource.includes('bridgePairDistance') && window.__gpuQA.shaderSource.includes('bridgeConnectorGate'), stableCrossing: window.__gpuQA.shaderSource.includes('verticalCrossingID') && window.__gpuQA.shaderSource.includes('horizontalCrossingID'), adjacentBands: window.__gpuQA.shaderSource.includes('bandCellOffset / latticeScale') && window.__gpuQA.shaderSource.includes('basePoint + bandOffset') && window.__gpuQA.shaderSource.includes('basePoint - bandOffset'), nestedTravel: window.__gpuQA.shaderSource.includes('outerStarScale') && window.__gpuQA.shaderSource.includes('innerRosetteScale') && window.__gpuQA.shaderSource.includes('travel: f32'), internalMotion: window.__gpuQA.shaderSource.includes('internalPulse') && window.__gpuQA.shaderSource.includes('kaleidoscopeTravel') })`);
+    const initial = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, submissions: window.__gpuQA.submissions, renderer: document.querySelector('#geometryCanvas').dataset.renderer || '', canvasOpacity: getComputedStyle(document.querySelector('#geometryCanvas')).opacity, canvasTransitionDuration: getComputedStyle(document.querySelector('#geometryCanvas')).transitionDuration, controlHeight: Math.round(document.querySelector('#motionToggle').getBoundingClientRect().height), state: document.querySelector('.geometry-stage').dataset.state, side: document.querySelector('.geometry-stage').dataset.side, connector: window.__gpuQA.shaderSource.includes('junctionInterior') && window.__gpuQA.shaderSource.includes('overUnder'), connectedOctagon: window.__gpuQA.shaderSource.includes('bridgePairDistance') && window.__gpuQA.shaderSource.includes('bridgeConnectorGate'), stableCrossing: window.__gpuQA.shaderSource.includes('verticalCrossingID') && window.__gpuQA.shaderSource.includes('horizontalCrossingID'), adjacentBands: window.__gpuQA.shaderSource.includes('bandCellOffset / latticeScale') && window.__gpuQA.shaderSource.includes('basePoint + bandOffset') && window.__gpuQA.shaderSource.includes('basePoint - bandOffset'), nestedTravel: window.__gpuQA.shaderSource.includes('outerStarScale') && window.__gpuQA.shaderSource.includes('innerRosetteScale') && window.__gpuQA.shaderSource.includes('travel: f32'), internalMotion: window.__gpuQA.shaderSource.includes('internalPulse') && window.__gpuQA.shaderSource.includes('kaleidoscopeTravel'), crispCore: window.__gpuQA.shaderSource.includes('crispCenterStroke') && window.__gpuQA.shaderSource.includes('halfCore'), localInteraction: window.__gpuQA.shaderSource.includes('interactionEnvelope') && window.__gpuQA.shaderSource.includes('localPoint') })`);
     assert.equal(initial.requests, 1);
     assert.ok(initial.submissions >= 1);
     assert.equal(initial.renderer, 'webgpu');
-    assert.equal(initial.canvasOpacity, '0.9', 'fresh enhancement makes the canvas visible immediately');
+    assert.equal(initial.canvasOpacity, '1', 'fresh enhancement makes the solid center core visible without attenuating the surrounding field');
     assert.equal(initial.canvasTransitionDuration, '0s', 'fresh visibility does not depend on transition timing');
     assert.ok(initial.controlHeight >= 44);
     assert.equal(initial.state, '0');
@@ -549,6 +551,31 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     assert.equal(initial.adjacentBands, true);
     assert.equal(initial.nestedTravel, true);
     assert.equal(initial.internalMotion, true);
+    assert.equal(initial.crispCore, true);
+    assert.equal(initial.localInteraction, true);
+
+    const beforePointerInteraction = await evaluate(client, `({ submissions: window.__gpuQA.submissions, baseline: window.__gpuQA.uniforms.at(-1).slice(0, 8) })`);
+    await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 300, y: 240 });
+    await waitFor(() => evaluate(client, `window.__gpuQA.uniforms.at(-1)?.[10] > 0.12`), 'WebGPU receives gently eased local pointer strength');
+    const pointerInteraction = await evaluate(client, `(() => { const values = window.__gpuQA.uniforms.at(-1); const stage = document.querySelector('.geometry-stage'); return { length: values.length, x: values[8], y: values[9], strength: values[10], phase: values[11], path: values.slice(0, 8), state: stage.dataset.state, side: stage.dataset.side, interaction: stage.dataset.interaction, localOpacity: getComputedStyle(document.querySelector('.geometry-interaction')).opacity, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth }; })()`);
+    assert.equal(pointerInteraction.length, 16, 'the expanded uniform keeps the original scroll fields and one bounded interaction payload');
+    assert.ok(Math.abs(pointerInteraction.x - (-2 / 3)) < 0.01 && Math.abs(pointerInteraction.y - (-7 / 15)) < 0.01, `shader interaction is local to the pointer: ${pointerInteraction.x},${pointerInteraction.y}`);
+    assert.ok(pointerInteraction.strength > 0.12 && pointerInteraction.strength < 1 && pointerInteraction.phase > 0, 'pointer response eases instead of flashing to its final transform');
+    assert.deepEqual({ path: pointerInteraction.path, state: pointerInteraction.state, side: pointerInteraction.side, localOpacity: pointerInteraction.localOpacity, overflow: pointerInteraction.overflow }, {
+      path: beforePointerInteraction.baseline, state: '0', side: 'right', localOpacity: '0', overflow: false,
+    }, 'local WebGPU interaction does not alter the authoritative scroll path, expose the fallback copy, or create overflow');
+    await evaluate(client, `window.dispatchEvent(new Event('blur'))`);
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.interaction === 'idle' && window.__gpuQA.uniforms.at(-1)?.[10] === 0`), 'active enhanced blur clears the local renderer input');
+    const afterEnhancedBlur = await evaluate(client, `window.__gpuQA.submissions`);
+    await wait(120);
+    assert.equal(await evaluate(client, `window.__gpuQA.submissions`), afterEnhancedBlur, 'enhanced blur cleanup leaves no surviving interaction draw loop');
+    await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 300, y: 240 });
+    await waitFor(() => evaluate(client, `window.__gpuQA.uniforms.at(-1)?.[10] > 0.12`), 'enhanced pointer interaction reactivates after blur cleanup');
+    await evaluate(client, `window.dispatchEvent(new PointerEvent('pointerout', { pointerType: 'mouse', isPrimary: true, relatedTarget: null }))`);
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.interaction === 'idle' && window.__gpuQA.uniforms.at(-1)?.[10] === 0`), 'WebGPU pointer leave fades and renders the exact resting state');
+    const afterPointerSettlement = await evaluate(client, `window.__gpuQA.submissions`);
+    await wait(120);
+    assert.equal(await evaluate(client, `window.__gpuQA.submissions`), afterPointerSettlement, 'settled local interaction leaves no surviving draw loop');
 
     await evaluate(client, `document.querySelector('#motionToggle').click()`);
     await waitFor(() => evaluate(client, `!document.querySelector('.geometry-stage').hasAttribute('data-enhanced') && !document.querySelector('#motionToggle').hidden && document.querySelector('#motionToggle').getAttribute('aria-pressed') === 'false'`), 'reversible user pause');
@@ -563,7 +590,7 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     await waitFor(() => evaluate(client, `window.__gpuQA.submissions >= ${beforeSettledSlowFrame + 2}`), 'nonfatal settled-frame downgrade receives one replacement submission');
     await wait(120);
     assert.equal(await evaluate(client, `window.__gpuQA.submissions`), beforeSettledSlowFrame + 2, 'a settled downgrade schedules exactly one replacement draw and no loop');
-    assert.deepEqual(await evaluate(client, `({ enhanced: document.querySelector('.geometry-stage').dataset.enhanced, renderer: document.querySelector('#geometryCanvas').dataset.renderer, opacity: getComputedStyle(document.querySelector('#geometryCanvas')).opacity, queuedCosts: window.__gpuQA.submitCosts.length })`), { enhanced: 'true', renderer: 'webgpu', opacity: '0.9', queuedCosts: 0 }, 'replacement draw keeps a settled enhanced canvas visible after reconfiguration');
+    assert.deepEqual(await evaluate(client, `({ enhanced: document.querySelector('.geometry-stage').dataset.enhanced, renderer: document.querySelector('#geometryCanvas').dataset.renderer, opacity: getComputedStyle(document.querySelector('#geometryCanvas')).opacity, queuedCosts: window.__gpuQA.submitCosts.length })`), { enhanced: 'true', renderer: 'webgpu', opacity: '1', queuedCosts: 0 }, 'replacement draw keeps a settled enhanced canvas visible after reconfiguration');
 
     const beforeIsolatedSlowFrames = await evaluate(client, `window.__gpuQA.submissions`);
     await evaluate(client, `(() => { window.__gpuQA.submitCosts.push(24, 0, 24, 0); window.scrollTo({ top: 4, behavior: 'instant' }); })()`);
@@ -625,7 +652,10 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     const bottomMainPath = await evaluate(client, `(() => { const values = window.__gpuQA.uniforms.at(-1); return { side: values[5], transition: values[6] }; })()`);
     assert.ok(Math.abs(bottomMainPath.side - 1) < 0.0001 && bottomMainPath.transition < 0.001, `main bottom returns to the stable right apex without another cycle: ${JSON.stringify(bottomMainPath)}`);
 
-    const beforeBackForwardCache = await evaluate(client, `({ submissions: window.__gpuQA.submissions, adapters: window.__gpuQA.adapterRequests })`);
+    await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 680, y: 420 });
+    await waitFor(() => evaluate(client, `window.__gpuQA.uniforms.at(-1)?.[10] > 0.12`), 'active enhanced interaction before back-forward-cache suspension');
+    const beforeBackForwardCache = await evaluate(client, `({ submissions: window.__gpuQA.submissions, adapters: window.__gpuQA.adapterRequests, interaction: window.__gpuQA.uniforms.at(-1)[10] })`);
+    assert.ok(beforeBackForwardCache.interaction > 0.12, 'back-forward-cache cleanup starts from a nonzero local renderer input');
     await evaluate(client, `(() => {
       const hidden = new Event('pagehide');
       Object.defineProperty(hidden, 'persisted', { value: true });
@@ -640,10 +670,12 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     await evaluate(client, `(() => { const shown = new Event('pageshow'); Object.defineProperty(shown, 'persisted', { value: true }); window.dispatchEvent(shown); })()`);
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.spring === 'settled'
       && document.querySelector('.geometry-stage').dataset.enhanced === 'true'
-      && getComputedStyle(document.querySelector('#geometryCanvas')).opacity === '0.9'
+      && getComputedStyle(document.querySelector('#geometryCanvas')).opacity === '1'
+      && document.querySelector('.geometry-stage').dataset.interaction === 'idle'
+      && window.__gpuQA.uniforms.at(-1)?.[10] === 0
       && window.__gpuQA.submissions > ${beforeBackForwardCache.submissions + 2}`), 'back-forward cache pageshow restores visible canvas and settles the retained renderer');
     assert.equal(await evaluate(client, `window.__gpuQA.adapterRequests`), beforeBackForwardCache.adapters, 'back-forward cache recovery reuses one renderer without duplicate initialization');
-    assert.deepEqual(await evaluate(client, `({ opacity: document.querySelector('#geometryCanvas').style.opacity, transition: document.querySelector('#geometryCanvas').style.transition })`), { opacity: '0.9', transition: '' }, 'back-forward cache visibility recovery retains authoritative enhanced opacity while returning transition ownership to CSS');
+    assert.deepEqual(await evaluate(client, `({ opacity: document.querySelector('#geometryCanvas').style.opacity, transition: document.querySelector('#geometryCanvas').style.transition })`), { opacity: '1', transition: '' }, 'back-forward cache visibility recovery retains authoritative enhanced opacity while returning transition ownership to CSS');
 
     const beforeContinuationScroll = settled.submissions;
     await evaluate(client, `document.querySelector('.geometry-continuation:last-of-type').scrollIntoView({ block: 'center', behavior: 'instant' })`);
@@ -683,9 +715,12 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     await client.send('Page.navigate', { url: origin });
     await waitFor(() => evaluate(client, `document.readyState === 'complete'`), 'reduced-motion landing');
     await wait(200);
-    const reduced = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, canvasDisplay: getComputedStyle(document.querySelector('#geometryCanvas')).display, controlHidden: document.querySelector('#motionToggle').hidden })`);
+    const reduced = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, canvasDisplay: getComputedStyle(document.querySelector('#geometryCanvas')).display, interactionDisplay: getComputedStyle(document.querySelector('.geometry-interaction')).display, interactionState: document.querySelector('.geometry-stage').dataset.interaction, interactionStrength: Number(getComputedStyle(document.querySelector('.geometry-stage')).getPropertyValue('--geometry-interaction-strength')), controlHidden: document.querySelector('#motionToggle').hidden })`);
     assert.equal(reduced.requests, 0, 'reduced motion must not request a GPU adapter');
     assert.equal(reduced.canvasDisplay, 'none');
+    assert.equal(reduced.interactionDisplay, 'none');
+    assert.equal(reduced.interactionState, 'idle');
+    assert.equal(reduced.interactionStrength, 0);
     assert.equal(reduced.controlHidden, true);
 
     await client.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }, { name: 'forced-colors', value: 'active' }] });
@@ -820,6 +855,208 @@ test('bounded UI safety mutations stay self/workspace scoped and version guarded
   assert.match(html, /details summary \{ min-height: 44px; min-width: 44px;/u);
 });
 
+test('public Islamic geometry keeps one crisp pattern and one bounded local interaction loop', async () => {
+  const html = await readFile(new URL('./landing.html', import.meta.url), 'utf8');
+  const loader = await readFile(new URL('./geometric-landing.js', import.meta.url), 'utf8');
+  const renderer = await readFile(new URL('./geometric-renderer.js', import.meta.url), 'utf8');
+  const css = html.match(/<style>([\s\S]*?)<\/style>/u)?.[1] || '';
+
+  assert.equal((css.match(/--geometry-pattern:/gu) || []).length, 1, 'static and local geometry reuse one pattern definition');
+  assert.match(css, /--geometry-center-stroke:\s*rgb\(242, 234, 216\)/u, 'the gradient center uses an opaque theme stroke');
+  assert.match(css, /--geometry-center-half:\s*1\.25px/u, 'the crisp center stroke is exactly 2.5 CSS px wide');
+  assert.match(css, /\.geometry-static, \.geometry-interaction::before[^}]*background-image:\s*var\(--geometry-pattern\)/u, 'both decorative layers share the pattern');
+  assert.match(css, /\.geometry-interaction \{[^}]*pointer-events:\s*none[^}]*mask-image:\s*radial-gradient\(circle var\(--geometry-interaction-radius\) at var\(--geometry-interaction-x\) var\(--geometry-interaction-y\)/u, 'motion is clipped locally and cannot intercept content');
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.geometry-interaction \{ display: none; \}/u, 'reduced motion keeps only the crisp static geometry');
+  assert.match(loader, /let interactionFrame = 0/u);
+  assert.match(loader, /if \(interactionFrame \|\| !interactionAllowed\(\)\) return;/u, 'multiple events share one guarded interaction frame');
+  assert.doesNotMatch(loader.match(/const interaction = \{[\s\S]*?window\.addEventListener\('blur', resetInteraction\);/u)?.[0] || '', /setTimeout|setInterval/u, 'the interaction lifecycle does not accumulate timers');
+  for (const event of ['pointermove', 'pointerdown', 'pointerup', 'pointercancel', 'pointerout', 'blur', 'pagehide', 'visibilitychange']) {
+    assert.match(loader, new RegExp(`addEventListener\\('${event}'`, 'u'), `${event} participates in bounded interaction cleanup`);
+  }
+  assert.match(loader, /\{ passive: true \}/u, 'pointer input remains passive for touch scrolling');
+  assert.doesNotMatch(loader, /preventDefault\(\)/u);
+  assert.match(renderer, /fn crispCenterStroke[\s\S]*?max\(u\.renderMetrics\.x, 1\.0\) \* 1\.25/u, 'WebGPU keeps the same 2.5 CSS px solid center core');
+  assert.match(renderer, /interactionEnvelope = \(1\.0 - smoothstep\(0\.035, 0\.54, interactionDistance\)\)/u, 'WebGPU deformation falls off around the exact interaction point');
+  assert.match(renderer, /createBuffer\(\{ size: 64/u);
+  assert.match(renderer, /setInteraction\(next = \{\}\)/u, 'interaction updates share the renderer draw scheduler');
+});
+
+test('public Islamic geometry eases locally for pointer and touch without scroll interception', { timeout: 30_000 }, async () => {
+  const browser = await installedChromium();
+  assert.ok(browser, 'Chromium is required; decorative pointer and touch behavior cannot be accepted statically');
+
+  const landingHTML = await readFile(new URL('./landing.html', import.meta.url), 'utf8');
+  const landingScript = await readFile(new URL('./geometric-landing.js', import.meta.url), 'utf8');
+  const server = createServer((request, response) => {
+    const requestPath = new URL(request.url, 'http://localhost').pathname;
+    if (request.method === 'GET' && requestPath === '/') {
+      response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      response.end(landingHTML);
+      return;
+    }
+    if (request.method === 'GET' && requestPath === '/geometric-landing.js') {
+      response.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
+      response.end(landingScript);
+      return;
+    }
+    response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    response.end('Not found.');
+  });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const tempDirectory = await mkdtemp(path.join(tmpdir(), 'taawun-tiling-browser-'));
+  let chromium;
+  try {
+    chromium = await launchChromium(browser, path.join(tempDirectory, 'profile'));
+    const { client } = chromium;
+    await client.send('Page.enable');
+    await client.send('Runtime.enable');
+    await client.send('Emulation.setDeviceMetricsOverride', {
+      width: 800,
+      height: 500,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await client.send('Page.navigate', { url: origin });
+    await waitFor(() => evaluate(client, `document.readyState === 'complete' && document.querySelector('.geometry-stage')?.dataset.interaction === 'idle'`), 'static decorative tiling');
+
+    const staticTiling = await evaluate(client, `(() => {
+      const stage = document.querySelector('.geometry-stage');
+      const before = getComputedStyle(document.querySelector('.geometry-static'));
+      const after = getComputedStyle(document.querySelector('.geometry-interaction'), '::before');
+      const local = getComputedStyle(document.querySelector('.geometry-interaction'));
+      return {
+        beforeImage: before.backgroundImage,
+        afterImage: after.backgroundImage,
+        beforeOpacity: Number(before.opacity),
+        localOpacity: Number(local.opacity),
+        afterMask: local.maskImage || local.webkitMaskImage,
+        position: getComputedStyle(stage).position,
+        pointerEvents: local.pointerEvents,
+        stroke: getComputedStyle(stage).getPropertyValue('--geometry-center-stroke').trim(),
+        halfStroke: getComputedStyle(stage).getPropertyValue('--geometry-center-half').trim(),
+        overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      };
+    })()`);
+    assert.equal(staticTiling.beforeImage, staticTiling.afterImage, 'static and local layers render the same tessellation');
+    assert.ok(staticTiling.beforeImage.includes('linear-gradient'), 'the crisp static tessellation remains rendered');
+    assert.equal(staticTiling.beforeOpacity, 1, 'the 2.5px center core remains fully opaque while muted colors carry the surrounding field');
+    assert.equal(staticTiling.localOpacity, 0, 'the local layer starts settled');
+    assert.match(staticTiling.afterMask, /radial-gradient/iu, 'the interactive copy is locally masked');
+    assert.deepEqual({ position: staticTiling.position, pointerEvents: staticTiling.pointerEvents, stroke: staticTiling.stroke, halfStroke: staticTiling.halfStroke, overflow: staticTiling.overflow }, {
+      position: 'fixed', pointerEvents: 'none', stroke: 'rgb(242, 234, 216)', halfStroke: '1.25px', overflow: false,
+    });
+
+    await evaluate(client, `window.scrollTo({ top: 80, behavior: 'instant' })`);
+    await waitFor(() => evaluate(client, `Math.round(window.scrollY) === 80`), 'settled scrollable tiling fixture');
+    const pointerBaseline = await evaluate(client, `(() => { const hit = document.elementFromPoint(180, 170); return { scrollY: window.scrollY, hit: [hit?.tagName, hit?.id, hit?.className].join('|') }; })()`);
+    await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 180, y: 170 });
+    const earlyStrength = await evaluate(client, `new Promise((resolve) => requestAnimationFrame(() => resolve(Number(getComputedStyle(document.querySelector('.geometry-stage')).getPropertyValue('--geometry-interaction-strength')))))`);
+    await waitFor(() => evaluate(client, `Number(getComputedStyle(document.querySelector('.geometry-stage')).getPropertyValue('--geometry-interaction-strength')) > ${Math.max(0.12, earlyStrength + 0.05)}`), 'gently eased pointer tessellation');
+    const pointerTiling = await evaluate(client, `(() => {
+      const root = document.documentElement;
+      const stage = document.querySelector('.geometry-stage');
+      const before = getComputedStyle(document.querySelector('.geometry-static'));
+      const localElement = document.querySelector('.geometry-interaction');
+      const after = getComputedStyle(localElement, '::before');
+      const local = getComputedStyle(localElement);
+      const hit = document.elementFromPoint(180, 170);
+      return {
+        x: Number.parseFloat(stage.style.getPropertyValue('--geometry-interaction-x')),
+        y: Number.parseFloat(stage.style.getPropertyValue('--geometry-interaction-y')),
+        strength: Number(stage.style.getPropertyValue('--geometry-interaction-strength')),
+        opacity: Number(local.opacity),
+        mask: local.maskImage || local.webkitMaskImage,
+        localTransform: after.transform,
+        staticTransform: before.transform,
+        scrollY: window.scrollY,
+        scrollX: window.scrollX,
+        hit: [hit?.tagName, hit?.id, hit?.className].join('|'),
+        overflow: root.scrollWidth > root.clientWidth,
+      };
+    })()`);
+    assert.ok(pointerTiling.strength > earlyStrength && pointerTiling.strength < 0.8, `pointer response must ease instead of flash: ${earlyStrength} -> ${pointerTiling.strength}`);
+    assert.ok(Math.abs(pointerTiling.x - 180) < 2 && Math.abs(pointerTiling.y - 170) < 2, `local mask must originate at the pointer: ${pointerTiling.x},${pointerTiling.y}`);
+    assert.ok(pointerTiling.opacity > 0 && pointerTiling.opacity < 0.2, 'local overlay remains subtle while easing');
+    assert.match(pointerTiling.mask, /radial-gradient/iu);
+    assert.notEqual(pointerTiling.localTransform, 'none', 'only the masked decorative copy transforms');
+    assert.notEqual(pointerTiling.localTransform, pointerTiling.staticTransform, 'the interaction transforms only its masked copy, independently of scroll geometry');
+    assert.deepEqual({ scrollY: pointerTiling.scrollY, scrollX: pointerTiling.scrollX, hit: pointerTiling.hit, overflow: pointerTiling.overflow }, {
+      scrollY: pointerBaseline.scrollY, scrollX: 0, hit: pointerBaseline.hit, overflow: false,
+    }, 'pointer motion neither intercepts content nor shifts or overflows the document');
+
+    await evaluate(client, `window.dispatchEvent(new PointerEvent('pointerout', { pointerType: 'mouse', isPrimary: true, relatedTarget: null }))`);
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.interaction === 'idle' && Number(getComputedStyle(document.querySelector('.geometry-stage')).getPropertyValue('--geometry-interaction-strength')) === 0`), 'pointer leave fade settles without a surviving frame');
+
+    await client.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+    await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 610, y: 210, radiusX: 1, radiusY: 1, force: 1, id: 0 }] });
+    await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 618, y: 218, radiusX: 1, radiusY: 1, force: 1, id: 0 }] });
+    await waitFor(() => evaluate(client, `Number(getComputedStyle(document.querySelector('.geometry-stage')).getPropertyValue('--geometry-interaction-strength')) > 0.1`), 'touch-local tessellation response');
+    await waitFor(() => evaluate(client, `Number.parseFloat(document.querySelector('.geometry-stage').style.getPropertyValue('--geometry-interaction-x')) > 616 && Number.parseFloat(document.querySelector('.geometry-stage').style.getPropertyValue('--geometry-interaction-y')) > 216`), 'touch-local origin follows pointer movement');
+    const touchTiling = await evaluate(client, `(() => { const root = document.documentElement; const stage = document.querySelector('.geometry-stage'); return { x: Number.parseFloat(stage.style.getPropertyValue('--geometry-interaction-x')), y: Number.parseFloat(stage.style.getPropertyValue('--geometry-interaction-y')), opacity: Number(getComputedStyle(document.querySelector('.geometry-interaction')).opacity), overflow: root.scrollWidth > root.clientWidth, scrollX: window.scrollX }; })()`);
+    assert.ok(Math.hypot(touchTiling.x - 610, touchTiling.y - 210) > 8, `touch motion must follow beyond the start-position tolerance: ${touchTiling.x},${touchTiling.y}`);
+    assert.ok(touchTiling.opacity > 0, 'touch activates the masked decorative copy');
+    assert.deepEqual({ overflow: touchTiling.overflow, scrollX: touchTiling.scrollX }, { overflow: false, scrollX: 0 }, 'touch decoration creates no horizontal scroll regression');
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.interaction === 'idle' && getComputedStyle(document.querySelector('.geometry-interaction')).opacity === '0'`), 'touch release fades and stops the bounded motion loop');
+
+    const touchScrollStart = await evaluate(client, `({ x: window.scrollX, y: window.scrollY })`);
+    await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 610, y: 380, radiusX: 1, radiusY: 1, force: 1, id: 0 }] });
+    await wait(60);
+    await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 614, y: 300, radiusX: 1, radiusY: 1, force: 1, id: 0 }] });
+    await wait(60);
+    await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 620, y: 205, radiusX: 1, radiusY: 1, force: 1, id: 0 }] });
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await waitFor(() => evaluate(client, `window.scrollY > ${touchScrollStart.y + 20}`), 'native touch scrolling through the decorative layer');
+    const touchScroll = await evaluate(client, `({ x: window.scrollX, y: window.scrollY, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth })`);
+    assert.ok(touchScroll.y > touchScrollStart.y + 20, 'the passive decorative listener preserves native vertical touch scrolling');
+    assert.deepEqual({ x: touchScroll.x, overflow: touchScroll.overflow }, { x: touchScrollStart.x, overflow: false }, 'native touch scrolling creates no horizontal regression');
+
+    await evaluate(client, `window.scrollTo(0, 0)`);
+    await waitFor(() => evaluate(client, `window.scrollY === 0`), 'wheel scroll reset');
+    const wheelStart = await evaluate(client, `window.scrollY`);
+    await client.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 400, y: 250, deltaX: 0, deltaY: 80 });
+    await waitFor(() => evaluate(client, `window.scrollY > ${wheelStart}`), 'native scrolling remains available through decorative layers');
+
+    for (const cleanup of [
+      { label: 'blur', expression: `window.dispatchEvent(new Event('blur'))` },
+      { label: 'pagehide', expression: `window.dispatchEvent(new PageTransitionEvent('pagehide'))` },
+      { label: 'hidden page', expression: `Object.defineProperty(document, 'hidden', { configurable: true, value: true }); document.dispatchEvent(new Event('visibilitychange'))` },
+    ]) {
+      if (cleanup.label === 'hidden page') {
+        await evaluate(client, `Object.defineProperty(document, 'hidden', { configurable: true, value: false })`);
+      }
+      await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 330, y: 230 });
+      await waitFor(() => evaluate(client, `Number(getComputedStyle(document.querySelector('.geometry-stage')).getPropertyValue('--geometry-interaction-strength')) > 0.08`), `${cleanup.label} cleanup setup`);
+      await evaluate(client, cleanup.expression);
+      await wait(120);
+      const cleaned = await evaluate(client, `({ motion: document.querySelector('.geometry-stage').dataset.interaction, strength: Number(getComputedStyle(document.querySelector('.geometry-stage')).getPropertyValue('--geometry-interaction-strength')), opacity: Number(getComputedStyle(document.querySelector('.geometry-interaction')).opacity) })`);
+      assert.deepEqual(cleaned, { motion: 'idle', strength: 0, opacity: 0 }, `${cleanup.label} synchronously clears local motion without a surviving frame`);
+    }
+    await evaluate(client, `Object.defineProperty(document, 'hidden', { configurable: true, value: false })`);
+
+    await client.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+    await waitFor(() => evaluate(client, `matchMedia('(prefers-reduced-motion: reduce)').matches && document.querySelector('.geometry-stage').dataset.interaction === 'idle'`), 'reduced-motion tiling reset');
+    await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 260, y: 190 });
+    await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 520, y: 220, radiusX: 1, radiusY: 1, force: 1, id: 0 }] });
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await wait(180);
+    const reducedTiling = await evaluate(client, `(() => { const root = document.documentElement; const stage = document.querySelector('.geometry-stage'); const before = getComputedStyle(document.querySelector('.geometry-static')); const localElement = document.querySelector('.geometry-interaction'); const after = getComputedStyle(localElement, '::before'); const local = getComputedStyle(localElement); return { strength: Number(getComputedStyle(stage).getPropertyValue('--geometry-interaction-strength')), motion: stage.dataset.interaction, beforeImage: before.backgroundImage, beforeOpacity: Number(before.opacity), localDisplay: local.display, afterOpacity: Number(local.opacity), afterTransform: after.transform, overflow: root.scrollWidth > root.clientWidth }; })()`);
+    assert.deepEqual({ strength: reducedTiling.strength, motion: reducedTiling.motion, beforeOpacity: reducedTiling.beforeOpacity, localDisplay: reducedTiling.localDisplay, afterOpacity: reducedTiling.afterOpacity, overflow: reducedTiling.overflow }, {
+      strength: 0, motion: 'idle', beforeOpacity: 1, localDisplay: 'none', afterOpacity: 0, overflow: false,
+    }, 'reduced motion suppresses all local animation while preserving static layout');
+    assert.ok(reducedTiling.beforeImage.includes('linear-gradient'), 'reduced motion retains the crisp static tiling');
+  } finally {
+    await closeChromium(chromium, 'tiling-journey');
+    server.closeAllConnections?.();
+    await new Promise((resolve) => server.close(resolve));
+    await rm(tempDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+});
+
 test('successful registration signs in with ephemeral local credentials', async () => {
   const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const handler = html.match(/element\('registerForm'\)\.addEventListener\('submit',[\s\S]*?(?=\n\s*element\('logoutButton'\))/u)?.[0];
@@ -904,6 +1141,7 @@ test('public landing and account shell remain distinct, responsive, and keyboard
       menuExpanded: document.querySelector('#menuToggle').getAttribute('aria-expanded'),
       motionHidden: document.querySelector('#motionToggle').hidden,
       motionPressed: document.querySelector('#motionToggle').getAttribute('aria-pressed'),
+      interactionPointerEvents: getComputedStyle(document.querySelector('.geometry-interaction')).pointerEvents,
       staticEdgePeek: (() => { const rect = document.querySelector('.geometry-static').getBoundingClientRect(); return rect.left < 0 || rect.right > innerWidth; })(),
       translation: document.querySelector('.verse-translation-text')?.innerText.trim(),
       translationLabel: document.querySelector('#verseTranslationLabel')?.textContent.trim(),
@@ -926,6 +1164,7 @@ test('public landing and account shell remain distinct, responsive, and keyboard
     assert.equal(landingSemantics.menuExpanded, 'false');
     assert.equal(landingSemantics.motionHidden, false);
     assert.equal(landingSemantics.motionPressed, 'true');
+    assert.equal(landingSemantics.interactionPointerEvents, 'none');
     assert.equal(landingSemantics.staticEdgePeek, true);
     assert.equal(landingSemantics.translation, 'Cooperate with one another in goodness and righteousness, and do not cooperate in sin and transgression.');
     assert.equal(landingSemantics.translationLabel, 'English translation · Dr. Mustafa Khattab, The Clear Quran');

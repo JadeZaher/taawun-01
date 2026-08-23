@@ -58,13 +58,34 @@
     .skip-link { position: fixed; z-index: 100; top: 8px; left: 8px; min-height: 44px; display: flex; align-items: center; padding: 10px 14px; background: var(--parchment); color: var(--ink); transform: translateY(-160%); }
     .skip-link:focus { transform: translateY(0); }
 
-    .geometry-stage { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: transparent; pointer-events: none; --geometry-x: 22vw; --geometry-scale: 1; --geometry-turn: 1deg; }
-    .geometry-static { position: absolute; top: 50%; left: 50%; width: min(62vw, 900px); aspect-ratio: 1; opacity: 0.58; background-image: radial-gradient(circle at 64% 28%, rgba(224, 183, 91, 0.34), transparent 24%), repeating-conic-gradient(from 22.5deg at 50% 50%, rgba(99, 184, 155, 0.28) 0 2deg, transparent 2deg 22.5deg), repeating-radial-gradient(circle at 50% 50%, transparent 0 28px, rgba(224, 183, 91, 0.18) 29px 30px, transparent 31px 56px); mask-image: radial-gradient(circle, #000 0 48%, transparent 76%); transform: translate(calc(-50% + var(--geometry-x)), -50%) scale(var(--geometry-scale)) rotate(var(--geometry-turn)); transition: transform 1200ms cubic-bezier(.22,.72,.2,1), opacity 520ms ease; }
+    .geometry-stage {
+      position: fixed; inset: 0; z-index: 0; overflow: hidden; background: transparent; pointer-events: none;
+      --geometry-x: 22vw; --geometry-scale: 1; --geometry-turn: 1deg;
+      --geometry-center-stroke: rgb(242, 234, 216); --geometry-center-half: 1.25px;
+      --geometry-glow: rgba(224, 183, 91, 0.20);
+      --geometry-emerald-field: rgba(99, 184, 155, 0.16);
+      --geometry-gold-field: rgba(224, 183, 91, 0.10);
+      --geometry-interaction-x: 50vw; --geometry-interaction-y: 50vh; --geometry-interaction-opacity: 0;
+      --geometry-interaction-shift-x: 0px; --geometry-interaction-shift-y: 0px;
+      --geometry-interaction-scale: 1; --geometry-interaction-turn: 0deg;
+      --geometry-interaction-radius: clamp(118px, 18vw, 220px);
+      --geometry-pattern:
+        radial-gradient(circle at 64% 28%, var(--geometry-glow), transparent 24%),
+        repeating-linear-gradient(45deg, transparent 0 calc(46px - var(--geometry-center-half)), var(--geometry-center-stroke) calc(46px - var(--geometry-center-half)) calc(46px + var(--geometry-center-half)), transparent calc(46px + var(--geometry-center-half)) 92px),
+        repeating-linear-gradient(-45deg, transparent 0 calc(46px - var(--geometry-center-half)), var(--geometry-center-stroke) calc(46px - var(--geometry-center-half)) calc(46px + var(--geometry-center-half)), transparent calc(46px + var(--geometry-center-half)) 92px),
+        repeating-conic-gradient(from 22.5deg at 50% 50%, var(--geometry-emerald-field) 0 2deg, transparent 2deg 22.5deg),
+        repeating-radial-gradient(circle at 50% 50%, transparent 0 28px, var(--geometry-gold-field) 29px 30px, transparent 31px 56px);
+    }
+    .geometry-static, .geometry-interaction::before { position: absolute; top: 50%; left: 50%; width: min(62vw, 900px); aspect-ratio: 1; opacity: 1; background-image: var(--geometry-pattern); mask-image: radial-gradient(circle, #000 0 48%, transparent 76%); }
+    .geometry-static { transform: translate(calc(-50% + var(--geometry-x)), -50%) scale(var(--geometry-scale)) rotate(var(--geometry-turn)); transition: transform 1200ms cubic-bezier(.22,.72,.2,1), opacity 520ms ease; }
+    .geometry-interaction { position: absolute; inset: 0; opacity: var(--geometry-interaction-opacity); pointer-events: none; -webkit-mask-image: radial-gradient(circle var(--geometry-interaction-radius) at var(--geometry-interaction-x) var(--geometry-interaction-y), #000 0 22%, rgba(0, 0, 0, .88) 54%, transparent 100%); mask-image: radial-gradient(circle var(--geometry-interaction-radius) at var(--geometry-interaction-x) var(--geometry-interaction-y), #000 0 22%, rgba(0, 0, 0, .88) 54%, transparent 100%); will-change: opacity, -webkit-mask-image, mask-image; contain: strict; }
+    .geometry-interaction::before { content: ""; transform: translate(calc(-50% + var(--geometry-x)), -50%) translate(var(--geometry-interaction-shift-x), var(--geometry-interaction-shift-y)) scale(var(--geometry-scale)) scale(var(--geometry-interaction-scale)) rotate(calc(var(--geometry-turn) + var(--geometry-interaction-turn))); will-change: transform; }
     .geometry-stage[data-side="left"] { --geometry-x: -22vw; --geometry-turn: -1deg; }
     .geometry-stage[data-transition="true"] { --geometry-scale: 1.035; }
     .geometry-stage[data-motion="paused"] .geometry-static { transition: none; }
+    .geometry-stage[data-motion="paused"] .geometry-interaction, .geometry-stage[data-enhanced="true"] .geometry-interaction { opacity: 0; }
     #geometryCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; }
-    .geometry-stage[data-enhanced="true"] #geometryCanvas { opacity: 0.9; }
+    .geometry-stage[data-enhanced="true"] #geometryCanvas { opacity: 1; }
     .geometry-stage[data-enhanced="true"] .geometry-static { opacity: 0; }
     .geometry-vignette { position: absolute; inset: 0; background: transparent; }
 
@@ -172,8 +193,8 @@
       .nav-shell[data-menu-open="true"] .nav-links { position: absolute; inset: 100% 0 auto; display: grid; gap: 0; margin: 0; padding: 10px 16px 16px; border-bottom: 1px solid var(--line); background: var(--ink); box-shadow: 0 20px 50px rgba(0,0,0,.36); }
       .nav-shell[data-menu-open="true"] .nav-links a { display: flex; min-height: 48px; padding-inline: 12px; }
       .nav-shell[data-menu-open="true"] .nav-account { margin-top: 6px; justify-content: center; }
-      .geometry-stage { opacity: 0.68; }
-      .geometry-static { top: 42vh; width: min(78vw, 390px); opacity: 0.44; --geometry-scale: .88; }
+      .geometry-stage { --geometry-glow: rgba(224, 183, 91, 0.10); --geometry-emerald-field: rgba(99, 184, 155, 0.08); --geometry-gold-field: rgba(224, 183, 91, 0.05); }
+      .geometry-static, .geometry-interaction::before { top: 42vh; width: min(78vw, 390px); --geometry-scale: .88; }
       .geometry-stage[data-side="right"] { --geometry-x: 42vw; }
       .geometry-stage[data-side="left"] { --geometry-x: -42vw; }
       #geometryCanvas { display: none; }
@@ -216,11 +237,11 @@
       html { scroll-behavior: auto; }
       *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
       #geometryCanvas { display: none; }
+      .geometry-interaction { display: none; }
     }
     @media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
-      .geometry-stage { background: transparent; }
+      .geometry-stage { background: transparent; --geometry-glow: rgba(224, 183, 91, 0.10); --geometry-emerald-field: rgba(99, 184, 155, 0.08); --geometry-gold-field: rgba(224, 183, 91, 0.05); }
       #geometryCanvas { display: none; }
-      .geometry-static { opacity: 0.32; }
       .story-copy, .verse-card, .content-section.geometry-continuation { background: var(--ink); backdrop-filter: none; }
     }
     @media (forced-colors: active) {
@@ -233,6 +254,7 @@
   <a class="skip-link" href="#mainContent">Skip to main content</a>
   <div class="geometry-stage" data-side="right" aria-hidden="true">
     <div class="geometry-static"></div>
+    <div class="geometry-interaction"></div>
     <canvas id="geometryCanvas"></canvas>
     <div class="geometry-vignette"></div>
   </div>

@@ -35,6 +35,7 @@
   const stage = document.querySelector('.geometry-stage');
   const canvas = document.getElementById('geometryCanvas');
   const toggle = document.getElementById('motionToggle');
+  const interactionLayer = stage?.querySelector('.geometry-interaction');
   if (!stage || !canvas || !toggle) return;
 
   const sections = [...document.querySelectorAll('[data-geometry-state]')];
@@ -98,12 +99,116 @@
     Boolean(navigator.gpu) && sceneVisible;
   const motionControlEligible = () => !reducedMotion.matches && !forcedColors.matches && !increasedContrast.matches && !reducedTransparency.matches;
   const capable = () => environmentEligible() && !userPaused();
+  const interaction = {
+    x: window.innerWidth * 0.5,
+    y: window.innerHeight * 0.5,
+    targetX: window.innerWidth * 0.5,
+    targetY: window.innerHeight * 0.5,
+    strength: 0,
+    targetStrength: 0,
+    phase: 0,
+    lastTime: 0,
+  };
+  let interactionFrame = 0;
+  const interactionAllowed = () => Boolean(interactionLayer) && motionControlEligible() && !userPaused() && !staticMotionPaused && !document.hidden;
+  const renderInteraction = () => {
+    const strength = Math.min(1, Math.max(0, interaction.strength));
+    stage.style.setProperty('--geometry-interaction-x', `${interaction.x.toFixed(2)}px`);
+    stage.style.setProperty('--geometry-interaction-y', `${interaction.y.toFixed(2)}px`);
+    stage.style.setProperty('--geometry-interaction-opacity', (strength * 0.2).toFixed(5));
+    stage.style.setProperty('--geometry-interaction-shift-x', `${(Math.sin(interaction.phase) * strength * 5).toFixed(3)}px`);
+    stage.style.setProperty('--geometry-interaction-shift-y', `${(Math.cos(interaction.phase * 0.82) * strength * 3.5).toFixed(3)}px`);
+    stage.style.setProperty('--geometry-interaction-scale', (1 + strength * 0.018).toFixed(5));
+    stage.style.setProperty('--geometry-interaction-turn', `${(Math.sin(interaction.phase * 0.76) * strength * 1.4).toFixed(3)}deg`);
+    stage.style.setProperty('--geometry-interaction-strength', strength.toFixed(5));
+    renderer?.setInteraction({ x: interaction.x, y: interaction.y, strength, phase: interaction.phase });
+  };
+  const resetInteraction = () => {
+    if (interactionFrame) window.cancelAnimationFrame(interactionFrame);
+    interactionFrame = 0;
+    interaction.strength = 0;
+    interaction.targetStrength = 0;
+    interaction.phase = 0;
+    interaction.lastTime = 0;
+    stage.dataset.interaction = 'idle';
+    renderInteraction();
+  };
+  const queueInteractionFrame = () => {
+    if (interactionFrame || !interactionAllowed()) return;
+    stage.dataset.interaction = 'moving';
+    interactionFrame = window.requestAnimationFrame(stepInteraction);
+  };
+  const stepInteraction = (time) => {
+    interactionFrame = 0;
+    if (!interactionAllowed()) {
+      resetInteraction();
+      return;
+    }
+    const elapsed = interaction.lastTime ? Math.min(64, Math.max(8, time - interaction.lastTime)) : 16;
+    interaction.lastTime = time;
+    const positionEase = 1 - Math.exp(-elapsed / 520);
+    const strengthEase = 1 - Math.exp(-elapsed / (interaction.targetStrength ? 650 : 820));
+    interaction.x += (interaction.targetX - interaction.x) * positionEase;
+    interaction.y += (interaction.targetY - interaction.y) * positionEase;
+    interaction.strength += (interaction.targetStrength - interaction.strength) * strengthEase;
+    interaction.phase += elapsed / 1800;
+    if (interaction.targetStrength === 0 && interaction.strength < 0.002) {
+      resetInteraction();
+      return;
+    }
+    const positionSettled = Math.abs(interaction.targetX - interaction.x) < 0.15 && Math.abs(interaction.targetY - interaction.y) < 0.15;
+    const strengthSettled = Math.abs(interaction.targetStrength - interaction.strength) < 0.002;
+    if (positionSettled && strengthSettled) {
+      interaction.x = interaction.targetX;
+      interaction.y = interaction.targetY;
+      interaction.strength = interaction.targetStrength;
+      interaction.lastTime = 0;
+      renderInteraction();
+      stage.dataset.interaction = interaction.targetStrength ? 'resting' : 'idle';
+      return;
+    }
+    renderInteraction();
+    queueInteractionFrame();
+  };
+  const activateInteraction = (event) => {
+    if (!interactionAllowed() || event.isPrimary === false) return;
+    const clientX = Number(event.clientX);
+    const clientY = Number(event.clientY);
+    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return;
+    const wasIdle = interaction.strength < 0.002 && interaction.targetStrength === 0;
+    interaction.targetX = Math.min(window.innerWidth, Math.max(0, clientX));
+    interaction.targetY = Math.min(window.innerHeight, Math.max(0, clientY));
+    if (wasIdle) {
+      interaction.x = interaction.targetX;
+      interaction.y = interaction.targetY;
+    }
+    interaction.targetStrength = 1;
+    queueInteractionFrame();
+  };
+  const settleInteraction = (event) => {
+    if (event?.type === 'pointerup' && event.pointerType === 'mouse') return;
+    interaction.targetStrength = 0;
+    if (interactionAllowed()) queueInteractionFrame();
+    else resetInteraction();
+  };
   const setToggleState = (active) => {
     staticMotionPaused = !active;
     toggle.setAttribute('aria-pressed', String(active));
     stage.dataset.motion = active ? 'running' : 'paused';
-    if (!active) stage.removeAttribute('data-transition');
+    if (!active) {
+      stage.removeAttribute('data-transition');
+      resetInteraction();
+    }
   };
+  window.addEventListener('pointermove', activateInteraction, { passive: true });
+  window.addEventListener('pointerdown', activateInteraction, { passive: true });
+  window.addEventListener('pointerup', settleInteraction, { passive: true });
+  window.addEventListener('pointercancel', settleInteraction, { passive: true });
+  window.addEventListener('pointerout', (event) => {
+    if (!event.relatedTarget) settleInteraction(event);
+  }, { passive: true });
+  window.addEventListener('blur', resetInteraction);
+  resetInteraction();
 
   const clearCanvasRecovery = () => {
     if (canvasRecoveryFrame) window.cancelAnimationFrame(canvasRecoveryFrame);
@@ -116,7 +221,7 @@
     if (!renderer || stage.dataset.enhanced !== 'true' || !capable()) return;
     clearCanvasRecovery();
     canvas.style.transition = 'none';
-    canvas.style.opacity = '0.9';
+    canvas.style.opacity = '1';
     void canvas.offsetWidth;
     canvasRecoveryFrame = window.requestAnimationFrame(() => {
       canvasRecoveryFrame = 0;
@@ -153,6 +258,7 @@
         return;
       }
       renderer = candidate;
+      renderInteraction();
       toggle.hidden = !motionControlEligible();
       setToggleState(true);
     } catch {
@@ -195,7 +301,13 @@
   increasedContrast.addEventListener?.('change', reconcilePreference);
   reducedTransparency.addEventListener?.('change', reconcilePreference);
   connection?.addEventListener?.('change', reconcilePreference);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) renderer?.pause(); else if (renderer) renderer.resume(); else reconcilePreference(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      resetInteraction();
+      renderer?.pause();
+    } else if (renderer) renderer.resume();
+    else reconcilePreference();
+  });
   window.addEventListener('resize', () => {
     if (resizeFrame) return;
     resizeFrame = window.requestAnimationFrame(() => {
@@ -227,6 +339,7 @@
     }
     if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
     if (sceneFrame) window.cancelAnimationFrame(sceneFrame);
+    resetInteraction();
     clearCanvasRecovery();
     idleHandle = 0;
     resizeFrame = 0;
