@@ -112,10 +112,8 @@
     stage.style.setProperty('--geometry-interaction-x', `${interaction.x.toFixed(2)}px`);
     stage.style.setProperty('--geometry-interaction-y', `${interaction.y.toFixed(2)}px`);
     stage.style.setProperty('--geometry-interaction-opacity', (strength * 0.2).toFixed(5));
-    stage.style.setProperty('--geometry-interaction-shift-x', `${(Math.sin(interaction.phase) * strength * 8).toFixed(3)}px`);
-    stage.style.setProperty('--geometry-interaction-shift-y', `${(Math.cos(interaction.phase * 0.82) * strength * 6).toFixed(3)}px`);
-    stage.style.setProperty('--geometry-interaction-scale', (1 + strength * 0.028).toFixed(5));
     stage.style.setProperty('--geometry-interaction-turn', `${(Math.sin(interaction.phase * 0.76) * strength * 3.8).toFixed(3)}deg`);
+    stage.style.setProperty('--geometry-local-rosette-radius', `${(18 + strength * 3.2).toFixed(3)}px`);
     stage.style.setProperty('--geometry-interaction-strength', strength.toFixed(5));
     renderer?.setInteraction({ x: interaction.x, y: interaction.y, strength, phase: interaction.phase });
   };

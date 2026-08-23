@@ -323,6 +323,7 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(html, /\.geometry-stage \{\s*position: fixed; inset: 0;[^}]*background: transparent;/u);
   const geometryCanvasRule = html.match(/#geometryCanvas \{[^}]+\}/u)?.[0] || '';
   assert.match(geometryCanvasRule, /opacity: 0;/u);
+  assert.match(geometryCanvasRule, /inset: -40px;[^}]*width: calc\(100% \+ 80px\); height: calc\(100% \+ 80px\);/u, 'a replaced canvas explicitly fills the stage plus its bounded overscan');
   assert.doesNotMatch(geometryCanvasRule, /transition:/u, 'enhanced canvas visibility must not depend on an initial opacity transition');
   assert.match(html, /\.geometry-stage\[data-enhanced="true"\] #geometryCanvas \{ opacity: 1; \}/u);
   assert.match(html, /id="motionToggle"[^>]*type="button"[^>]*aria-pressed="true"/u);
@@ -391,23 +392,28 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(renderer, /let authoredLensCenter = vec2f\(0\.20, -0\.18\)/u);
   assert.match(renderer, /let lensCenter = mix\(authoredLensCenter, interactionPoint, u\.interaction\.z \* 0\.82\)/u);
   assert.match(renderer, /let canvasUV = \(position\.xy \* 2\.0 - resolution\) \/ resolution\.y;\s*var uv = canvasUV/u);
-  assert.match(renderer, /let star = starOutline\(cell\)/u);
-  assert.match(renderer, /let innerRosette = starOutline\(rotate2\(cell, 0\.39269908\) \* 1\.42\) \/ 1\.42/u);
-  assert.match(renderer, /fn lattice\(point: vec2f, scale: f32, turn: f32, softness: f32\)/u);
+  assert.match(renderer, /let star = starOutline\(rotate2\(cell, outerStarTurn\) \/ outerStarScale\) \* outerStarScale/u);
+  assert.match(renderer, /let innerRosette = starOutline\(rotate2\(cell, innerRosetteTurn\) \* 1\.42 \/ innerRosetteScale\) \* innerRosetteScale \/ 1\.42/u);
+  assert.match(renderer, /fn lattice\(point: vec2f, scale: f32, turn: f32, softness: f32, shapeMotion: f32, shapePhase: f32\) -> vec4f/u);
   assert.match(renderer, /let latticeScale = 3\.45/u);
   assert.doesNotMatch(renderer, /latticeScale \*=|latticeScale = [^;]*(?:travel|section)/u);
   assert.match(renderer, /let stableTurn = 0\.018/u);
   assert.doesNotMatch(renderer, /stableTurn\s*=\s*[^;]*section/u);
   assert.doesNotMatch(renderer, /let turn =|stableTurn \+/u);
   assert.match(renderer, /let interactionEnvelope = \(1\.0 - smoothstep\(0\.035, 0\.54, interactionDistance\)\) \* u\.interaction\.z \* interactionWave/u);
-  assert.match(renderer, /let localPoint = interactionPoint \+ rotate2\(interactionDelta, interactionEnvelope \* 0\.082\) \* \(1\.0 \+ interactionEnvelope \* 0\.030\)/u);
-  assert.match(renderer, /let basePoint = localPoint/u);
+  assert.match(renderer, /let basePoint = uv/u);
+  assert.match(renderer, /let cellCenter = rotate2\(tiledCellCenter \/ latticeScale, -stableTurn\)/u);
+  assert.match(renderer, /let interactionDistance = length\(cellCenter - interactionPoint\)/u);
+  assert.doesNotMatch(renderer, /interactionDelta|localPoint/u, 'interaction never rotates or scales the base lattice coordinates');
+  assert.match(renderer, /let outerStarTurn = shapeMotion \* \(0\.12 \+ 0\.04 \* sin\(shapePhase\)\)/u);
+  assert.match(renderer, /let innerRosetteTurn = 0\.39269908 - shapeMotion/u);
+  assert.match(renderer, /let diagonalA = abs\(abs\(cell\.x \+ cell\.y\)/u, 'connector and strap anchors retain the rigid cell coordinates');
   assert.match(renderer, /uv\.x -= side \* 0\.34/u);
   assert.match(renderer, /let bandCellOffset = 0\.016 \+ lens \* 0\.012 \+ interactionEnvelope \* 0\.006/u);
   assert.doesNotMatch(renderer, /scroll \* 0\.045|scroll \* 0\.025/u);
-  assert.match(renderer, /lattice\(basePoint, latticeScale, stableTurn, softness\)/u);
-  assert.match(renderer, /let refractionPoint = rotate2\(basePoint \+ vec2f\(0\.012, -0\.008\), 0\.056 \+ interactionEnvelope \* 0\.045\)/u);
-  assert.match(renderer, /lattice\(refractionPoint \+ bandOffset, latticeScale, stableTurn, softness\)/u);
+  assert.match(renderer, /lattice\(basePoint, latticeScale, stableTurn, softness, interactionEnvelope, u\.interaction\.w\)/u);
+  assert.match(renderer, /let refractionPoint = rotate2\(basePoint \+ vec2f\(0\.012, -0\.008\), 0\.056\)/u);
+  assert.match(renderer, /lattice\(refractionPoint \+ bandOffset, latticeScale, stableTurn, softness, interactionEnvelope \* 0\.45/u);
   assert.doesNotMatch(renderer, /turn = .*transition|rotate2\([^\n]*transition/u);
   assert.match(renderer, /let bandMagnitude = bandCellOffset \/ latticeScale/u);
   assert.match(renderer, /let chromaticEnvelope = 0\.12 \+ lens \* 0\.72/u);
@@ -421,14 +427,17 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.doesNotMatch(renderer, /mirrorPoint|deepLayer|4\.25/u);
   assert.doesNotMatch(renderer, /uv \/= .*sin/u);
   assert.match(renderer, /1\.0 - smoothstep\(0\.04, 0\.66, lensDistance\)/u);
-  assert.match(renderer, /let viewportHalfExtent = vec2f\(resolution\.x \/ resolution\.y, 1\.0\)/u);
-  assert.match(renderer, /let viewportEdgeDistance = min\(viewportHalfExtent\.x - abs\(canvasUV\.x\), viewportHalfExtent\.y - abs\(canvasUV\.y\)\)/u);
-  assert.match(renderer, /let viewportFeather = smoothstep\(0\.015, 0\.10, viewportEdgeDistance\)/u);
+  assert.match(renderer, /let visibleHalfExtent = max\(u\.renderMetrics\.yz, vec2f\(0\.001\)\)/u);
+  assert.match(renderer, /let viewportEdgeDistance = min\(visibleHalfExtent\.x - abs\(canvasUV\.x\), visibleHalfExtent\.y - abs\(canvasUV\.y\)\)/u);
+  assert.match(renderer, /let viewportFeather = smoothstep\(0\.0, 0\.12, viewportEdgeDistance\)/u);
   assert.match(renderer, /let refractionPremultiplied = refractionColor \* refractionAlpha/u);
+  assert.match(renderer, /let halo = max\(stroke\(star, 0\.026/u, 'analytic wide strokes form a subordinate halo without softening the core');
+  assert.match(renderer, /let haloPremultiplied = haloColor \* haloAlpha/u);
   assert.match(renderer, /let mainPremultiplied = mainColor \* mainAlpha/u);
-  assert.match(renderer, /let outputAlpha = mainAlpha \+ refractionAlpha \* \(1\.0 - mainAlpha\)/u);
-  assert.match(renderer, /let outputPremultiplied = mainPremultiplied \+ refractionPremultiplied \* \(1\.0 - mainAlpha\)/u, 'refraction is explicitly source-over composited beneath the crisp base');
+  assert.match(renderer, /let underPremultiplied = haloPremultiplied \+ refractionPremultiplied \* \(1\.0 - haloAlpha\)/u);
+  assert.match(renderer, /let outputPremultiplied = mainPremultiplied \+ underPremultiplied \* \(1\.0 - mainAlpha\)/u, 'refraction and halo are explicitly source-over composited beneath the crisp base');
   assert.match(renderer, /return vec4f\(outputPremultiplied, outputAlpha\)/u);
+  assert.match(renderer, /cssPixelRatio, visibleHalfWidth, visibleHalfHeight, 0/u, 'the overscanned canvas feathers against the visible viewport rather than its clipped buffer edge');
   assert.doesNotMatch(renderer, /color \+=.*(?:emeraldBand|rustBand)|field = clamp\([^\n]*(?:emeraldBand|rustBand)/u, 'refraction is not mixed into main color or alpha');
   assert.match(renderer, /const FIXED_STEP_SECONDS = 1 \/ 60/u);
   assert.match(renderer, /const MAX_DT_SECONDS = 0\.05/u);
@@ -528,12 +537,13 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     })();` });
     await client.send('Page.navigate', { url: origin });
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage')?.dataset.enhanced === 'true' && !document.querySelector('#motionToggle').hidden`), 'mocked WebGPU enhancement');
-    const initial = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, submissions: window.__gpuQA.submissions, renderer: document.querySelector('#geometryCanvas').dataset.renderer || '', canvasOpacity: getComputedStyle(document.querySelector('#geometryCanvas')).opacity, canvasTransitionDuration: getComputedStyle(document.querySelector('#geometryCanvas')).transitionDuration, controlHeight: Math.round(document.querySelector('#motionToggle').getBoundingClientRect().height), state: document.querySelector('.geometry-stage').dataset.state, side: document.querySelector('.geometry-stage').dataset.side, connector: window.__gpuQA.shaderSource.includes('junctionInterior') && window.__gpuQA.shaderSource.includes('overUnder'), connectedOctagon: window.__gpuQA.shaderSource.includes('bridgePairDistance') && window.__gpuQA.shaderSource.includes('bridgeConnectorGate'), stableCrossing: window.__gpuQA.shaderSource.includes('verticalCrossingID') && window.__gpuQA.shaderSource.includes('horizontalCrossingID'), adjacentBands: window.__gpuQA.shaderSource.includes('bandCellOffset / latticeScale') && window.__gpuQA.shaderSource.includes('refractionPoint + bandOffset') && window.__gpuQA.shaderSource.includes('refractionPoint - bandOffset'), separateUnder: window.__gpuQA.shaderSource.includes('refractionPremultiplied') && window.__gpuQA.shaderSource.includes('mainPremultiplied') && window.__gpuQA.shaderSource.includes('1.0 - mainAlpha'), scrollIndependent: !window.__gpuQA.shaderSource.includes('internalPulse') && !window.__gpuQA.shaderSource.includes('scrollActivity') && !window.__gpuQA.shaderSource.includes('mix(1.75'), crispCore: window.__gpuQA.shaderSource.includes('crispCenterStroke') && window.__gpuQA.shaderSource.includes('halfCore'), localInteraction: window.__gpuQA.shaderSource.includes('interactionEnvelope * 0.082') && window.__gpuQA.shaderSource.includes('localPoint') })`);
+    const initial = await evaluate(client, `(() => { const canvas = document.querySelector('#geometryCanvas'); const rect = canvas.getBoundingClientRect(); return { requests: window.__gpuQA.adapterRequests, submissions: window.__gpuQA.submissions, renderer: canvas.dataset.renderer || '', canvasOpacity: getComputedStyle(canvas).opacity, canvasTransitionDuration: getComputedStyle(canvas).transitionDuration, canvasOverscan: { left: rect.left, top: rect.top, right: rect.right - innerWidth, bottom: rect.bottom - innerHeight }, controlHeight: Math.round(document.querySelector('#motionToggle').getBoundingClientRect().height), state: document.querySelector('.geometry-stage').dataset.state, side: document.querySelector('.geometry-stage').dataset.side, connector: window.__gpuQA.shaderSource.includes('junctionInterior') && window.__gpuQA.shaderSource.includes('overUnder'), connectedOctagon: window.__gpuQA.shaderSource.includes('bridgePairDistance') && window.__gpuQA.shaderSource.includes('bridgeConnectorGate'), stableCrossing: window.__gpuQA.shaderSource.includes('verticalCrossingID') && window.__gpuQA.shaderSource.includes('horizontalCrossingID'), adjacentBands: window.__gpuQA.shaderSource.includes('bandCellOffset / latticeScale') && window.__gpuQA.shaderSource.includes('refractionPoint + bandOffset') && window.__gpuQA.shaderSource.includes('refractionPoint - bandOffset'), separateUnder: window.__gpuQA.shaderSource.includes('refractionPremultiplied') && window.__gpuQA.shaderSource.includes('haloPremultiplied') && window.__gpuQA.shaderSource.includes('mainPremultiplied'), scrollIndependent: !window.__gpuQA.shaderSource.includes('internalPulse') && !window.__gpuQA.shaderSource.includes('scrollActivity') && !window.__gpuQA.shaderSource.includes('mix(1.75'), crispCore: window.__gpuQA.shaderSource.includes('crispCenterStroke') && window.__gpuQA.shaderSource.includes('halfCore'), localInteraction: window.__gpuQA.shaderSource.includes('outerStarTurn') && window.__gpuQA.shaderSource.includes('innerRosetteTurn') && window.__gpuQA.shaderSource.includes('let basePoint = uv') && !window.__gpuQA.shaderSource.includes('localPoint') }; })()`);
     assert.equal(initial.requests, 1);
     assert.ok(initial.submissions >= 1);
     assert.equal(initial.renderer, 'webgpu');
     assert.equal(initial.canvasOpacity, '1', 'fresh enhancement makes the solid center core visible without attenuating the surrounding field');
     assert.equal(initial.canvasTransitionDuration, '0s', 'fresh visibility does not depend on transition timing');
+    assert.ok(initial.canvasOverscan.left <= -39 && initial.canvasOverscan.top <= -39 && initial.canvasOverscan.right >= 24 && initial.canvasOverscan.bottom >= 39, `the enhanced field renders past each viewport edge before its visible-edge feather: ${JSON.stringify(initial.canvasOverscan)}`);
     assert.ok(initial.controlHeight >= 44);
     assert.equal(initial.state, '0');
     assert.equal(initial.side, 'right');
@@ -852,15 +862,24 @@ test('public Islamic geometry separates refraction under a crisp base and keeps 
   const css = html.match(/<style>([\s\S]*?)<\/style>/u)?.[1] || '';
 
   assert.equal((css.match(/--geometry-main-pattern:/gu) || []).length, 1, 'static and local main geometry reuse one pattern definition');
+  assert.equal((css.match(/--geometry-halo-pattern:/gu) || []).length, 1, 'a reusable glass halo stays separate from the crisp pattern');
   assert.equal((css.match(/--geometry-refraction-pattern:/gu) || []).length, 1, 'static and local refraction reuse one underlayer definition');
   assert.match(css, /--geometry-center-stroke:\s*rgb\(242, 234, 216\)/u, 'the gradient center uses an opaque theme stroke');
   assert.match(css, /--geometry-center-half:\s*1\.25px/u, 'the crisp center stroke is exactly 2.5 CSS px wide');
-  assert.match(html, /<div class="geometry-refraction"><\/div>\s*<div class="geometry-static"><\/div>/u, 'refraction is an explicit DOM layer beneath the crisp base');
+  assert.match(html, /<div class="geometry-refraction"><\/div>\s*<div class="geometry-halo"><\/div>\s*<div class="geometry-static"><\/div>/u, 'refraction and glass halo are explicit DOM layers beneath the crisp base');
   assert.match(css, /\.geometry-refraction, \.geometry-interaction::after[^}]*background-image:\s*var\(--geometry-refraction-pattern\)/u, 'both underlayers share only the refraction pattern');
+  assert.match(css, /\.geometry-halo, \.geometry-interaction-halo[^}]*background-image:\s*var\(--geometry-halo-pattern\)/u, 'the aligned wide-stroke halo is a separate non-filter layer');
   assert.match(css, /\.geometry-static, \.geometry-interaction::before[^}]*background-image:\s*var\(--geometry-main-pattern\)/u, 'both crisp layers share only the main pattern');
   assert.match(css, /\.geometry-refraction \{[^}]*translate\(6px, -4px\)[^}]*scale\(1\.018\)[^}]*3\.25deg/u, 'fallback refraction overlap is a stable authored offset, not scroll delta');
   assert.doesNotMatch(css, /data-transition="true"[^}]*scale/u);
   assert.match(css, /\.geometry-interaction \{[^}]*pointer-events:\s*none[^}]*mask-image:\s*radial-gradient\(circle var\(--geometry-interaction-radius\) at var\(--geometry-interaction-x\) var\(--geometry-interaction-y\)/u, 'motion is clipped locally and cannot intercept content');
+  assert.match(css, /\.geometry-interaction::before \{[^}]*scale\(var\(--geometry-scale\)\) rotate\(var\(--geometry-turn\)\)[^}]*\}/u, 'the local crisp fallback retains the rigid base transform');
+  assert.match(css, /\.geometry-interaction-halo \{[^}]*var\(--geometry-local-shape-pattern\)[^}]*92px 92px/u, 'fallback interaction rotates cell-local rosette accents without moving the lattice');
+  assert.doesNotMatch(css, /filter:\s*blur|backdrop-filter:[^;]*blur/iu, 'no blur softens the crisp geometry or manufactures its halo');
+  assert.match(css, /#geometryCanvas \{[^}]*inset: -40px;[^}]*width: calc\(100% \+ 80px\); height: calc\(100% \+ 80px\)/u, 'bounded canvas overscan explicitly sizes the replaced element past every visible edge');
+  assert.match(css, /mask-image: radial-gradient\(circle closest-side,[^;]*transparent 88%\)/u, 'fallback geometry fades before an overscanned square reaches the viewport edge');
+  assert.match(css, /\.geometry-vignette \{[^}]*linear-gradient\(180deg,[^}]*transparent 176px/u, 'the header edge receives a natural non-intercepting fade');
+  assert.match(css, /linear-gradient\(90deg, var\(--ink\) 0, transparent 9%, transparent 91%, var\(--ink\) 100%\)/u, 'the side feather reaches opaque ink exactly at both viewport clips');
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.geometry-interaction \{ display: none; \}/u, 'reduced motion keeps only the crisp static geometry');
   assert.match(loader, /let interactionFrame = 0/u);
   assert.match(loader, /if \(interactionFrame \|\| !interactionAllowed\(\)\) return;/u, 'multiple events share one guarded interaction frame');
@@ -872,7 +891,12 @@ test('public Islamic geometry separates refraction under a crisp base and keeps 
   assert.doesNotMatch(loader, /preventDefault\(\)/u);
   assert.match(renderer, /fn crispCenterStroke[\s\S]*?max\(u\.renderMetrics\.x, 1\.0\) \* 1\.25/u, 'WebGPU keeps the same 2.5 CSS px solid center core');
   assert.match(renderer, /interactionEnvelope = \(1\.0 - smoothstep\(0\.035, 0\.54, interactionDistance\)\)/u, 'WebGPU deformation falls off around the exact interaction point');
-  assert.match(renderer, /interactionEnvelope \* 0\.082/u, 'local input owns the stronger internal rotation');
+  assert.match(renderer, /let basePoint = uv/u);
+  assert.doesNotMatch(renderer, /interactionDelta|localPoint/u, 'local input cannot deform base lattice coordinates');
+  assert.match(renderer, /let outerStarTurn = shapeMotion/u, 'local input rotates the outer star inside each rigid cell');
+  assert.match(renderer, /let innerRosetteTurn = 0\.39269908 - shapeMotion/u, 'the inner rosette counter-rotates and overlaps independently');
+  assert.match(renderer, /let haloAlpha = clamp\(baseLayer\.w[^;]*0\.28/u, 'analytic wide strokes remain a subordinate glass halo');
+  assert.match(renderer, /let underPremultiplied = haloPremultiplied \+ refractionPremultiplied/u, 'halo and refraction remain premultiplied under-composites');
   assert.doesNotMatch(renderer, /internalPulse|scrollActivity|mix\(1\.75/u);
   assert.match(renderer, /createBuffer\(\{ size: 64/u);
   assert.match(renderer, /setInteraction\(next = \{\}\)/u, 'interaction updates share the renderer draw scheduler');
@@ -924,16 +948,21 @@ test('public Islamic geometry eases locally for pointer and touch without scroll
       const stage = document.querySelector('.geometry-stage');
       const before = getComputedStyle(document.querySelector('.geometry-static'));
       const under = getComputedStyle(document.querySelector('.geometry-refraction'));
+      const halo = getComputedStyle(document.querySelector('.geometry-halo'));
       const after = getComputedStyle(document.querySelector('.geometry-interaction'), '::before');
       const localUnder = getComputedStyle(document.querySelector('.geometry-interaction'), '::after');
+      const localHalo = getComputedStyle(document.querySelector('.geometry-interaction-halo'));
       const local = getComputedStyle(document.querySelector('.geometry-interaction'));
       return {
         beforeImage: before.backgroundImage,
         underImage: under.backgroundImage,
+        haloImage: halo.backgroundImage,
         afterImage: after.backgroundImage,
         localUnderImage: localUnder.backgroundImage,
+        localHaloImage: localHalo.backgroundImage,
         beforeOpacity: Number(before.opacity),
         underOpacity: Number(under.opacity),
+        haloOpacity: Number(halo.opacity),
         underTransform: under.transform,
         mainTransform: before.transform,
         localOpacity: Number(local.opacity),
@@ -942,18 +971,26 @@ test('public Islamic geometry eases locally for pointer and touch without scroll
         pointerEvents: local.pointerEvents,
         stroke: getComputedStyle(stage).getPropertyValue('--geometry-center-stroke').trim(),
         halfStroke: getComputedStyle(stage).getPropertyValue('--geometry-center-half').trim(),
+        staticMask: before.maskImage || before.webkitMaskImage,
+        vignette: getComputedStyle(document.querySelector('.geometry-vignette')).backgroundImage,
         overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
       };
     })()`);
     assert.equal(staticTiling.beforeImage, staticTiling.afterImage, 'static and local layers render the same tessellation');
     assert.equal(staticTiling.underImage, staticTiling.localUnderImage, 'static and local refraction share the same underlayer');
     assert.notEqual(staticTiling.beforeImage, staticTiling.underImage, 'refraction is not mixed into the crisp main pattern');
+    assert.notEqual(staticTiling.beforeImage, staticTiling.haloImage, 'the glass halo is not mixed into the crisp main pattern');
+    assert.ok(staticTiling.localHaloImage.includes('conic-gradient'), 'the local fallback owns a cell-sized internal rosette accent');
     assert.ok(staticTiling.beforeImage.includes('linear-gradient'), 'the crisp static tessellation remains rendered');
     assert.equal(staticTiling.beforeOpacity, 1, 'the 2.5px center core remains fully opaque while muted colors carry the surrounding field');
     assert.equal(staticTiling.underOpacity, 0.72, 'the distinct refraction layer remains subordinate');
+    assert.equal(staticTiling.haloOpacity, 1, 'the halo opacity is encoded in its translucent strokes, never by softening the main layer');
     assert.notEqual(staticTiling.underTransform, staticTiling.mainTransform, 'authored refraction rotation and overlap stay stable beneath the base');
     assert.equal(staticTiling.localOpacity, 0, 'the local layer starts settled');
     assert.match(staticTiling.afterMask, /radial-gradient/iu, 'the interactive copy is locally masked');
+    assert.match(staticTiling.staticMask, /closest-side/iu, 'the fallback lattice fades before its overscanned box edge');
+    assert.ok(staticTiling.vignette.includes('linear-gradient'), 'the viewport and fixed header edge receive a natural fade');
+    assert.match(staticTiling.vignette, /rgb\(7, 16, 14\) 100%/iu, 'the fallback is fully covered before the right stage clip');
     assert.deepEqual({ position: staticTiling.position, pointerEvents: staticTiling.pointerEvents, stroke: staticTiling.stroke, halfStroke: staticTiling.halfStroke, overflow: staticTiling.overflow }, {
       position: 'fixed', pointerEvents: 'none', stroke: 'rgb(242, 234, 216)', halfStroke: '1.25px', overflow: false,
     });
@@ -971,6 +1008,7 @@ test('public Islamic geometry eases locally for pointer and touch without scroll
       const localElement = document.querySelector('.geometry-interaction');
       const after = getComputedStyle(localElement, '::before');
       const localUnder = getComputedStyle(localElement, '::after');
+      const localHalo = getComputedStyle(document.querySelector('.geometry-interaction-halo'));
       const local = getComputedStyle(localElement);
       const hit = document.elementFromPoint(180, 170);
       return {
@@ -981,6 +1019,8 @@ test('public Islamic geometry eases locally for pointer and touch without scroll
         mask: local.maskImage || local.webkitMaskImage,
         localTransform: after.transform,
         localUnderTransform: localUnder.transform,
+        localHaloTransform: localHalo.transform,
+        localHaloImage: localHalo.backgroundImage,
         staticTransform: before.transform,
         scrollY: window.scrollY,
         scrollX: window.scrollX,
@@ -992,8 +1032,9 @@ test('public Islamic geometry eases locally for pointer and touch without scroll
     assert.ok(Math.abs(pointerTiling.x - 180) < 2 && Math.abs(pointerTiling.y - 170) < 2, `local mask must originate at the pointer: ${pointerTiling.x},${pointerTiling.y}`);
     assert.ok(pointerTiling.opacity > 0 && pointerTiling.opacity < 0.2, 'local overlay remains subtle while easing');
     assert.match(pointerTiling.mask, /radial-gradient/iu);
-    assert.notEqual(pointerTiling.localTransform, 'none', 'only the masked decorative copy transforms');
-    assert.notEqual(pointerTiling.localTransform, pointerTiling.staticTransform, 'the interaction transforms only its masked copy, independently of scroll geometry');
+    assert.equal(pointerTiling.localTransform, pointerTiling.staticTransform, 'the masked crisp copy preserves the rigid lattice coordinates');
+    assert.equal(pointerTiling.localHaloTransform, pointerTiling.staticTransform, 'the fallback halo keeps cell anchors fixed');
+    assert.notEqual(pointerTiling.localHaloImage, staticTiling.localHaloImage, 'pointer input rotates and expands only the shapes inside each fallback cell');
     assert.notEqual(pointerTiling.localUnderTransform, pointerTiling.localTransform, 'local refraction keeps its stronger authored overlap beneath the crisp copy');
     assert.deepEqual({ scrollY: pointerTiling.scrollY, scrollX: pointerTiling.scrollX, hit: pointerTiling.hit, overflow: pointerTiling.overflow }, {
       scrollY: pointerBaseline.scrollY, scrollX: 0, hit: pointerBaseline.hit, overflow: false,

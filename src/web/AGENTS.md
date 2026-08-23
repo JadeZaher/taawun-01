@@ -225,13 +225,13 @@ global lattice coordinate: a
 vertical edge uses `round(x)+floor(y)` and a horizontal edge uses
 `floor(x)+round(y)`, so both cell halves agree which physical diagonal passes on
 top. Emerald, gold, and rust refraction occupies an explicit underlayer rather
-than the crisp pattern itself. In CSS that underlayer precedes the main geometry
-in the DOM and keeps a stable 6px/-4px, 3.25-degree authored overlap. WebGPU
-samples the same lattice at a stable offset and composites its premultiplied
-color beneath the premultiplied main geometry. The localized lens may widen and
-rotate that overlap with pointer or touch strength, but scroll never changes
-rail width, color, turn, scale, or softness. The static HTML and CSS fallback
-carry the complete product story.
+than the crisp pattern itself. A second translucent wide-stroke halo sits above
+that refraction and below the exact core; neither layer uses blur or filters. In
+CSS the refraction keeps a stable 6px/-4px, 3.25-degree authored overlap. WebGPU
+composites the analytic halo and refraction as premultiplied underlayers before
+the premultiplied main geometry. Scroll never changes rail width, color, turn,
+scale, or softness. The static HTML and CSS fallback carry the complete product
+story.
 
 WebGPU may enhance only on capable desktop devices after idle, never moves text
 or captures scrolling. Scroll events update only a normalized target. A bounded
@@ -240,14 +240,16 @@ time and a 0.42 normalized velocity ceiling. Stiffness 22 with a 1.25 damping
 ratio produces a slow-starting monotonic slide; a tiny final positional
 normalization happens only inside the settlement tolerances. There is no
 scroll-activity impulse, internal phase, crossing wiggle, or moving-frame blur.
-Pointer/touch input owns the stronger local rotation, scale, lens position, and
-chromatic separation, and it still settles through the one guarded interaction
-frame. Lattice scale, octagonal connectors, bridge rails, and over/under straps
-remain fixed spatial anchors outside that bounded local envelope. The broad
-radial field is also multiplied by a narrow viewport-aware feather computed from unshifted canvas
-coordinates and the actual aspect ratio. Alpha reaches zero just inside every
-physical edge even on square or portrait-capable desktop viewports, so the
-shifted lattice cannot reveal the exact canvas boundary. Every travel frame
+Pointer/touch input counter-rotates and scales the outer star and inner rosette
+inside rigid cells, and it still settles through the one guarded interaction
+frame. Base lattice coordinates, octagonal connectors, bridge rails, and
+over/under straps remain fixed spatial anchors throughout that bounded local
+envelope. The CSS fallback expresses the same intent with cell-sized rosette
+accents above an aligned halo, never by transforming the crisp copy. The canvas
+renders into a bounded 40px overscan and the shader feathers against separately
+reported visible-viewport bounds; the fallback uses a closest-side radial fade
+and the fixed header/side vignette finishes the edge. Alpha therefore settles
+naturally before the stage clip without creating document overflow. Every travel frame
 retains the same crisp center and the renderer stops scheduling frames once both
 displacement and velocity settle. A draw over 50ms fails directly to the still design; two
 consecutive draws over 20ms also fail, while any intervening healthy draw clears
@@ -286,9 +288,10 @@ Canvas visibility changes immediately with the authoritative enhanced state; it
 does not use an opacity fade that a reload or browser history restoration can
 strand at its initial value. Decorative movement combines the bounded scroll
 response with one separately guarded, slowly eased local pointer/touch input.
-The CSS fallback masks separate refraction-under and crisp-main copies around
-the input; WebGPU applies the same bounded falloff and under-composite through
-its existing draw scheduler. Neither path transforms the whole field,
+The CSS fallback masks separate refraction, halo, cell-local shape, and
+crisp-main copies around the input; WebGPU applies the same bounded falloff and
+cell-internal morph through its existing draw scheduler. Neither path deforms
+the base lattice or transforms the whole field,
 intercepts touch scrolling, or creates another renderer loop. Touch release, pointer leave, blur, hidden-page,
 preference, pause, and pagehide paths clear the local state. Reduced motion keeps
 the crisp static tiling and suppresses all local movement.

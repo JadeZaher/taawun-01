@@ -40,13 +40,17 @@ const shaderSource = `
     let halfCore = pixelFootprint * max(u.renderMetrics.x, 1.0) * 1.25;
     return 1.0 - smoothstep(halfCore, halfCore + pixelFootprint * softness, distance);
   }
-  fn lattice(point: vec2f, scale: f32, turn: f32, softness: f32) -> vec3f {
+  fn lattice(point: vec2f, scale: f32, turn: f32, softness: f32, shapeMotion: f32, shapePhase: f32) -> vec4f {
     let tiledPoint = rotate2(point, turn) * scale;
     let cell = fract(tiledPoint) - vec2f(0.5);
-    let star = starOutline(cell);
+    let outerStarTurn = shapeMotion * (0.12 + 0.04 * sin(shapePhase));
+    let outerStarScale = 1.0 - shapeMotion * 0.07;
+    let star = starOutline(rotate2(cell, outerStarTurn) / outerStarScale) * outerStarScale;
     let diagonalA = abs(abs(cell.x + cell.y) - 0.5) * 0.70710678;
     let diagonalB = abs(abs(cell.x - cell.y) - 0.5) * 0.70710678;
-    let innerRosette = starOutline(rotate2(cell, 0.39269908) * 1.42) / 1.42;
+    let innerRosetteTurn = 0.39269908 - shapeMotion * (0.18 + 0.05 * cos(shapePhase * 0.82));
+    let innerRosetteScale = 1.0 + shapeMotion * 0.11;
+    let innerRosette = starOutline(rotate2(cell, innerRosetteTurn) * 1.42 / innerRosetteScale) * innerRosetteScale / 1.42;
     let junctionPoint = vec2f(0.5) - abs(cell);
     let junctionMetric = octagonMetric(junctionPoint);
     let junctionInterior = 1.0 - smoothstep(0.105, 0.135, junctionMetric);
@@ -67,12 +71,17 @@ const shaderSource = `
     let strapB = stroke(diagonalB, 0.008, softness) * strapGate * (1.0 - crossing * overUnder);
     let primary = max(stroke(star, 0.009, softness), max(connector, max(bridgeRails, max(strapA, strapB))));
     let secondary = stroke(innerRosette, 0.004, softness);
+    let connectorHalo = stroke(abs(junctionMetric - 0.145), 0.022, softness * 1.4);
+    let bridgeHalo = stroke(bridgePairDistance, 0.016, softness * 1.4) * bridgeStarGate * bridgeConnectorGate;
+    let strapAHalo = stroke(diagonalA, 0.022, softness * 1.4) * strapGate * (1.0 - crossing * (1.0 - overUnder));
+    let strapBHalo = stroke(diagonalB, 0.022, softness * 1.4) * strapGate * (1.0 - crossing * overUnder);
+    let halo = max(stroke(star, 0.026, softness * 1.4), max(stroke(innerRosette, 0.018, softness * 1.4), max(connectorHalo, max(bridgeHalo, max(strapAHalo, strapBHalo)))));
     let connectorCore = crispCenterStroke(abs(junctionMetric - 0.145), softness);
     let bridgeCore = crispCenterStroke(bridgePairDistance, softness) * bridgeStarGate * bridgeConnectorGate;
     let strapACore = crispCenterStroke(diagonalA, softness) * strapGate * (1.0 - crossing * (1.0 - overUnder));
     let strapBCore = crispCenterStroke(diagonalB, softness) * strapGate * (1.0 - crossing * overUnder);
     let centerCore = max(crispCenterStroke(star, softness), max(connectorCore, max(bridgeCore, max(strapACore, max(strapBCore, crispCenterStroke(innerRosette, softness))))));
-    return vec3f(primary, secondary, centerCore);
+    return vec4f(primary, secondary, centerCore, halo);
   }
   @fragment fn fragmentMain(@builtin(position) position: vec4f) -> @location(0) vec4f {
     let resolution = max(u.viewportScroll.xy, vec2f(1.0));
@@ -84,14 +93,15 @@ const shaderSource = `
     let stableTurn = 0.018;
     var interactionPoint = u.interaction.xy;
     interactionPoint.x -= side * 0.34;
-    let interactionDelta = uv - interactionPoint;
-    let interactionDistance = length(interactionDelta);
+    let basePoint = uv;
+    let latticeScale = 3.45;
+    let tiledBasePoint = rotate2(basePoint, stableTurn) * latticeScale;
+    let tiledCellCenter = floor(tiledBasePoint) + vec2f(0.5);
+    let cellCenter = rotate2(tiledCellCenter / latticeScale, -stableTurn);
+    let interactionDistance = length(cellCenter - interactionPoint);
     let interactionWave = 0.72 + 0.28 * cos(interactionDistance * 20.0 - u.interaction.w);
     let interactionEnvelope = (1.0 - smoothstep(0.035, 0.54, interactionDistance)) * u.interaction.z * interactionWave;
-    let localPoint = interactionPoint + rotate2(interactionDelta, interactionEnvelope * 0.082) * (1.0 + interactionEnvelope * 0.030);
-    let basePoint = localPoint;
-    let latticeScale = 3.45;
-    let baseLayer = lattice(basePoint, latticeScale, stableTurn, softness);
+    let baseLayer = lattice(basePoint, latticeScale, stableTurn, softness, interactionEnvelope, u.interaction.w);
     let authoredLensCenter = vec2f(0.20, -0.18);
     let lensCenter = mix(authoredLensCenter, interactionPoint, u.interaction.z * 0.82);
     let lensDistance = length(uv - lensCenter);
@@ -104,17 +114,17 @@ const shaderSource = `
     let bandDirection = bandVector / max(length(bandVector), 0.0001);
     let bandOffset = bandDirection * bandMagnitude;
     let mirrorOffset = vec2f(-bandOffset.y, bandOffset.x) * (0.82 + interactionEnvelope * 0.12);
-    let refractionPoint = rotate2(basePoint + vec2f(0.012, -0.008), 0.056 + interactionEnvelope * 0.045);
-    let emeraldBand = lattice(refractionPoint + bandOffset, latticeScale, stableTurn, softness);
-    let rustBand = lattice(refractionPoint - bandOffset, latticeScale, stableTurn, softness);
-    let mirrorBand = lattice(refractionPoint + mirrorOffset, latticeScale, stableTurn, softness);
+    let refractionPoint = rotate2(basePoint + vec2f(0.012, -0.008), 0.056);
+    let emeraldBand = lattice(refractionPoint + bandOffset, latticeScale, stableTurn, softness, interactionEnvelope * 0.45, u.interaction.w);
+    let rustBand = lattice(refractionPoint - bandOffset, latticeScale, stableTurn, softness, interactionEnvelope * 0.45, u.interaction.w);
+    let mirrorBand = lattice(refractionPoint + mirrorOffset, latticeScale, stableTurn, softness, interactionEnvelope * 0.45, u.interaction.w);
     let refractionEdge = abs(emeraldBand.x - rustBand.x);
     let chromaticEnvelope = 0.12 + lens * 0.72;
     let caustic = 0.5 + 0.5 * sin(refractionPoint.x * 5.0 - refractionPoint.y * 3.0 - u.interaction.w * u.interaction.z);
     let edgeFade = 1.0 - smoothstep(0.16, 1.65, length(uv));
-    let viewportHalfExtent = vec2f(resolution.x / resolution.y, 1.0);
-    let viewportEdgeDistance = min(viewportHalfExtent.x - abs(canvasUV.x), viewportHalfExtent.y - abs(canvasUV.y));
-    let viewportFeather = smoothstep(0.015, 0.10, viewportEdgeDistance);
+    let visibleHalfExtent = max(u.renderMetrics.yz, vec2f(0.001));
+    let viewportEdgeDistance = min(visibleHalfExtent.x - abs(canvasUV.x), visibleHalfExtent.y - abs(canvasUV.y));
+    let viewportFeather = smoothstep(0.0, 0.12, viewportEdgeDistance);
     var refractionColor = vec3f(0.012, 0.04, 0.034);
     refractionColor += vec3f(0.16, 0.57, 0.45) * emeraldBand.x * chromaticEnvelope * 0.58;
     refractionColor += vec3f(0.78, 0.24, 0.08) * rustBand.x * chromaticEnvelope * 0.52;
@@ -125,6 +135,9 @@ const shaderSource = `
     let refractionField = clamp((emeraldBand.x * 0.24 + rustBand.x * 0.22) * chromaticEnvelope + mirrorBand.y * (0.05 + lens * 0.11) + lens * 0.06 + refractionEdge * (0.06 + lens * 0.16), 0.0, 1.0);
     let refractionAlpha = clamp(refractionField * edgeFade * viewportFeather * 0.58, 0.0, 0.58);
     let refractionPremultiplied = refractionColor * refractionAlpha;
+    let haloAlpha = clamp(baseLayer.w * edgeFade * viewportFeather * 0.28, 0.0, 0.28);
+    let haloColor = vec3f(0.48, 0.72, 0.64);
+    let haloPremultiplied = haloColor * haloAlpha;
     var mainColor = vec3f(0.74, 0.56, 0.26);
     mainColor += vec3f(0.95, 0.68, 0.24) * baseLayer.x * 0.34;
     mainColor += vec3f(0.95, 0.68, 0.24) * baseLayer.y * 0.24;
@@ -133,8 +146,10 @@ const shaderSource = `
     let mainField = clamp(baseLayer.x * 0.48 + baseLayer.y * 0.68, 0.0, 1.0);
     let mainAlpha = clamp(max(mainField * 0.72, baseLayer.z) * edgeFade * viewportFeather, 0.0, 1.0);
     let mainPremultiplied = mainColor * mainAlpha;
-    let outputAlpha = mainAlpha + refractionAlpha * (1.0 - mainAlpha);
-    let outputPremultiplied = mainPremultiplied + refractionPremultiplied * (1.0 - mainAlpha);
+    let underAlpha = haloAlpha + refractionAlpha * (1.0 - haloAlpha);
+    let underPremultiplied = haloPremultiplied + refractionPremultiplied * (1.0 - haloAlpha);
+    let outputAlpha = mainAlpha + underAlpha * (1.0 - mainAlpha);
+    let outputPremultiplied = mainPremultiplied + underPremultiplied * (1.0 - mainAlpha);
     return vec4f(outputPremultiplied, outputAlpha);
   }
 `;
@@ -293,11 +308,13 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       const interactionX = ((interaction.x - canvasRect.left) * 2 - canvasRect.width) / Math.max(1, canvasRect.height);
       const interactionY = ((interaction.y - canvasRect.top) * 2 - canvasRect.height) / Math.max(1, canvasRect.height);
       const cssPixelRatio = canvas.height / Math.max(1, canvasRect.height);
+      const visibleHalfWidth = window.innerWidth / Math.max(1, canvasRect.height);
+      const visibleHalfHeight = window.innerHeight / Math.max(1, canvasRect.height);
       device.queue.writeBuffer(uniformBuffer, 0, new Float32Array([
         canvas.width, canvas.height, scroll, 0,
         section, side, 0, 1,
         interactionX, interactionY, interaction.strength, interaction.phase,
-        cssPixelRatio, 0, 0, 0,
+        cssPixelRatio, visibleHalfWidth, visibleHalfHeight, 0,
       ]));
       const encoder = device.createCommandEncoder();
       const pass = encoder.beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }] });
