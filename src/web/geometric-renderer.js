@@ -119,7 +119,7 @@ const shaderSource = `
     let rustBand = lattice(refractionPoint - bandOffset, latticeScale, stableTurn, softness, interactionEnvelope * 0.45, u.interaction.w);
     let mirrorBand = lattice(refractionPoint + mirrorOffset, latticeScale, stableTurn, softness, interactionEnvelope * 0.45, u.interaction.w);
     let refractionEdge = abs(emeraldBand.x - rustBand.x);
-    let chromaticEnvelope = 0.12 + lens * 0.72;
+    let chromaticEnvelope = 0.20 + lens * 0.64;
     let caustic = 0.5 + 0.5 * sin(refractionPoint.x * 5.0 - refractionPoint.y * 3.0 - u.interaction.w * u.interaction.z);
     let edgeFade = 1.0 - smoothstep(0.16, 1.65, length(uv));
     let visibleHalfExtent = max(u.renderMetrics.yz, vec2f(0.001));
@@ -141,7 +141,7 @@ const shaderSource = `
     var mainColor = vec3f(0.74, 0.56, 0.26);
     mainColor += vec3f(0.95, 0.68, 0.24) * baseLayer.x * 0.34;
     mainColor += vec3f(0.95, 0.68, 0.24) * baseLayer.y * 0.24;
-    mainColor = mix(mainColor, vec3f(0.38, 0.34, 0.24), baseLayer.z * 0.72);
+    mainColor = mix(mainColor, vec3f(0.94, 0.88, 0.70), baseLayer.z * 0.85);
     mainColor = clamp(mainColor, vec3f(0.0), vec3f(1.0));
     let mainField = clamp(baseLayer.x * 0.48 + baseLayer.y * 0.68, 0.0, 1.0);
     let mainAlpha = clamp(max(mainField * 0.72, baseLayer.z) * edgeFade * viewportFeather, 0.0, 1.0);
@@ -156,7 +156,7 @@ const shaderSource = `
 
 export async function createGeometricRenderer({ canvas, stage, onFailure = () => {} }) {
   const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'low-power' });
-  if (!adapter || adapter.isFallbackAdapter) return null;
+  if (!adapter || adapter.isFallbackAdapter || adapter.info?.isFallbackAdapter) return null;
   const device = await adapter.requestDevice();
   try {
   const context = canvas.getContext('webgpu');

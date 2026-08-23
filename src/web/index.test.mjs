@@ -416,7 +416,7 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(renderer, /lattice\(refractionPoint \+ bandOffset, latticeScale, stableTurn, softness, interactionEnvelope \* 0\.45/u);
   assert.doesNotMatch(renderer, /turn = .*transition|rotate2\([^\n]*transition/u);
   assert.match(renderer, /let bandMagnitude = bandCellOffset \/ latticeScale/u);
-  assert.match(renderer, /let chromaticEnvelope = 0\.12 \+ lens \* 0\.72/u);
+  assert.match(renderer, /let chromaticEnvelope = 0\.20 \+ lens \* 0\.64/u);
   assert.match(renderer, /let emeraldBand = lattice\(refractionPoint \+ bandOffset/u);
   assert.match(renderer, /let rustBand = lattice\(refractionPoint - bandOffset/u);
   assert.match(renderer, /let mirrorBand = lattice\(refractionPoint \+ mirrorOffset/u);
@@ -559,9 +559,9 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     const beforePointerInteraction = await evaluate(client, `({ submissions: window.__gpuQA.submissions, baseline: window.__gpuQA.uniforms.at(-1).slice(0, 8) })`);
     await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 300, y: 240 });
     await waitFor(() => evaluate(client, `window.__gpuQA.uniforms.at(-1)?.[10] > 0.12`), 'WebGPU receives gently eased local pointer strength');
-    const pointerInteraction = await evaluate(client, `(() => { const values = window.__gpuQA.uniforms.at(-1); const stage = document.querySelector('.geometry-stage'); return { length: values.length, x: values[8], y: values[9], strength: values[10], phase: values[11], path: values.slice(0, 8), state: stage.dataset.state, side: stage.dataset.side, interaction: stage.dataset.interaction, localOpacity: getComputedStyle(document.querySelector('.geometry-interaction')).opacity, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth }; })()`);
+    const pointerInteraction = await evaluate(client, `(() => { const values = window.__gpuQA.uniforms.at(-1); const stage = document.querySelector('.geometry-stage'); const rect = document.querySelector('#geometryCanvas').getBoundingClientRect(); return { length: values.length, x: values[8], y: values[9], expectedX: ((300 - rect.left) * 2 - rect.width) / rect.height, expectedY: ((240 - rect.top) * 2 - rect.height) / rect.height, strength: values[10], phase: values[11], path: values.slice(0, 8), state: stage.dataset.state, side: stage.dataset.side, interaction: stage.dataset.interaction, localOpacity: getComputedStyle(document.querySelector('.geometry-interaction')).opacity, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth }; })()`);
     assert.equal(pointerInteraction.length, 16, 'the expanded uniform keeps the original scroll fields and one bounded interaction payload');
-    assert.ok(Math.abs(pointerInteraction.x - (-2 / 3)) < 0.01 && Math.abs(pointerInteraction.y - (-7 / 15)) < 0.01, `shader interaction is local to the pointer: ${pointerInteraction.x},${pointerInteraction.y}`);
+    assert.ok(Math.abs(pointerInteraction.x - pointerInteraction.expectedX) < 0.01 && Math.abs(pointerInteraction.y - pointerInteraction.expectedY) < 0.01, `shader interaction maps the pointer into the overscanned canvas space the shader feathers against: ${pointerInteraction.x},${pointerInteraction.y} vs ${pointerInteraction.expectedX},${pointerInteraction.expectedY}`);
     assert.ok(pointerInteraction.strength > 0.12 && pointerInteraction.strength < 1 && pointerInteraction.phase > 0, 'pointer response eases instead of flashing to its final transform');
     assert.deepEqual({ path: pointerInteraction.path, state: pointerInteraction.state, side: pointerInteraction.side, localOpacity: pointerInteraction.localOpacity, overflow: pointerInteraction.overflow }, {
       path: beforePointerInteraction.baseline, state: '0', side: 'right', localOpacity: '0', overflow: false,
@@ -990,7 +990,7 @@ test('public Islamic geometry eases locally for pointer and touch without scroll
     assert.match(staticTiling.afterMask, /radial-gradient/iu, 'the interactive copy is locally masked');
     assert.match(staticTiling.staticMask, /closest-side/iu, 'the fallback lattice fades before its overscanned box edge');
     assert.ok(staticTiling.vignette.includes('linear-gradient'), 'the viewport and fixed header edge receive a natural fade');
-    assert.match(staticTiling.vignette, /rgb\(7, 16, 14\) 100%/iu, 'the fallback is fully covered before the right stage clip');
+    assert.match(staticTiling.vignette, /rgb\(8, 17, 15\) 100%/iu, 'the fallback is fully covered before the right stage clip');
     assert.deepEqual({ position: staticTiling.position, pointerEvents: staticTiling.pointerEvents, stroke: staticTiling.stroke, halfStroke: staticTiling.halfStroke, overflow: staticTiling.overflow }, {
       position: 'fixed', pointerEvents: 'none', stroke: 'rgb(242, 234, 216)', halfStroke: '1.25px', overflow: false,
     });

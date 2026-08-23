@@ -215,7 +215,11 @@ contrast, and forced-color paths. The resting pattern
 is a disciplined repeated eight-point star and rosette tessellation with narrow
 polygonal straps. Its static fallback and WebGPU enhancement share a fully
 opaque 2.5 CSS px center core; the surrounding color and field stay muted so
-the line remains crisp without competing with content. Shared rosette corners form an outlined octagonal connector
+the line remains crisp without competing with content. In both paths that core
+is the lightest parchment tone in the rail — the wider gold stroke body and
+mint halo sit beneath it — so rails read as lit inlay rather than engraved
+outline and the edge fades taper to fine bright lines instead of hollow
+double-strokes. Shared rosette corners form an outlined octagonal connector
 with an open center. Paired diagonal bridge rails enter at the real offset
 outer-arm intersection near lattice radius 0.406 and end on that octagon's
 boundary, making the connector part of the strap network without cutting through
@@ -225,7 +229,9 @@ global lattice coordinate: a
 vertical edge uses `round(x)+floor(y)` and a horizontal edge uses
 `floor(x)+round(y)`, so both cell halves agree which physical diagonal passes on
 top. Emerald, gold, and rust refraction occupies an explicit underlayer rather
-than the crisp pattern itself. A second translucent wide-stroke halo sits above
+than the crisp pattern itself, and its resting envelope stays perceptible so
+the untouched scene already reads as layered glass; the authored lens and
+local interaction only deepen that same envelope. A second translucent wide-stroke halo sits above
 that refraction and below the exact core; neither layer uses blur or filters. In
 CSS the refraction keeps a stable 6px/-4px, 3.25-degree authored overlap. WebGPU
 composites the analytic halo and refraction as premultiplied underlayers before
