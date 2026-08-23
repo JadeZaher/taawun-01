@@ -195,31 +195,39 @@ The Islamic geometric scene is progressive decoration. It occupies one
 transparent full-viewport layer rather than a framed object. Six authored
 content and static-fallback states place geometry right, right, left, left,
 right, right while readable content uses the inverse sequence. Enhanced WebGPU
-does not inherit those categorical section sides: normalized progress through
-the whole public `main` drives one cosine path from right, to one left apex at
-mid-main, and back right at the bottom. Scroll controls only that lagged lateral
-position. There are no same-side plateaus, section-boundary jumps, scale pulses,
-softness changes, shimmer phases, or additional lateral cycles. A fixed-step
-over-damped response makes the scene feel heavy while keeping wheel and swipe
-speed from setting travel speed or causing overshoot. Renderer eligibility follows the
+treats the whole tessellation as one rigid inertial panel: scroll never sets
+its position, it applies impulses, while soft anchors on the authored section
+sides pull the panel home. The panel carries mass — it starts slowly, lags
+scrolling like a heavy suspended screen, lifts a few thousandths of the frame
+against fast scrolling, and leans into travel with a bounded full-tile rotation
+of about a degree before settling back to its resting turn. A fixed 60Hz
+physics step with capped elapsed time, a velocity ceiling, and over-critical
+anchor damping keeps travel monotonic: no bounce, no oscillation, no wiggle
+after scrolling stops, and no scale pulses, softness changes, or shimmer
+phases. Renderer eligibility follows the
 entire public `main` region rather than ending with the sixth marker. The three
 post-Templates sections add no geometry states: they retain state 5 on the right
 and use a left-weighted translucent background so cards and text stay readable
 without hard-occluding the fixed scene. Small
-screens keep only restrained static edge peeks that fade beyond the viewport.
-Their 1.8-second transform starts slowly and uses a non-overshooting curve, so
-swipe or wheel rate never changes the transition duration and no transition
-scale reads as a snap. Continuation sections use
+screens enhance too when the device reports WebGPU with adequate memory and
+cores: they use wider side anchors, a tighter resolution budget, and the same
+settle-and-stop scheduler. Devices that stay on the fallback keep restrained
+static edge peeks whose 1.8-second transform starts slowly and uses a
+non-overshooting curve, so swipe or wheel rate never changes the transition
+duration and no transition scale reads as a snap. Continuation sections use
 a stronger uniform reading surface on mobile, reduced-transparency, increased-
 contrast, and forced-color paths. The resting pattern
 is a disciplined repeated eight-point star and rosette tessellation with narrow
 polygonal straps. Its static fallback and WebGPU enhancement share a fully
 opaque 2.5 CSS px center core; the surrounding color and field stay muted so
-the line remains crisp without competing with content. In both paths that core
-is the lightest parchment tone in the rail — the wider gold stroke body and
-mint halo sit beneath it — so rails read as lit inlay rather than engraved
-outline and the edge fades taper to fine bright lines instead of hollow
-double-strokes. Shared rosette corners form an outlined octagonal connector
+the line remains crisp without competing with content. The enhanced material is
+silver mirror-chrome in the ayeneh-kari spirit: every rail is a beveled
+polished bar shaded by one procedural high-contrast studio environment —
+near-white zenith and horizon flash over deep ink — and the palette lives in
+the reflections as an emerald under-band, a gold high band, and a rust sliver,
+with one bevel flank catching gold and the other emerald so color never sits on
+the geometry itself. The core survives as the fully opaque polished face of
+each rail. Shared rosette corners form an outlined octagonal connector
 with an open center. Paired diagonal bridge rails enter at the real offset
 outer-arm intersection near lattice radius 0.406 and end on that octagon's
 boundary, making the connector part of the strap network without cutting through
@@ -228,24 +236,25 @@ establish a visible over/under interlock. Crossing parity comes from the shared
 global lattice coordinate: a
 vertical edge uses `round(x)+floor(y)` and a horizontal edge uses
 `floor(x)+round(y)`, so both cell halves agree which physical diagonal passes on
-top. Emerald, gold, and rust refraction occupies an explicit underlayer rather
-than the crisp pattern itself, and its resting envelope stays perceptible so
-the untouched scene already reads as layered glass; the authored lens and
-local interaction only deepen that same envelope. A second translucent wide-stroke halo sits above
-that refraction and below the exact core; neither layer uses blur or filters. In
-CSS the refraction keeps a stable 6px/-4px, 3.25-degree authored overlap. WebGPU
-composites the analytic halo and refraction as premultiplied underlayers before
-the premultiplied main geometry. Scroll never changes rail width, color, turn,
-scale, or softness. The static HTML and CSS fallback carry the complete product
-story.
+top. Beneath the rails, large diamond mirror panes set at 45 degrees echo the
+strap diagonals and fill the voids as a dim mosaic ground that glints toward
+the live light. The pointer or touch point is a roaming light source, not a
+lens: rails carry a moving specular band, panes flare and die as it passes,
+one restrained anamorphic streak rides it, and inside a tight radius the
+reflections smear and flow like molten metal — that melt lives entirely in
+reflection space, so lattice coordinates never deform. Neither path uses blur
+or filters. In CSS the fallback keeps its stable 6px/-4px, 3.25-degree
+authored refraction overlap beneath an aligned halo. WebGPU composites panes,
+rails, and glare as premultiplied layers. Scroll never changes rail width,
+material, or softness. The static HTML and CSS fallback carry the complete
+product story.
 
-WebGPU may enhance only on capable desktop devices after idle, never moves text
-or captures scrolling. Scroll events update only a normalized target. A bounded
-over-damped response advances at a fixed 60Hz physics step with capped elapsed
-time and a 0.42 normalized velocity ceiling. Stiffness 22 with a 1.25 damping
-ratio produces a slow-starting monotonic slide; a tiny final positional
-normalization happens only inside the settlement tolerances. There is no
-scroll-activity impulse, internal phase, crossing wiggle, or moving-frame blur.
+WebGPU may enhance only on capable devices after idle, never moves text
+or captures scrolling. Scroll events update only the target anchor and a
+decaying impulse estimate; the anchor, lift, and tilt springs advance at a
+fixed 60Hz physics step with capped elapsed time and a velocity ceiling, and a
+tiny final positional normalization happens only inside the settlement
+tolerances. There is no crossing wiggle or moving-frame blur.
 Pointer/touch input counter-rotates and scales the outer star and inner rosette
 inside rigid cells, and it still settles through the one guarded interaction
 frame. Base lattice coordinates, octagonal connectors, bridge rails, and
@@ -292,12 +301,20 @@ and contains no decorative renderer.
 
 Canvas visibility changes immediately with the authoritative enhanced state; it
 does not use an opacity fade that a reload or browser history restoration can
-strand at its initial value. Decorative movement combines the bounded scroll
-response with one separately guarded, slowly eased local pointer/touch input.
+strand at its initial value. Decorative movement combines the inertial panel
+with one separately guarded, slowly eased local pointer/touch light.
 The CSS fallback masks separate refraction, halo, cell-local shape, and
-crisp-main copies around the input; WebGPU applies the same bounded falloff and
-cell-internal morph through its existing draw scheduler. Neither path deforms
-the base lattice or transforms the whole field,
-intercepts touch scrolling, or creates another renderer loop. Touch release, pointer leave, blur, hidden-page,
-preference, pause, and pagehide paths clear the local state. Reduced motion keeps
-the crisp static tiling and suppresses all local movement.
+crisp-main copies around the input; WebGPU applies the same bounded falloff,
+the cell-internal star morph, and its light-and-melt response through the
+existing draw scheduler. Neither path deforms the base lattice, intercepts
+touch scrolling, or creates another renderer loop; the only whole-field
+transform is the panel's own rigid inertial motion. Touch release, pointer
+leave, blur, hidden-page, preference, pause, and pagehide paths clear the
+local state. Reduced motion keeps the crisp static tiling and suppresses all
+local movement.
+
+The executable contract is a deliberate smoke tier as of 2026-08-23: landing
+layer/core/overscan structure, cleanup and no-overflow behavior, and mocked
+desktop and mobile enhancement journeys. The former exhaustive suite (cockpit
+trust flows, exact shader constants) was retired by decision and lives in git
+history.

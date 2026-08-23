@@ -90,8 +90,8 @@
     } catch { /* The visible control remains authoritative for this page. */ }
   };
   const environmentEligible = () => !reducedMotion.matches && !forcedColors.matches && !increasedContrast.matches && !reducedTransparency.matches &&
-    !Boolean(connection && connection.saveData) && window.innerWidth > 840 &&
-    (!navigator.deviceMemory || navigator.deviceMemory > 4) && (!navigator.hardwareConcurrency || navigator.hardwareConcurrency > 4) &&
+    !Boolean(connection && connection.saveData) &&
+    (!navigator.deviceMemory || navigator.deviceMemory >= 4) && (!navigator.hardwareConcurrency || navigator.hardwareConcurrency >= 4) &&
     Boolean(navigator.gpu) && sceneVisible;
   const motionControlEligible = () => !reducedMotion.matches && !forcedColors.matches && !increasedContrast.matches && !reducedTransparency.matches;
   const capable = () => environmentEligible() && !userPaused();
