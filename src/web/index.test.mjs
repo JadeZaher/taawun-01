@@ -349,15 +349,16 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(loader, /disposed = true;\s*observer\.disconnect\(\);\s*stop\(\);/u);
   assert.match(loader, /const stop = [\s\S]*?clearCanvasRecovery\(\);\s*updateStaticScene\(\);\s*renderer\?\.destroy\(\)/u);
   assert.doesNotMatch(loader, /addEventListener\('pagehide',[\s\S]*?\}, \{ once: true \}\)/u);
-  assert.match(loader, /const sideChanges = currentSide !== nextSide/u);
-  assert.match(loader, /if \(sideChanges && progress > 0\.12 && progress < 0\.88\)/u);
+  assert.doesNotMatch(loader, /sideChanges|data-transition.*true/u, 'fallback scroll state changes position without a scale pulse');
   assert.match(html, /--geometry-x: 22vw/u);
-  assert.match(html, /transition: transform 1200ms cubic-bezier\(\.22,\.72,\.2,1\)/u);
+  assert.match(html, /\.geometry-refraction[^}]*transition: transform 1800ms cubic-bezier\(\.34,\.08,\.22,1\)/u);
+  assert.match(html, /\.geometry-static[^}]*transition: transform 1800ms cubic-bezier\(\.34,\.08,\.22,1\)/u);
+  assert.doesNotMatch(html, /data-transition="true"|data-transition="true"\][^}]*--geometry-scale/u, 'fallback movement has no scroll-driven scale pulse');
   assert.equal((html.match(/class="content-section geometry-continuation(?: final)?"/gu) || []).length, 3);
   assert.doesNotMatch(html, /geometry-continuation[^>]*data-geometry-state/u);
   assert.match(html, /\.content-section\.geometry-continuation \{ background: linear-gradient\(90deg,[^}]*transparent 100%\)/u);
   assert.match(html, /--geometry-turn: 1deg/u);
-  assert.match(html, /data-side="left"[^}]*--geometry-turn: -1deg/u);
+  assert.doesNotMatch(html, /data-side="left"[^}]*--geometry-turn/u, 'fallback side changes translate without rotating the complete field');
   assert.ok(loader.indexOf('if (!capable()') < loader.indexOf("import('/geometric-renderer.js')"), 'capability checks must precede the renderer request');
   assert.match(renderer, /powerPreference: 'low-power'/u);
   assert.match(renderer, /adapter\.isFallbackAdapter/u);
@@ -384,38 +385,36 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(renderer, /let crossingID = select\(horizontalCrossingID, verticalCrossingID, verticalCrossing\)/u);
   assert.match(renderer, /let overUnder = step\(0\.5, fract\(crossingID \* 0\.5\)\)/u);
   assert.match(renderer, /strapA = stroke\(diagonalA[\s\S]*?strapB = stroke\(diagonalB/u);
-  assert.match(renderer, /let softness = mix\(1\.75, 1\.0, u\.stageMotion\.w\)/u);
-  assert.match(renderer, /let travel = 1\.0 - u\.stageMotion\.w/u);
-  assert.match(renderer, /let sceneTravel = travel \* transition/u);
-  assert.match(renderer, /let internalPulse = travel \* \(0\.58 \+ 0\.42 \* sin\(phase\)\)/u);
-  assert.match(renderer, /let kaleidoscopeTravel = max\(sceneTravel, internalPulse \* 0\.45\)/u);
-  assert.match(renderer, /let lensCenter = vec2f\(side \* 0\.08 \+ 0\.26 \* sin\(phase \* 0\.72 \+ transition\), -0\.18 \+ 0\.12 \* cos\(phase \* 0\.54\)\)/u);
+  assert.match(renderer, /let softness = 1\.0/u);
+  assert.doesNotMatch(renderer, /mix\(1\.75|internalPulse|kaleidoscopeTravel|sceneTravel|\btravel\b/u, 'scroll never changes line softness, scale, turn, or overlap');
+  assert.doesNotMatch(renderer, /u\.stageMotion\.[xzw]|u\.viewportScroll\.[zw]/u, 'only the lagged side position enters shader geometry');
+  assert.match(renderer, /let authoredLensCenter = vec2f\(0\.20, -0\.18\)/u);
+  assert.match(renderer, /let lensCenter = mix\(authoredLensCenter, interactionPoint, u\.interaction\.z \* 0\.82\)/u);
   assert.match(renderer, /let canvasUV = \(position\.xy \* 2\.0 - resolution\) \/ resolution\.y;\s*var uv = canvasUV/u);
-  assert.match(renderer, /let outerStarScale = 1\.0 - travel \* 0\.035/u);
-  assert.match(renderer, /let innerRosetteScale = 1\.0 \+ travel \* 0\.045/u);
-  assert.match(renderer, /let star = starOutline\(cell \/ outerStarScale\) \* outerStarScale/u);
-  assert.match(renderer, /let innerRosette = starOutline\(rotate2\(cell, 0\.39269908\) \* 1\.42 \/ innerRosetteScale\) \* innerRosetteScale \/ 1\.42/u);
-  assert.match(renderer, /fn lattice\(point: vec2f, scale: f32, turn: f32, softness: f32, travel: f32\)/u);
+  assert.match(renderer, /let star = starOutline\(cell\)/u);
+  assert.match(renderer, /let innerRosette = starOutline\(rotate2\(cell, 0\.39269908\) \* 1\.42\) \/ 1\.42/u);
+  assert.match(renderer, /fn lattice\(point: vec2f, scale: f32, turn: f32, softness: f32\)/u);
   assert.match(renderer, /let latticeScale = 3\.45/u);
   assert.doesNotMatch(renderer, /latticeScale \*=|latticeScale = [^;]*(?:travel|section)/u);
   assert.match(renderer, /let stableTurn = 0\.018/u);
   assert.doesNotMatch(renderer, /stableTurn\s*=\s*[^;]*section/u);
-  assert.match(renderer, /let turn = stableTurn \+ sceneTravel \* 0\.012/u);
+  assert.doesNotMatch(renderer, /let turn =|stableTurn \+/u);
   assert.match(renderer, /let interactionEnvelope = \(1\.0 - smoothstep\(0\.035, 0\.54, interactionDistance\)\) \* u\.interaction\.z \* interactionWave/u);
-  assert.match(renderer, /let localPoint = interactionPoint \+ rotate2\(interactionDelta, interactionEnvelope \* 0\.035\) \* \(1\.0 \+ interactionEnvelope \* 0\.018\)/u);
-  assert.match(renderer, /let basePoint = rotate2\(localPoint, sceneTravel \* 0\.006\)/u);
+  assert.match(renderer, /let localPoint = interactionPoint \+ rotate2\(interactionDelta, interactionEnvelope \* 0\.082\) \* \(1\.0 \+ interactionEnvelope \* 0\.030\)/u);
+  assert.match(renderer, /let basePoint = localPoint/u);
   assert.match(renderer, /uv\.x -= side \* 0\.34/u);
-  assert.match(renderer, /let bandCellOffset = 0\.010 \+ lens \* 0\.010 \+ internalPulse \* 0\.0008 \+ sceneTravel \* 0\.0012/u);
+  assert.match(renderer, /let bandCellOffset = 0\.016 \+ lens \* 0\.012 \+ interactionEnvelope \* 0\.006/u);
   assert.doesNotMatch(renderer, /scroll \* 0\.045|scroll \* 0\.025/u);
-  assert.match(renderer, /lattice\(basePoint, latticeScale, turn, softness, kaleidoscopeTravel\)/u);
-  assert.match(renderer, /lattice\(basePoint \+ bandOffset, latticeScale, turn, softness, kaleidoscopeTravel\)/u);
-  assert.doesNotMatch(renderer, /turn = .*transition|rotate2\([^\n]*transition \* 0\.025/u);
+  assert.match(renderer, /lattice\(basePoint, latticeScale, stableTurn, softness\)/u);
+  assert.match(renderer, /let refractionPoint = rotate2\(basePoint \+ vec2f\(0\.012, -0\.008\), 0\.056 \+ interactionEnvelope \* 0\.045\)/u);
+  assert.match(renderer, /lattice\(refractionPoint \+ bandOffset, latticeScale, stableTurn, softness\)/u);
+  assert.doesNotMatch(renderer, /turn = .*transition|rotate2\([^\n]*transition/u);
   assert.match(renderer, /let bandMagnitude = bandCellOffset \/ latticeScale/u);
-  assert.match(renderer, /let chromaticEnvelope = 0\.07 \+ lens \* 0\.68/u);
-  assert.match(renderer, /let emeraldBand = lattice\(basePoint \+ bandOffset/u);
-  assert.match(renderer, /let rustBand = lattice\(basePoint - bandOffset/u);
-  assert.match(renderer, /let mirrorBand = lattice\(basePoint \+ mirrorOffset/u);
-  assert.match(renderer, /let mirrorOffset = vec2f\(-bandOffset\.y, bandOffset\.x\) \* \(0\.72 \+ internalPulse \* 0\.06\)/u);
+  assert.match(renderer, /let chromaticEnvelope = 0\.12 \+ lens \* 0\.72/u);
+  assert.match(renderer, /let emeraldBand = lattice\(refractionPoint \+ bandOffset/u);
+  assert.match(renderer, /let rustBand = lattice\(refractionPoint - bandOffset/u);
+  assert.match(renderer, /let mirrorBand = lattice\(refractionPoint \+ mirrorOffset/u);
+  assert.match(renderer, /let mirrorOffset = vec2f\(-bandOffset\.y, bandOffset\.x\) \* \(0\.82 \+ interactionEnvelope \* 0\.12\)/u);
   assert.match(renderer, /refractionVector \/ max\(length\(refractionVector\), 0\.0001\)/u);
   assert.match(renderer, /bandVector \/ max\(length\(bandVector\), 0\.0001\)/u);
   assert.doesNotMatch(renderer, /normalize\(/u);
@@ -425,47 +424,40 @@ test('geometric enhancement is surface-level, optional, and spring-driven', asyn
   assert.match(renderer, /let viewportHalfExtent = vec2f\(resolution\.x \/ resolution\.y, 1\.0\)/u);
   assert.match(renderer, /let viewportEdgeDistance = min\(viewportHalfExtent\.x - abs\(canvasUV\.x\), viewportHalfExtent\.y - abs\(canvasUV\.y\)\)/u);
   assert.match(renderer, /let viewportFeather = smoothstep\(0\.015, 0\.10, viewportEdgeDistance\)/u);
-  assert.match(renderer, /field \* edgeFade \* viewportFeather/u);
+  assert.match(renderer, /let refractionPremultiplied = refractionColor \* refractionAlpha/u);
+  assert.match(renderer, /let mainPremultiplied = mainColor \* mainAlpha/u);
+  assert.match(renderer, /let outputAlpha = mainAlpha \+ refractionAlpha \* \(1\.0 - mainAlpha\)/u);
+  assert.match(renderer, /let outputPremultiplied = mainPremultiplied \+ refractionPremultiplied \* \(1\.0 - mainAlpha\)/u, 'refraction is explicitly source-over composited beneath the crisp base');
+  assert.match(renderer, /return vec4f\(outputPremultiplied, outputAlpha\)/u);
+  assert.doesNotMatch(renderer, /color \+=.*(?:emeraldBand|rustBand)|field = clamp\([^\n]*(?:emeraldBand|rustBand)/u, 'refraction is not mixed into main color or alpha');
   assert.match(renderer, /const FIXED_STEP_SECONDS = 1 \/ 60/u);
   assert.match(renderer, /const MAX_DT_SECONDS = 0\.05/u);
-  assert.match(renderer, /const SPRING_STIFFNESS = 72/u);
-  assert.match(renderer, /const SPRING_DAMPING = 2 \* Math\.sqrt\(SPRING_STIFFNESS\)/u);
-  assert.match(renderer, /const INTERNAL_PHASE_RATE = 0\.55/u);
-  assert.match(renderer, /const INTERNAL_PHASE_EASE = 0\.18/u);
-  assert.match(renderer, /const INTERNAL_PHASE_SETTLE_VELOCITY = 0\.001/u);
-  assert.match(renderer, /const SCROLL_ACTIVITY_DECAY = 0\.12/u);
-  assert.match(renderer, /const SCROLL_ACTIVITY_SETTLE = 0\.004/u);
-  assert.match(renderer, /const SCROLL_ACTIVITY_STRENGTH = 0\.32/u);
-  assert.match(renderer, /const MAX_VELOCITY = 0\.9/u);
+  assert.match(renderer, /const SPRING_STIFFNESS = 22/u);
+  assert.match(renderer, /const SPRING_DAMPING_RATIO = 1\.25/u);
+  assert.match(renderer, /const SPRING_DAMPING = 2 \* Math\.sqrt\(SPRING_STIFFNESS\) \* SPRING_DAMPING_RATIO/u);
+  assert.match(renderer, /const MAX_VELOCITY = 0\.42/u);
   assert.match(renderer, /const landingMain = document\.querySelector\('main'\)/u);
   assert.match(renderer, /while \(physicsAccumulator >= FIXED_STEP_SECONDS\)/u);
-  assert.match(renderer, /const internalMotionActive = Math\.abs\(priorDistance\) > SETTLE_DISTANCE \|\| Math\.abs\(springVelocity\) > SETTLE_VELOCITY \|\| scrollActivity > SCROLL_ACTIVITY_SETTLE/u);
-  assert.match(renderer, /const internalPhaseTarget = internalMotionActive \? INTERNAL_PHASE_RATE : 0/u);
-  assert.match(renderer, /internalPhaseVelocity \+= \(internalPhaseTarget - internalPhaseVelocity\) \* INTERNAL_PHASE_EASE/u);
-  assert.match(renderer, /if \(!internalMotionActive && Math\.abs\(internalPhaseVelocity\) <= INTERNAL_PHASE_SETTLE_VELOCITY\) internalPhaseVelocity = 0/u);
-  assert.match(renderer, /internalPhase = \(internalPhase \+ internalPhaseVelocity \* FIXED_STEP_SECONDS\) % \(Math\.PI \* 2\)/u);
-  assert.match(renderer, /scrollActivity \*= 1 - SCROLL_ACTIVITY_DECAY/u);
-  assert.match(renderer, /settling = !springSettled \|\| internalPhaseVelocity !== 0 \|\| scrollActivity !== 0/u);
+  assert.doesNotMatch(renderer, /internalPhase|internalPulse|scrollActivity|motionAmount|settledMix/u);
+  assert.match(renderer, /settling = !springSettled/u);
   assert.match(renderer, /if \(!settling\) \{\s*physicsAccumulator = 0;\s*lastPhysicsTime = 0;/u);
-  assert.match(renderer, /priorDistance \* \(targetScroll - springScroll\) <= 0/u);
-  assert.match(renderer, /const motionAmount = moving \? Math\.min\(1,[\s\S]*?const settledMix = 1 - motionAmount/u);
+  assert.doesNotMatch(renderer, /priorDistance \* \(targetScroll - springScroll\) <= 0/u, 'over-damping makes a crossing snap unnecessary');
   assert.match(renderer, /const mainProgress = Math\.min\(1, Math\.max\(0, \(scrollTop - mainStart\) \/ mainScrollSpan\)\)/u);
   assert.match(renderer, /const lateralAngle = Math\.PI \* 2 \* mainProgress/u);
   assert.match(renderer, /const side = Math\.cos\(lateralAngle\)/u);
-  assert.match(renderer, /const transition = Math\.abs\(Math\.sin\(lateralAngle\)\)/u);
+  assert.doesNotMatch(renderer, /const transition =|const phase =/u);
   assert.doesNotMatch(renderer, /const currentSide|const nextSide|const sideChanges|const sideProgress/u);
-  assert.match(renderer, /const phase = internalPhase/u);
-  assert.match(renderer, /if \(moving && transition > 0\.24\) stage\.dataset\.transition = 'true'/u);
+  assert.match(renderer, /stage\.removeAttribute\('data-transition'\)/u);
   assert.match(renderer, /if \(elapsed > 50 \|\| \(elapsed > 20 && lastFrameCostExceeded\)\)/u);
   assert.match(renderer, /if \(elapsed > 20\)[^\n]*lastFrameCostExceeded = true[^\n]*\n\s*else lastFrameCostExceeded = false/u);
   assert.match(renderer, /let replacementDrawRequired = false/u);
   assert.match(renderer, /if \(elapsed > 20\)[^\n]*replacementDrawRequired = true/u);
   assert.match(renderer, /if \(moving \|\| replacementDrawRequired\) requestDraw\(\)/u);
   assert.match(scrollHandler, /const nextTarget = readScrollTarget\(\)/u);
-  assert.match(scrollHandler, /scrollActivity = 1/u);
+  assert.doesNotMatch(scrollHandler, /scrollActivity|internalPhase/u);
   assert.doesNotMatch(scrollHandler, /writeBuffer|window\.scrollY|dataset\.state/u);
   assert.match(renderer, /clearValue: \{ r: 0, g: 0, b: 0, a: 0 \}/u);
-  assert.match(renderer, /color \* alpha, alpha/u);
+  assert.doesNotMatch(renderer, /color \* alpha, alpha/u);
 });
 
 test('promoted browser proves WebGPU enhancement, reversible pause, failure fallback, and reduced motion', { timeout: 90_000 }, async () => {
@@ -536,7 +528,7 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     })();` });
     await client.send('Page.navigate', { url: origin });
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage')?.dataset.enhanced === 'true' && !document.querySelector('#motionToggle').hidden`), 'mocked WebGPU enhancement');
-    const initial = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, submissions: window.__gpuQA.submissions, renderer: document.querySelector('#geometryCanvas').dataset.renderer || '', canvasOpacity: getComputedStyle(document.querySelector('#geometryCanvas')).opacity, canvasTransitionDuration: getComputedStyle(document.querySelector('#geometryCanvas')).transitionDuration, controlHeight: Math.round(document.querySelector('#motionToggle').getBoundingClientRect().height), state: document.querySelector('.geometry-stage').dataset.state, side: document.querySelector('.geometry-stage').dataset.side, connector: window.__gpuQA.shaderSource.includes('junctionInterior') && window.__gpuQA.shaderSource.includes('overUnder'), connectedOctagon: window.__gpuQA.shaderSource.includes('bridgePairDistance') && window.__gpuQA.shaderSource.includes('bridgeConnectorGate'), stableCrossing: window.__gpuQA.shaderSource.includes('verticalCrossingID') && window.__gpuQA.shaderSource.includes('horizontalCrossingID'), adjacentBands: window.__gpuQA.shaderSource.includes('bandCellOffset / latticeScale') && window.__gpuQA.shaderSource.includes('basePoint + bandOffset') && window.__gpuQA.shaderSource.includes('basePoint - bandOffset'), nestedTravel: window.__gpuQA.shaderSource.includes('outerStarScale') && window.__gpuQA.shaderSource.includes('innerRosetteScale') && window.__gpuQA.shaderSource.includes('travel: f32'), internalMotion: window.__gpuQA.shaderSource.includes('internalPulse') && window.__gpuQA.shaderSource.includes('kaleidoscopeTravel'), crispCore: window.__gpuQA.shaderSource.includes('crispCenterStroke') && window.__gpuQA.shaderSource.includes('halfCore'), localInteraction: window.__gpuQA.shaderSource.includes('interactionEnvelope') && window.__gpuQA.shaderSource.includes('localPoint') })`);
+    const initial = await evaluate(client, `({ requests: window.__gpuQA.adapterRequests, submissions: window.__gpuQA.submissions, renderer: document.querySelector('#geometryCanvas').dataset.renderer || '', canvasOpacity: getComputedStyle(document.querySelector('#geometryCanvas')).opacity, canvasTransitionDuration: getComputedStyle(document.querySelector('#geometryCanvas')).transitionDuration, controlHeight: Math.round(document.querySelector('#motionToggle').getBoundingClientRect().height), state: document.querySelector('.geometry-stage').dataset.state, side: document.querySelector('.geometry-stage').dataset.side, connector: window.__gpuQA.shaderSource.includes('junctionInterior') && window.__gpuQA.shaderSource.includes('overUnder'), connectedOctagon: window.__gpuQA.shaderSource.includes('bridgePairDistance') && window.__gpuQA.shaderSource.includes('bridgeConnectorGate'), stableCrossing: window.__gpuQA.shaderSource.includes('verticalCrossingID') && window.__gpuQA.shaderSource.includes('horizontalCrossingID'), adjacentBands: window.__gpuQA.shaderSource.includes('bandCellOffset / latticeScale') && window.__gpuQA.shaderSource.includes('refractionPoint + bandOffset') && window.__gpuQA.shaderSource.includes('refractionPoint - bandOffset'), separateUnder: window.__gpuQA.shaderSource.includes('refractionPremultiplied') && window.__gpuQA.shaderSource.includes('mainPremultiplied') && window.__gpuQA.shaderSource.includes('1.0 - mainAlpha'), scrollIndependent: !window.__gpuQA.shaderSource.includes('internalPulse') && !window.__gpuQA.shaderSource.includes('scrollActivity') && !window.__gpuQA.shaderSource.includes('mix(1.75'), crispCore: window.__gpuQA.shaderSource.includes('crispCenterStroke') && window.__gpuQA.shaderSource.includes('halfCore'), localInteraction: window.__gpuQA.shaderSource.includes('interactionEnvelope * 0.082') && window.__gpuQA.shaderSource.includes('localPoint') })`);
     assert.equal(initial.requests, 1);
     assert.ok(initial.submissions >= 1);
     assert.equal(initial.renderer, 'webgpu');
@@ -549,8 +541,8 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     assert.equal(initial.connectedOctagon, true);
     assert.equal(initial.stableCrossing, true);
     assert.equal(initial.adjacentBands, true);
-    assert.equal(initial.nestedTravel, true);
-    assert.equal(initial.internalMotion, true);
+    assert.equal(initial.separateUnder, true);
+    assert.equal(initial.scrollIndependent, true);
     assert.equal(initial.crispCore, true);
     assert.equal(initial.localInteraction, true);
 
@@ -603,14 +595,13 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
       return window.scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
     })()`);
     assert.ok(microScrollTarget > 0 && microScrollTarget < 0.0002, 'the regression nudge stays below the positional spring settle distance');
-    await waitFor(() => evaluate(client, `window.__gpuQA.submissions >= ${beforeMicroScroll + 3}`), 'first tiny scroll immediately drives visible internal motion');
+    await waitFor(() => evaluate(client, `window.__gpuQA.submissions > ${beforeMicroScroll}`), 'tiny scroll receives one positional response');
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.spring === 'settled'`), 'tiny-scroll activity settles cleanly');
-    const microScroll = await evaluate(client, `window.__gpuQA.uniforms.slice(${beforeMicroScroll}).map((values) => ({ phase: values[3], side: values[5], transition: values[6], sharp: values[7] }))`);
-    assert.ok(microScroll.length > 2 && microScroll.length < 90, `tiny-scroll activity remains bounded: ${microScroll.length}`);
-    assert.ok(microScroll.some((sample) => sample.sharp < 0.8), 'the first tiny delta produces a visible fixed-strength tessellation pulse');
-    assert.ok(microScroll.slice(1).some((sample, index) => sample.phase > microScroll[index].phase), 'the first tiny delta advances the internal phase');
-    assert.ok(microScroll.every((sample) => sample.side > 0.999 && sample.side <= 1 && sample.transition >= 0 && sample.transition < 0.01), 'the tiny scroll begins the continuous page path without a jump or extra crossing');
-    assert.equal(microScroll.at(-1)?.sharp, 1, 'the tiny-scroll pulse returns to the exact sharp resting pattern');
+    const microScroll = await evaluate(client, `window.__gpuQA.uniforms.slice(${beforeMicroScroll}).map((values) => ({ scroll: values[2], phase: values[3], side: values[5], transition: values[6], sharp: values[7] }))`);
+    assert.ok(microScroll.length >= 1 && microScroll.length < 45, `tiny positional response remains bounded: ${microScroll.length}`);
+    assert.ok(microScroll.every((sample) => sample.phase === 0 && sample.transition === 0 && sample.sharp === 1), 'even the smallest scroll keeps phase, overlap, and line softness invariant');
+    assert.ok(microScroll.every((sample) => sample.side > 0.999 && sample.side <= 1), 'the tiny scroll begins only the continuous positional path');
+    assert.ok(Math.abs(microScroll.at(-1).scroll - microScrollTarget) < 0.00001, 'tiny positional travel settles exactly without a visual pulse');
 
     const beforeScroll = await evaluate(client, `window.__gpuQA.submissions`);
     const scrollTarget = await evaluate(client, `(() => {
@@ -627,16 +618,15 @@ test('promoted browser proves WebGPU enhancement, reversible pause, failure fall
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.state !== '0'`), 'approaching-section state transition');
     await waitFor(() => evaluate(client, `document.querySelector('.geometry-stage').dataset.spring === 'settled'`), 'bounded spring settlement');
     const settled = await evaluate(client, `({ submissions: window.__gpuQA.submissions, samples: window.__gpuQA.uniforms.slice(${beforeScroll}).map((values) => ({ scroll: values[2], phase: values[3], side: values[5], transition: values[6], sharp: values[7] })) })`);
-    assert.ok(settled.submissions > beforeScroll + 2 && settled.submissions < beforeScroll + 120, `spring must settle in a bounded number of frames: ${settled.submissions - beforeScroll}`);
+    assert.ok(settled.submissions > beforeScroll + 12 && settled.submissions < beforeScroll + 170, `heavy over-damped spring must settle in a bounded number of frames: ${settled.submissions - beforeScroll}`);
     assert.ok(settled.samples.every((sample) => sample.scroll <= scrollTarget.normalized + 0.00001), 'smoothed travel must not overshoot the target');
     assert.ok(settled.samples.every((sample, index, samples) => index === 0 || sample.scroll + 0.00001 >= samples[index - 1].scroll), 'downward travel must settle without a reverse swing');
+    const slideDeltas = settled.samples.slice(1).map((sample, index) => sample.scroll - settled.samples[index].scroll);
+    assert.ok(slideDeltas.length > 8 && slideDeltas[0] < Math.max(...slideDeltas), 'the heavy slide starts slowly before reaching its bounded travel rate');
+    assert.ok(slideDeltas.every((delta) => delta >= -0.00001 && delta < 0.012), `the over-damped slide has no snap-sized step: ${Math.max(...slideDeltas)}`);
     assert.ok(settled.samples.some((sample) => sample.side < 0.999) && settled.samples.every((sample, index, samples) => index === 0 || sample.side <= samples[index - 1].side + 0.00001), 'scrolling through same-side content advances the one continuous outbound lateral path without a plateau or reversal');
-    assert.ok(settled.samples.some((sample) => sample.transition > 0) && settled.samples.every((sample) => sample.transition >= 0 && sample.transition <= 1), 'crossing shimmer follows the same bounded page path');
     assert.ok(Math.abs(settled.samples.at(-1).side - scrollTarget.expectedSide) < 0.0001, 'settled lateral position equals the page-length path rather than a section side');
-    const internalPhaseDeltas = settled.samples.slice(1).map((sample, index) => sample.phase - settled.samples[index].phase);
-    assert.ok(internalPhaseDeltas.some((delta) => delta > 0) && internalPhaseDeltas.every((delta) => delta >= 0 && delta <= 0.04), 'same-side scrolling advances a small fixed-rate internal phase without wheel-speed-linked jumps');
-    assert.ok(internalPhaseDeltas.at(-1) <= 0.001, 'internal phase eases to an imperceptible final step instead of freezing at full velocity');
-    assert.ok(settled.samples.some((sample) => sample.sharp < 0.99) && settled.samples.at(-1)?.sharp === 1, 'moving frames soften and the final settled frame sharpens the tessellation');
+    assert.ok(settled.samples.every((sample) => sample.phase === 0 && sample.transition === 0 && sample.sharp === 1), 'scroll changes position only: phase, overlap, and crispness stay exact on every frame');
     await wait(250);
     assert.equal(await evaluate(client, `window.__gpuQA.submissions`), settled.submissions, 'settled spring must stop submitting frames');
 
@@ -855,16 +845,21 @@ test('bounded UI safety mutations stay self/workspace scoped and version guarded
   assert.match(html, /details summary \{ min-height: 44px; min-width: 44px;/u);
 });
 
-test('public Islamic geometry keeps one crisp pattern and one bounded local interaction loop', async () => {
+test('public Islamic geometry separates refraction under a crisp base and keeps one bounded local loop', async () => {
   const html = await readFile(new URL('./landing.html', import.meta.url), 'utf8');
   const loader = await readFile(new URL('./geometric-landing.js', import.meta.url), 'utf8');
   const renderer = await readFile(new URL('./geometric-renderer.js', import.meta.url), 'utf8');
   const css = html.match(/<style>([\s\S]*?)<\/style>/u)?.[1] || '';
 
-  assert.equal((css.match(/--geometry-pattern:/gu) || []).length, 1, 'static and local geometry reuse one pattern definition');
+  assert.equal((css.match(/--geometry-main-pattern:/gu) || []).length, 1, 'static and local main geometry reuse one pattern definition');
+  assert.equal((css.match(/--geometry-refraction-pattern:/gu) || []).length, 1, 'static and local refraction reuse one underlayer definition');
   assert.match(css, /--geometry-center-stroke:\s*rgb\(242, 234, 216\)/u, 'the gradient center uses an opaque theme stroke');
   assert.match(css, /--geometry-center-half:\s*1\.25px/u, 'the crisp center stroke is exactly 2.5 CSS px wide');
-  assert.match(css, /\.geometry-static, \.geometry-interaction::before[^}]*background-image:\s*var\(--geometry-pattern\)/u, 'both decorative layers share the pattern');
+  assert.match(html, /<div class="geometry-refraction"><\/div>\s*<div class="geometry-static"><\/div>/u, 'refraction is an explicit DOM layer beneath the crisp base');
+  assert.match(css, /\.geometry-refraction, \.geometry-interaction::after[^}]*background-image:\s*var\(--geometry-refraction-pattern\)/u, 'both underlayers share only the refraction pattern');
+  assert.match(css, /\.geometry-static, \.geometry-interaction::before[^}]*background-image:\s*var\(--geometry-main-pattern\)/u, 'both crisp layers share only the main pattern');
+  assert.match(css, /\.geometry-refraction \{[^}]*translate\(6px, -4px\)[^}]*scale\(1\.018\)[^}]*3\.25deg/u, 'fallback refraction overlap is a stable authored offset, not scroll delta');
+  assert.doesNotMatch(css, /data-transition="true"[^}]*scale/u);
   assert.match(css, /\.geometry-interaction \{[^}]*pointer-events:\s*none[^}]*mask-image:\s*radial-gradient\(circle var\(--geometry-interaction-radius\) at var\(--geometry-interaction-x\) var\(--geometry-interaction-y\)/u, 'motion is clipped locally and cannot intercept content');
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.geometry-interaction \{ display: none; \}/u, 'reduced motion keeps only the crisp static geometry');
   assert.match(loader, /let interactionFrame = 0/u);
@@ -877,6 +872,8 @@ test('public Islamic geometry keeps one crisp pattern and one bounded local inte
   assert.doesNotMatch(loader, /preventDefault\(\)/u);
   assert.match(renderer, /fn crispCenterStroke[\s\S]*?max\(u\.renderMetrics\.x, 1\.0\) \* 1\.25/u, 'WebGPU keeps the same 2.5 CSS px solid center core');
   assert.match(renderer, /interactionEnvelope = \(1\.0 - smoothstep\(0\.035, 0\.54, interactionDistance\)\)/u, 'WebGPU deformation falls off around the exact interaction point');
+  assert.match(renderer, /interactionEnvelope \* 0\.082/u, 'local input owns the stronger internal rotation');
+  assert.doesNotMatch(renderer, /internalPulse|scrollActivity|mix\(1\.75/u);
   assert.match(renderer, /createBuffer\(\{ size: 64/u);
   assert.match(renderer, /setInteraction\(next = \{\}\)/u, 'interaction updates share the renderer draw scheduler');
 });
@@ -926,12 +923,19 @@ test('public Islamic geometry eases locally for pointer and touch without scroll
     const staticTiling = await evaluate(client, `(() => {
       const stage = document.querySelector('.geometry-stage');
       const before = getComputedStyle(document.querySelector('.geometry-static'));
+      const under = getComputedStyle(document.querySelector('.geometry-refraction'));
       const after = getComputedStyle(document.querySelector('.geometry-interaction'), '::before');
+      const localUnder = getComputedStyle(document.querySelector('.geometry-interaction'), '::after');
       const local = getComputedStyle(document.querySelector('.geometry-interaction'));
       return {
         beforeImage: before.backgroundImage,
+        underImage: under.backgroundImage,
         afterImage: after.backgroundImage,
+        localUnderImage: localUnder.backgroundImage,
         beforeOpacity: Number(before.opacity),
+        underOpacity: Number(under.opacity),
+        underTransform: under.transform,
+        mainTransform: before.transform,
         localOpacity: Number(local.opacity),
         afterMask: local.maskImage || local.webkitMaskImage,
         position: getComputedStyle(stage).position,
@@ -942,8 +946,12 @@ test('public Islamic geometry eases locally for pointer and touch without scroll
       };
     })()`);
     assert.equal(staticTiling.beforeImage, staticTiling.afterImage, 'static and local layers render the same tessellation');
+    assert.equal(staticTiling.underImage, staticTiling.localUnderImage, 'static and local refraction share the same underlayer');
+    assert.notEqual(staticTiling.beforeImage, staticTiling.underImage, 'refraction is not mixed into the crisp main pattern');
     assert.ok(staticTiling.beforeImage.includes('linear-gradient'), 'the crisp static tessellation remains rendered');
     assert.equal(staticTiling.beforeOpacity, 1, 'the 2.5px center core remains fully opaque while muted colors carry the surrounding field');
+    assert.equal(staticTiling.underOpacity, 0.72, 'the distinct refraction layer remains subordinate');
+    assert.notEqual(staticTiling.underTransform, staticTiling.mainTransform, 'authored refraction rotation and overlap stay stable beneath the base');
     assert.equal(staticTiling.localOpacity, 0, 'the local layer starts settled');
     assert.match(staticTiling.afterMask, /radial-gradient/iu, 'the interactive copy is locally masked');
     assert.deepEqual({ position: staticTiling.position, pointerEvents: staticTiling.pointerEvents, stroke: staticTiling.stroke, halfStroke: staticTiling.halfStroke, overflow: staticTiling.overflow }, {
@@ -962,6 +970,7 @@ test('public Islamic geometry eases locally for pointer and touch without scroll
       const before = getComputedStyle(document.querySelector('.geometry-static'));
       const localElement = document.querySelector('.geometry-interaction');
       const after = getComputedStyle(localElement, '::before');
+      const localUnder = getComputedStyle(localElement, '::after');
       const local = getComputedStyle(localElement);
       const hit = document.elementFromPoint(180, 170);
       return {
@@ -971,6 +980,7 @@ test('public Islamic geometry eases locally for pointer and touch without scroll
         opacity: Number(local.opacity),
         mask: local.maskImage || local.webkitMaskImage,
         localTransform: after.transform,
+        localUnderTransform: localUnder.transform,
         staticTransform: before.transform,
         scrollY: window.scrollY,
         scrollX: window.scrollX,
@@ -984,6 +994,7 @@ test('public Islamic geometry eases locally for pointer and touch without scroll
     assert.match(pointerTiling.mask, /radial-gradient/iu);
     assert.notEqual(pointerTiling.localTransform, 'none', 'only the masked decorative copy transforms');
     assert.notEqual(pointerTiling.localTransform, pointerTiling.staticTransform, 'the interaction transforms only its masked copy, independently of scroll geometry');
+    assert.notEqual(pointerTiling.localUnderTransform, pointerTiling.localTransform, 'local refraction keeps its stronger authored overlap beneath the crisp copy');
     assert.deepEqual({ scrollY: pointerTiling.scrollY, scrollX: pointerTiling.scrollX, hit: pointerTiling.hit, overflow: pointerTiling.overflow }, {
       scrollY: pointerBaseline.scrollY, scrollX: 0, hit: pointerBaseline.hit, overflow: false,
     }, 'pointer motion neither intercepts content nor shifts or overflows the document');
@@ -1044,11 +1055,12 @@ test('public Islamic geometry eases locally for pointer and touch without scroll
     await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 520, y: 220, radiusX: 1, radiusY: 1, force: 1, id: 0 }] });
     await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await wait(180);
-    const reducedTiling = await evaluate(client, `(() => { const root = document.documentElement; const stage = document.querySelector('.geometry-stage'); const before = getComputedStyle(document.querySelector('.geometry-static')); const localElement = document.querySelector('.geometry-interaction'); const after = getComputedStyle(localElement, '::before'); const local = getComputedStyle(localElement); return { strength: Number(getComputedStyle(stage).getPropertyValue('--geometry-interaction-strength')), motion: stage.dataset.interaction, beforeImage: before.backgroundImage, beforeOpacity: Number(before.opacity), localDisplay: local.display, afterOpacity: Number(local.opacity), afterTransform: after.transform, overflow: root.scrollWidth > root.clientWidth }; })()`);
-    assert.deepEqual({ strength: reducedTiling.strength, motion: reducedTiling.motion, beforeOpacity: reducedTiling.beforeOpacity, localDisplay: reducedTiling.localDisplay, afterOpacity: reducedTiling.afterOpacity, overflow: reducedTiling.overflow }, {
-      strength: 0, motion: 'idle', beforeOpacity: 1, localDisplay: 'none', afterOpacity: 0, overflow: false,
+    const reducedTiling = await evaluate(client, `(() => { const root = document.documentElement; const stage = document.querySelector('.geometry-stage'); const before = getComputedStyle(document.querySelector('.geometry-static')); const under = getComputedStyle(document.querySelector('.geometry-refraction')); const localElement = document.querySelector('.geometry-interaction'); const after = getComputedStyle(localElement, '::before'); const local = getComputedStyle(localElement); return { strength: Number(getComputedStyle(stage).getPropertyValue('--geometry-interaction-strength')), motion: stage.dataset.interaction, beforeImage: before.backgroundImage, underImage: under.backgroundImage, beforeOpacity: Number(before.opacity), underDisplay: under.display, localDisplay: local.display, afterOpacity: Number(local.opacity), afterTransform: after.transform, overflow: root.scrollWidth > root.clientWidth }; })()`);
+    assert.deepEqual({ strength: reducedTiling.strength, motion: reducedTiling.motion, beforeOpacity: reducedTiling.beforeOpacity, underDisplay: reducedTiling.underDisplay, localDisplay: reducedTiling.localDisplay, afterOpacity: reducedTiling.afterOpacity, overflow: reducedTiling.overflow }, {
+      strength: 0, motion: 'idle', beforeOpacity: 1, underDisplay: 'block', localDisplay: 'none', afterOpacity: 0, overflow: false,
     }, 'reduced motion suppresses all local animation while preserving static layout');
     assert.ok(reducedTiling.beforeImage.includes('linear-gradient'), 'reduced motion retains the crisp static tiling');
+    assert.notEqual(reducedTiling.beforeImage, reducedTiling.underImage, 'reduced motion retains the separate static refraction underlayer');
   } finally {
     await closeChromium(chromium, 'tiling-journey');
     server.closeAllConnections?.();

@@ -53,15 +53,11 @@
     const currentIndex = Math.max(0, nextIndex - 1);
     const span = Math.max(1, centers[nextIndex] - centers[currentIndex]);
     const progress = currentIndex === nextIndex ? 0 : Math.min(1, Math.max(0, (anchor - centers[currentIndex]) / span));
-    const currentSide = sections[currentIndex].dataset.geometrySide;
-    const nextSide = sections[nextIndex].dataset.geometrySide;
-    const sideChanges = currentSide !== nextSide;
     const selected = progress < 0.5 ? currentIndex : nextIndex;
     const section = sections[selected];
     stage.dataset.state = section.dataset.geometryState || String(selected);
     stage.dataset.side = section.dataset.geometrySide === 'left' ? 'left' : 'right';
-    if (sideChanges && progress > 0.12 && progress < 0.88) stage.dataset.transition = 'true';
-    else stage.removeAttribute('data-transition');
+    stage.removeAttribute('data-transition');
   };
   const scheduleStaticScene = () => {
     if (!sceneFrame) sceneFrame = window.requestAnimationFrame(updateStaticScene);
@@ -116,10 +112,10 @@
     stage.style.setProperty('--geometry-interaction-x', `${interaction.x.toFixed(2)}px`);
     stage.style.setProperty('--geometry-interaction-y', `${interaction.y.toFixed(2)}px`);
     stage.style.setProperty('--geometry-interaction-opacity', (strength * 0.2).toFixed(5));
-    stage.style.setProperty('--geometry-interaction-shift-x', `${(Math.sin(interaction.phase) * strength * 5).toFixed(3)}px`);
-    stage.style.setProperty('--geometry-interaction-shift-y', `${(Math.cos(interaction.phase * 0.82) * strength * 3.5).toFixed(3)}px`);
-    stage.style.setProperty('--geometry-interaction-scale', (1 + strength * 0.018).toFixed(5));
-    stage.style.setProperty('--geometry-interaction-turn', `${(Math.sin(interaction.phase * 0.76) * strength * 1.4).toFixed(3)}deg`);
+    stage.style.setProperty('--geometry-interaction-shift-x', `${(Math.sin(interaction.phase) * strength * 8).toFixed(3)}px`);
+    stage.style.setProperty('--geometry-interaction-shift-y', `${(Math.cos(interaction.phase * 0.82) * strength * 6).toFixed(3)}px`);
+    stage.style.setProperty('--geometry-interaction-scale', (1 + strength * 0.028).toFixed(5));
+    stage.style.setProperty('--geometry-interaction-turn', `${(Math.sin(interaction.phase * 0.76) * strength * 3.8).toFixed(3)}deg`);
     stage.style.setProperty('--geometry-interaction-strength', strength.toFixed(5));
     renderer?.setInteraction({ x: interaction.x, y: interaction.y, strength, phase: interaction.phase });
   };

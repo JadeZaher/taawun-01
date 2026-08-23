@@ -40,15 +40,13 @@ const shaderSource = `
     let halfCore = pixelFootprint * max(u.renderMetrics.x, 1.0) * 1.25;
     return 1.0 - smoothstep(halfCore, halfCore + pixelFootprint * softness, distance);
   }
-  fn lattice(point: vec2f, scale: f32, turn: f32, softness: f32, travel: f32) -> vec3f {
+  fn lattice(point: vec2f, scale: f32, turn: f32, softness: f32) -> vec3f {
     let tiledPoint = rotate2(point, turn) * scale;
     let cell = fract(tiledPoint) - vec2f(0.5);
-    let outerStarScale = 1.0 - travel * 0.035;
-    let innerRosetteScale = 1.0 + travel * 0.045;
-    let star = starOutline(cell / outerStarScale) * outerStarScale;
+    let star = starOutline(cell);
     let diagonalA = abs(abs(cell.x + cell.y) - 0.5) * 0.70710678;
     let diagonalB = abs(abs(cell.x - cell.y) - 0.5) * 0.70710678;
-    let innerRosette = starOutline(rotate2(cell, 0.39269908) * 1.42 / innerRosetteScale) * innerRosetteScale / 1.42;
+    let innerRosette = starOutline(rotate2(cell, 0.39269908) * 1.42) / 1.42;
     let junctionPoint = vec2f(0.5) - abs(cell);
     let junctionMetric = octagonMetric(junctionPoint);
     let junctionInterior = 1.0 - smoothstep(0.105, 0.135, junctionMetric);
@@ -78,65 +76,66 @@ const shaderSource = `
   }
   @fragment fn fragmentMain(@builtin(position) position: vec4f) -> @location(0) vec4f {
     let resolution = max(u.viewportScroll.xy, vec2f(1.0));
-    let phase = u.viewportScroll.w;
-    let section = u.stageMotion.x;
     let side = u.stageMotion.y;
-    let transition = u.stageMotion.z;
     let canvasUV = (position.xy * 2.0 - resolution) / resolution.y;
     var uv = canvasUV;
     uv.x -= side * 0.34;
-    let softness = mix(1.75, 1.0, u.stageMotion.w);
-    let travel = 1.0 - u.stageMotion.w;
-    let sceneTravel = travel * transition;
-    let internalPulse = travel * (0.58 + 0.42 * sin(phase));
-    let kaleidoscopeTravel = max(sceneTravel, internalPulse * 0.45);
+    let softness = 1.0;
     let stableTurn = 0.018;
-    let turn = stableTurn + sceneTravel * 0.012;
     var interactionPoint = u.interaction.xy;
     interactionPoint.x -= side * 0.34;
     let interactionDelta = uv - interactionPoint;
     let interactionDistance = length(interactionDelta);
-    let interactionWave = 0.82 + 0.18 * cos(interactionDistance * 20.0 - u.interaction.w);
+    let interactionWave = 0.72 + 0.28 * cos(interactionDistance * 20.0 - u.interaction.w);
     let interactionEnvelope = (1.0 - smoothstep(0.035, 0.54, interactionDistance)) * u.interaction.z * interactionWave;
-    let localPoint = interactionPoint + rotate2(interactionDelta, interactionEnvelope * 0.035) * (1.0 + interactionEnvelope * 0.018);
-    let basePoint = rotate2(localPoint, sceneTravel * 0.006);
+    let localPoint = interactionPoint + rotate2(interactionDelta, interactionEnvelope * 0.082) * (1.0 + interactionEnvelope * 0.030);
+    let basePoint = localPoint;
     let latticeScale = 3.45;
-    let baseLayer = lattice(basePoint, latticeScale, turn, softness, kaleidoscopeTravel);
-    let lensCenter = vec2f(side * 0.08 + 0.26 * sin(phase * 0.72 + transition), -0.18 + 0.12 * cos(phase * 0.54));
+    let baseLayer = lattice(basePoint, latticeScale, stableTurn, softness);
+    let authoredLensCenter = vec2f(0.20, -0.18);
+    let lensCenter = mix(authoredLensCenter, interactionPoint, u.interaction.z * 0.82);
     let lensDistance = length(uv - lensCenter);
     let lens = 1.0 - smoothstep(0.04, 0.66, lensDistance);
     let refractionVector = uv - lensCenter + vec2f(0.001);
     let refractionDirection = refractionVector / max(length(refractionVector), 0.0001);
-    let bandCellOffset = 0.010 + lens * 0.010 + internalPulse * 0.0008 + sceneTravel * 0.0012;
+    let bandCellOffset = 0.016 + lens * 0.012 + interactionEnvelope * 0.006;
     let bandMagnitude = bandCellOffset / latticeScale;
     let bandVector = refractionDirection + vec2f(0.35, -0.2);
     let bandDirection = bandVector / max(length(bandVector), 0.0001);
     let bandOffset = bandDirection * bandMagnitude;
-    let mirrorOffset = vec2f(-bandOffset.y, bandOffset.x) * (0.72 + internalPulse * 0.06);
-    let emeraldBand = lattice(basePoint + bandOffset, latticeScale, turn, softness, kaleidoscopeTravel);
-    let rustBand = lattice(basePoint - bandOffset, latticeScale, turn, softness, kaleidoscopeTravel);
-    let mirrorBand = lattice(basePoint + mirrorOffset, latticeScale, turn, softness * 1.05, kaleidoscopeTravel);
+    let mirrorOffset = vec2f(-bandOffset.y, bandOffset.x) * (0.82 + interactionEnvelope * 0.12);
+    let refractionPoint = rotate2(basePoint + vec2f(0.012, -0.008), 0.056 + interactionEnvelope * 0.045);
+    let emeraldBand = lattice(refractionPoint + bandOffset, latticeScale, stableTurn, softness);
+    let rustBand = lattice(refractionPoint - bandOffset, latticeScale, stableTurn, softness);
+    let mirrorBand = lattice(refractionPoint + mirrorOffset, latticeScale, stableTurn, softness);
     let refractionEdge = abs(emeraldBand.x - rustBand.x);
-    let chromaticEnvelope = 0.07 + lens * 0.68;
-    let caustic = 0.5 + 0.5 * sin(uv.x * 5.0 - uv.y * 3.0 - phase * 1.4);
-    var color = vec3f(0.012, 0.04, 0.034);
-    color += vec3f(0.95, 0.68, 0.24) * baseLayer.x * (0.48 + caustic * 0.18);
-    color += vec3f(0.16, 0.57, 0.45) * emeraldBand.x * chromaticEnvelope * 0.48;
-    color += vec3f(0.78, 0.24, 0.08) * rustBand.x * chromaticEnvelope * 0.44;
-    color += vec3f(0.95, 0.68, 0.24) * baseLayer.y * (0.4 + lens * 0.38);
-    color += vec3f(0.16, 0.57, 0.45) * mirrorBand.y * (0.03 + lens * 0.14);
-    color += vec3f(0.78, 0.24, 0.08) * refractionEdge * (0.05 + lens * 0.4);
-    color += vec3f(0.95, 0.68, 0.24) * pow(max(0.0, 1.0 - lensDistance), 5.0) * 0.14;
-    color = mix(color, vec3f(0.38, 0.34, 0.24), baseLayer.z * 0.72);
-    let field = clamp(baseLayer.x * 0.4 + baseLayer.y * 0.62 + (emeraldBand.x * 0.18 + rustBand.x * 0.16) * chromaticEnvelope + mirrorBand.y * (0.03 + lens * 0.09) + lens * 0.05 + refractionEdge * (0.04 + lens * 0.14), 0.0, 1.0);
+    let chromaticEnvelope = 0.12 + lens * 0.72;
+    let caustic = 0.5 + 0.5 * sin(refractionPoint.x * 5.0 - refractionPoint.y * 3.0 - u.interaction.w * u.interaction.z);
     let edgeFade = 1.0 - smoothstep(0.16, 1.65, length(uv));
     let viewportHalfExtent = vec2f(resolution.x / resolution.y, 1.0);
     let viewportEdgeDistance = min(viewportHalfExtent.x - abs(canvasUV.x), viewportHalfExtent.y - abs(canvasUV.y));
     let viewportFeather = smoothstep(0.015, 0.10, viewportEdgeDistance);
-    let fieldAlpha = field * edgeFade * viewportFeather * (0.52 + transition * 0.22) * mix(0.82, 1.0, u.stageMotion.w) * 0.9;
-    let centerAlpha = baseLayer.z * edgeFade * viewportFeather;
-    let alpha = clamp(max(fieldAlpha, centerAlpha), 0.0, 1.0);
-    return vec4f(color * alpha, alpha);
+    var refractionColor = vec3f(0.012, 0.04, 0.034);
+    refractionColor += vec3f(0.16, 0.57, 0.45) * emeraldBand.x * chromaticEnvelope * 0.58;
+    refractionColor += vec3f(0.78, 0.24, 0.08) * rustBand.x * chromaticEnvelope * 0.52;
+    refractionColor += vec3f(0.16, 0.57, 0.45) * mirrorBand.y * (0.05 + lens * 0.18);
+    refractionColor += vec3f(0.78, 0.24, 0.08) * refractionEdge * (0.08 + lens * 0.44);
+    refractionColor += vec3f(0.95, 0.68, 0.24) * caustic * lens * 0.12;
+    refractionColor = clamp(refractionColor, vec3f(0.0), vec3f(1.0));
+    let refractionField = clamp((emeraldBand.x * 0.24 + rustBand.x * 0.22) * chromaticEnvelope + mirrorBand.y * (0.05 + lens * 0.11) + lens * 0.06 + refractionEdge * (0.06 + lens * 0.16), 0.0, 1.0);
+    let refractionAlpha = clamp(refractionField * edgeFade * viewportFeather * 0.58, 0.0, 0.58);
+    let refractionPremultiplied = refractionColor * refractionAlpha;
+    var mainColor = vec3f(0.74, 0.56, 0.26);
+    mainColor += vec3f(0.95, 0.68, 0.24) * baseLayer.x * 0.34;
+    mainColor += vec3f(0.95, 0.68, 0.24) * baseLayer.y * 0.24;
+    mainColor = mix(mainColor, vec3f(0.38, 0.34, 0.24), baseLayer.z * 0.72);
+    mainColor = clamp(mainColor, vec3f(0.0), vec3f(1.0));
+    let mainField = clamp(baseLayer.x * 0.48 + baseLayer.y * 0.68, 0.0, 1.0);
+    let mainAlpha = clamp(max(mainField * 0.72, baseLayer.z) * edgeFade * viewportFeather, 0.0, 1.0);
+    let mainPremultiplied = mainColor * mainAlpha;
+    let outputAlpha = mainAlpha + refractionAlpha * (1.0 - mainAlpha);
+    let outputPremultiplied = mainPremultiplied + refractionPremultiplied * (1.0 - mainAlpha);
+    return vec4f(outputPremultiplied, outputAlpha);
   }
 `;
 
@@ -172,17 +171,12 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
   let configuredHeight = 0;
   const FIXED_STEP_SECONDS = 1 / 60;
   const MAX_DT_SECONDS = 0.05;
-  const SPRING_STIFFNESS = 72;
-  const SPRING_DAMPING = 2 * Math.sqrt(SPRING_STIFFNESS);
-  const INTERNAL_PHASE_RATE = 0.55;
-  const INTERNAL_PHASE_EASE = 0.18;
-  const INTERNAL_PHASE_SETTLE_VELOCITY = 0.001;
-  const SCROLL_ACTIVITY_DECAY = 0.12;
-  const SCROLL_ACTIVITY_SETTLE = 0.004;
-  const SCROLL_ACTIVITY_STRENGTH = 0.32;
-  const MAX_VELOCITY = 0.9;
-  const SETTLE_DISTANCE = 0.0002;
-  const SETTLE_VELOCITY = 0.0005;
+  const SPRING_STIFFNESS = 22;
+  const SPRING_DAMPING_RATIO = 1.25;
+  const SPRING_DAMPING = 2 * Math.sqrt(SPRING_STIFFNESS) * SPRING_DAMPING_RATIO;
+  const MAX_VELOCITY = 0.42;
+  const SETTLE_DISTANCE = 0.00005;
+  const SETTLE_VELOCITY = 0.0001;
   const readScrollTarget = () => {
     const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
     return Math.min(1, Math.max(0, window.scrollY / maxScroll));
@@ -193,9 +187,6 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
   let physicsAccumulator = 0;
   let lastPhysicsTime = 0;
   let settling = false;
-  let internalPhase = 0;
-  let internalPhaseVelocity = 0;
-  let scrollActivity = 0;
   const interaction = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5, strength: 0, phase: 0 };
 
   const teardown = ({ notify = false } = {}) => {
@@ -246,30 +237,17 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     lastPhysicsTime = timestamp;
     physicsAccumulator = Math.min(MAX_DT_SECONDS, physicsAccumulator + elapsed);
     while (physicsAccumulator >= FIXED_STEP_SECONDS) {
-      const priorDistance = targetScroll - springScroll;
-      const internalMotionActive = Math.abs(priorDistance) > SETTLE_DISTANCE || Math.abs(springVelocity) > SETTLE_VELOCITY || scrollActivity > SCROLL_ACTIVITY_SETTLE;
       const acceleration = SPRING_STIFFNESS * (targetScroll - springScroll) - SPRING_DAMPING * springVelocity;
       springVelocity = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, springVelocity + acceleration * FIXED_STEP_SECONDS));
       springScroll += springVelocity * FIXED_STEP_SECONDS;
-      const internalPhaseTarget = internalMotionActive ? INTERNAL_PHASE_RATE : 0;
-      internalPhaseVelocity += (internalPhaseTarget - internalPhaseVelocity) * INTERNAL_PHASE_EASE;
-      if (!internalMotionActive && Math.abs(internalPhaseVelocity) <= INTERNAL_PHASE_SETTLE_VELOCITY) internalPhaseVelocity = 0;
-      internalPhase = (internalPhase + internalPhaseVelocity * FIXED_STEP_SECONDS) % (Math.PI * 2);
-      scrollActivity *= 1 - SCROLL_ACTIVITY_DECAY;
-      if (scrollActivity <= SCROLL_ACTIVITY_SETTLE) scrollActivity = 0;
       physicsAccumulator -= FIXED_STEP_SECONDS;
-      if (priorDistance !== 0 && priorDistance * (targetScroll - springScroll) <= 0) {
-        springScroll = targetScroll;
-        springVelocity = 0;
-        break;
-      }
     }
     const springSettled = Math.abs(targetScroll - springScroll) <= SETTLE_DISTANCE && Math.abs(springVelocity) <= SETTLE_VELOCITY;
     if (springSettled) {
       springScroll = targetScroll;
       springVelocity = 0;
     }
-    settling = !springSettled || internalPhaseVelocity !== 0 || scrollActivity !== 0;
+    settling = !springSettled;
     if (!settling) {
       physicsAccumulator = 0;
       lastPhysicsTime = 0;
@@ -285,9 +263,6 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       const started = performance.now();
       const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
       const moving = advanceSpring(timestamp);
-      const springMotionAmount = Math.abs(springVelocity) / MAX_VELOCITY * 0.55 + Math.abs(targetScroll - springScroll) * 8;
-      const motionAmount = moving ? Math.min(1, Math.max(springMotionAmount, scrollActivity * SCROLL_ACTIVITY_STRENGTH)) : 0;
-      const settledMix = 1 - motionAmount;
       const scroll = Math.min(1, Math.max(0, springScroll));
       const scrollTop = scroll * maxScroll;
       const anchor = scrollTop + window.innerHeight * 0.68;
@@ -310,19 +285,17 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       const mainProgress = Math.min(1, Math.max(0, (scrollTop - mainStart) / mainScrollSpan));
       const lateralAngle = Math.PI * 2 * mainProgress;
       const side = Math.cos(lateralAngle);
-      const transition = Math.abs(Math.sin(lateralAngle));
-      const phase = internalPhase;
       const selected = progress < 0.5 ? current : next;
       stage.dataset.state = selected?.dataset.geometryState || String(Math.round(section));
       stage.dataset.side = side < 0 ? 'left' : 'right';
-      if (moving && transition > 0.24) stage.dataset.transition = 'true'; else stage.removeAttribute('data-transition');
+      stage.removeAttribute('data-transition');
       const canvasRect = canvas.getBoundingClientRect();
       const interactionX = ((interaction.x - canvasRect.left) * 2 - canvasRect.width) / Math.max(1, canvasRect.height);
       const interactionY = ((interaction.y - canvasRect.top) * 2 - canvasRect.height) / Math.max(1, canvasRect.height);
       const cssPixelRatio = canvas.height / Math.max(1, canvasRect.height);
       device.queue.writeBuffer(uniformBuffer, 0, new Float32Array([
-        canvas.width, canvas.height, scroll, phase,
-        section, side, transition, settledMix,
+        canvas.width, canvas.height, scroll, 0,
+        section, side, 0, 1,
         interactionX, interactionY, interaction.strength, interaction.phase,
         cssPixelRatio, 0, 0, 0,
       ]));
@@ -360,7 +333,6 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     const nextTarget = readScrollTarget();
     if (Math.abs(nextTarget - targetScroll) > Number.EPSILON) {
       targetScroll = nextTarget;
-      scrollActivity = 1;
       settling = true;
       stage.dataset.spring = 'settling';
       requestDraw();

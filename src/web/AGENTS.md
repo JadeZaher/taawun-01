@@ -197,19 +197,19 @@ content and static-fallback states place geometry right, right, left, left,
 right, right while readable content uses the inverse sequence. Enhanced WebGPU
 does not inherit those categorical section sides: normalized progress through
 the whole public `main` drives one cosine path from right, to one left apex at
-mid-main, and back right at the bottom. Its absolute-sine crossing envelope
-drives only the two corresponding shimmer/rotation passages. There are no
-same-side plateaus, section-boundary jumps, or additional lateral cycles, while
-the fixed-step critically damped scroll response keeps wheel and swipe speed
-from setting travel speed. Renderer eligibility follows the
+mid-main, and back right at the bottom. Scroll controls only that lagged lateral
+position. There are no same-side plateaus, section-boundary jumps, scale pulses,
+softness changes, shimmer phases, or additional lateral cycles. A fixed-step
+over-damped response makes the scene feel heavy while keeping wheel and swipe
+speed from setting travel speed or causing overshoot. Renderer eligibility follows the
 entire public `main` region rather than ending with the sixth marker. The three
 post-Templates sections add no geometry states: they retain state 5 on the right
 and use a left-weighted translucent background so cards and text stay readable
 without hard-occluding the fixed scene. Small
 screens keep only restrained static edge peeks that fade beyond the viewport.
-Their 1.2-second transform uses a smooth non-overshooting curve, so swipe or
-wheel rate never changes the transition duration. Static fallback scaling is
-limited to 3.5% and occurs only for a real side change. Continuation sections use
+Their 1.8-second transform starts slowly and uses a non-overshooting curve, so
+swipe or wheel rate never changes the transition duration and no transition
+scale reads as a snap. Continuation sections use
 a stronger uniform reading surface on mobile, reduced-transparency, increased-
 contrast, and forced-color paths. The resting pattern
 is a disciplined repeated eight-point star and rosette tessellation with narrow
@@ -224,48 +224,32 @@ establish a visible over/under interlock. Crossing parity comes from the shared
 global lattice coordinate: a
 vertical edge uses `round(x)+floor(y)` and a horizontal edge uses
 `floor(x)+round(y)`, so both cell halves agree which physical diagonal passes on
-top. Emerald, gold, and rust refraction stays within adjacent parallel samples
-of that exact lattice. Rail separation is authored in cell space from 0.010 to a
-maximum 0.022, then divided by the active lattice scale; the mirrored rail is a
-true small perpendicular offset, not a second scaled drawing elsewhere on the
-surface. Chromatic rails keep only a subtle baseline outside the localized lens
-envelope. Refraction remains visible without deforming or obscuring the crisp
-base edges. The static HTML and CSS fallback carry the complete product story.
+top. Emerald, gold, and rust refraction occupies an explicit underlayer rather
+than the crisp pattern itself. In CSS that underlayer precedes the main geometry
+in the DOM and keeps a stable 6px/-4px, 3.25-degree authored overlap. WebGPU
+samples the same lattice at a stable offset and composites its premultiplied
+color beneath the premultiplied main geometry. The localized lens may widen and
+rotate that overlap with pointer or touch strength, but scroll never changes
+rail width, color, turn, scale, or softness. The static HTML and CSS fallback
+carry the complete product story.
 
 WebGPU may enhance only on capable desktop devices after idle, never moves text
 or captures scrolling. Scroll events update only a normalized target. A bounded
-critically damped response advances at a fixed 60Hz physics step with capped
-elapsed time and velocity; an explicit target-crossing guard prevents numerical
-overshoot. A separate internal phase eases toward a fixed 0.55 radians per second
-while that response is moving, then eases its velocity to zero before sleeping;
-wheel or swipe speed can move the target but cannot set this phase rate. This
-short fixed-step tail prevents the localized lens and caustic from freezing at a
-nonzero velocity when the scroll spring reaches its target. Its bounded envelope
-evolves the rosette scale, perpendicular mirror depth, and at most 0.0008 cell of
-rail
-separation throughout the continuous main-page path, so scroll progress never freezes the
-decoration. Every nonzero scroll-position change also seeds one fixed-strength,
-fixed-decay internal envelope. This closes the sub-settlement first-scroll dead
-zone without linking amplitude to wheel speed, adding another lateral cycle, or
-keeping the GPU awake after the phase tail settles. The resting lattice
-orientation remains invariant across all six sections. Only while the continuous
-path's crossing envelope and physical settling overlap
-does it add at most 0.018 radians of combined travel-only lattice rotation plus
-another 0.0012 cell of rail shimmer. At internal-only strength the outer star
-contracts by at most 1.575% and the inner rosette expands by at most 2.025%; a
-side crossing may reach the existing 3.5% and 4.5% bounds. Nested scale, extra
-rail separation, and mirror depth return to their exact authored values on
-settlement, while the localized color phase simply freezes until the next scroll.
-This restrained kaleidoscope overlap changes only the nested star outlines.
-Lattice scale, octagonal
-connectors, bridge rails, and over/under straps remain fixed spatial anchors, so
-there is no whole-field zoom or added lateral swing. The broad radial field is
-also multiplied by a narrow viewport-aware feather computed from unshifted canvas
+over-damped response advances at a fixed 60Hz physics step with capped elapsed
+time and a 0.42 normalized velocity ceiling. Stiffness 22 with a 1.25 damping
+ratio produces a slow-starting monotonic slide; a tiny final positional
+normalization happens only inside the settlement tolerances. There is no
+scroll-activity impulse, internal phase, crossing wiggle, or moving-frame blur.
+Pointer/touch input owns the stronger local rotation, scale, lens position, and
+chromatic separation, and it still settles through the one guarded interaction
+frame. Lattice scale, octagonal connectors, bridge rails, and over/under straps
+remain fixed spatial anchors outside that bounded local envelope. The broad
+radial field is also multiplied by a narrow viewport-aware feather computed from unshifted canvas
 coordinates and the actual aspect ratio. Alpha reaches zero just inside every
 physical edge even on square or portrait-capable desktop viewports, so the
-shifted lattice cannot reveal the exact canvas boundary. It renders a
-sharper final tessellation and stops scheduling frames once both displacement and
-velocity settle. A draw over 50ms fails directly to the still design; two
+shifted lattice cannot reveal the exact canvas boundary. Every travel frame
+retains the same crisp center and the renderer stops scheduling frames once both
+displacement and velocity settle. A draw over 50ms fails directly to the still design; two
 consecutive draws over 20ms also fail, while any intervening healthy draw clears
 the slow-frame strike. A nonfatal resolution reconfiguration schedules exactly
 one replacement draw even when the spring was already settled, so a newly
@@ -302,9 +286,9 @@ Canvas visibility changes immediately with the authoritative enhanced state; it
 does not use an opacity fade that a reload or browser history restoration can
 strand at its initial value. Decorative movement combines the bounded scroll
 response with one separately guarded, slowly eased local pointer/touch input.
-The CSS fallback masks a transformed copy of the same pattern around the input;
-WebGPU applies the same bounded falloff through its existing draw scheduler, so
-neither path transforms the whole field, intercepts touch scrolling, or creates
-another renderer loop. Touch release, pointer leave, blur, hidden-page,
+The CSS fallback masks separate refraction-under and crisp-main copies around
+the input; WebGPU applies the same bounded falloff and under-composite through
+its existing draw scheduler. Neither path transforms the whole field,
+intercepts touch scrolling, or creates another renderer loop. Touch release, pointer leave, blur, hidden-page,
 preference, pause, and pagehide paths clear the local state. Reduced motion keeps
 the crisp static tiling and suppresses all local movement.
