@@ -35,17 +35,12 @@ const shaderSource = `
     let q = abs(p);
     return max(max(q.x, q.y), (q.x + q.y) * 0.70710678);
   }
-  // Nearest-rail distance across the whole tessellation; the lattice coordinates stay rigid.
-  fn railDistance(cellInput: vec2f, tiledPoint: vec2f, shapeMotion: f32, shapePhase: f32) -> vec2f {
+  // Nearest-rail distance across the whole tessellation; the lattice coordinates stay rigid
+  // and the star geometry never articulates — light alone carries the interaction.
+  fn railDistance(cellInput: vec2f, tiledPoint: vec2f) -> vec2f {
     let cell = cellInput;
-    // At full local strength the outer star rotates half a sector and the rosette
-    // counter-rotates to zero: the pair swaps symmetric poses instead of drifting.
-    let outerStarTurn = shapeMotion * 0.39269908;
-    let outerStarScale = 1.0 - shapeMotion * 0.07;
-    let star = starOutline(rotate2(cell, outerStarTurn) / outerStarScale) * outerStarScale;
-    let innerRosetteTurn = 0.39269908 * (1.0 - shapeMotion);
-    let innerRosetteScale = 1.0 + shapeMotion * 0.11;
-    let innerRosette = starOutline(rotate2(cell, innerRosetteTurn) * 1.42 / innerRosetteScale) * innerRosetteScale / 1.42;
+    let star = starOutline(cell);
+    let innerRosette = starOutline(rotate2(cell, 0.39269908) * 1.42) / 1.42;
     let diagonalA = abs(abs(cell.x + cell.y) - 0.5) * 0.70710678;
     let diagonalB = abs(abs(cell.x - cell.y) - 0.5) * 0.70710678;
     let junctionPoint = vec2f(0.5) - abs(cell);
@@ -82,11 +77,11 @@ const shaderSource = `
   // Metalheart studio: sharp horizon flash, zenith white, emerald and gold bands, a rust sliver.
   fn environmentColor(direction: vec3f, lightDirection: vec3f, lightEnergy: f32) -> vec3f {
     let elevation = direction.y;
-    var color = mix(vec3f(0.012, 0.03, 0.026), vec3f(0.34, 0.42, 0.4), smoothstep(-0.02, 0.3, elevation));
+    var color = mix(vec3f(0.02, 0.045, 0.04), vec3f(0.52, 0.6, 0.57), smoothstep(-0.02, 0.3, elevation));
     color = mix(color, vec3f(0.97, 0.99, 0.98), smoothstep(0.34, 0.72, elevation));
     color = mix(color, vec3f(0.05, 0.1, 0.09), smoothstep(-0.1, -0.42, elevation));
     let horizonFlash = exp(-abs(elevation) * 70.0);
-    color += vec3f(1.0, 1.0, 0.98) * horizonFlash * 0.85;
+    color += vec3f(1.0, 1.0, 0.98) * horizonFlash * 1.0;
     color += vec3f(0.92, 0.66, 0.28) * horizonFlash * smoothstep(0.08, 0.55, direction.x) * 0.4;
     color += vec3f(0.16, 0.62, 0.46) * horizonFlash * smoothstep(-0.08, -0.55, direction.x) * 0.4;
     color += vec3f(0.09, 0.46, 0.34) * exp(-abs(elevation + 0.4) * 7.5) * 1.1;
@@ -103,31 +98,27 @@ const shaderSource = `
   }
   @fragment fn fragmentMain(@builtin(position) position: vec4f) -> @location(0) vec4f {
     let resolution = max(u.viewportPanel.xy, vec2f(1.0));
-    let panelLift = u.viewportPanel.z;
+    let revealRadius = max(u.viewportPanel.z, 0.2);
     let panelAngle = u.viewportPanel.w;
     let panelX = u.panelMotion.x;
+    let panelZoom = clamp(u.panelMotion.y, 0.5, 1.5);
     let canvasUV = (position.xy * 2.0 - resolution) / resolution.y;
-    // One rigid body: the whole tessellation translates and rotates together.
-    let p = rotate2(canvasUV - vec2f(panelX, panelLift), -panelAngle);
+    // One rigid body on a single scroll timeline: the tessellation slides,
+    // slowly rotates, zooms in, and reveals more of itself as the page advances.
+    let p = rotate2(canvasUV - vec2f(panelX, 0.0), -panelAngle);
     let strength = clamp(u.interaction.z, 0.0, 1.0);
     let phase = u.interaction.w;
-    let pointerLight = rotate2(u.interaction.xy - vec2f(panelX, panelLift), -panelAngle);
+    let pointerLight = rotate2(u.interaction.xy - vec2f(panelX, 0.0), -panelAngle);
     let authoredLight = vec2f(0.22, -0.26);
     let lightPoint = mix(authoredLight, pointerLight, strength * 0.9);
-    let lightEnergy = mix(0.75, 1.5, strength);
+    let lightEnergy = mix(0.9, 1.5, strength);
     let lightDirection = normalize(vec3f(lightPoint - p, 0.8));
 
-    let latticeScale = 3.0;
+    let latticeScale = 3.0 * panelZoom;
     let tiledPoint = p * latticeScale;
     let cell = fract(tiledPoint) - vec2f(0.5);
-    let tiledCellCenter = floor(tiledPoint) + vec2f(0.5);
-    let cellCenter = tiledCellCenter / latticeScale;
-    let interactionDistance = length(cellCenter - lightPoint);
-    let nearField = 1.0 - smoothstep(0.0, 0.14, interactionDistance);
-    let interactionWave = mix(0.72 + 0.28 * cos(interactionDistance * 20.0 - phase), 1.0, nearField);
-    let interactionEnvelope = (1.0 - smoothstep(0.035, 0.54, interactionDistance)) * strength * interactionWave;
 
-    let rails = railDistance(cell, tiledPoint, interactionEnvelope, phase);
+    let rails = railDistance(cell, tiledPoint);
     let railField = clamp(1.0 - rails.x, 0.0, 1.0);
     let railAA = clamp(fwidth(rails.x), 0.001, 0.18);
     let coverage = 1.0 - smoothstep(1.0 - railAA, 1.0 + railAA, rails.x);
@@ -165,7 +156,7 @@ const shaderSource = `
     let lightProximity = 1.0 - smoothstep(0.05, 0.85, length(p - lightPoint));
     let facetAlphaRaw = (0.05 + luminance(facetEnv) * 0.07 + glint * 0.35) * (0.6 + 0.4 * lightProximity);
 
-    let edgeFade = 1.0 - smoothstep(0.18, 1.6, length(p));
+    let edgeFade = 1.0 - smoothstep(0.18, revealRadius, length(p));
     let visibleHalfExtent = max(u.renderMetrics.yz, vec2f(0.001));
     let viewportEdgeDistance = min(visibleHalfExtent.x - abs(canvasUV.x), visibleHalfExtent.y - abs(canvasUV.y));
     let viewportFeather = smoothstep(0.0, 0.12, viewportEdgeDistance);
@@ -215,7 +206,6 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
   });
   const uniformBuffer = device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const bindGroup = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: uniformBuffer } }] });
-  const sections = [...document.querySelectorAll('[data-geometry-state]')];
   let alive = true;
   let paused = false;
   let frame = 0;
@@ -228,44 +218,21 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
   const FIXED_STEP_SECONDS = 1 / 60;
   const MAX_DT_SECONDS = 0.05;
   const BASE_TURN = 0.018;
-  // The panel is an inertial body: scroll applies impulses, anchors pull softly, tilt follows velocity.
-  const ANCHOR_STIFFNESS = 5.5;
-  const ANCHOR_DAMPING = 2 * Math.sqrt(ANCHOR_STIFFNESS) * 1.1;
-  const LIFT_STIFFNESS = 14;
-  const LIFT_DAMPING = 2 * Math.sqrt(LIFT_STIFFNESS) * 1.2;
-  const MAX_PANEL_VELOCITY = 0.55;
-  const TILT_FROM_TRAVEL = 0.18;
-  const TILT_FROM_LIFT = 0.25;
-  const MAX_TILT = 0.016;
+  // One monotonic scroll timeline with mass: the heavy spring chases scroll
+  // progress, and every visual dimension (slide, turn, zoom, reveal) derives
+  // from that single lagged value.
+  const TIMELINE_STIFFNESS = 6;
+  const TIMELINE_DAMPING = 2 * Math.sqrt(TIMELINE_STIFFNESS) * 1.12;
+  const MAX_TIMELINE_VELOCITY = 0.6;
   const SETTLE_DISTANCE = 0.0004;
   const SETTLE_VELOCITY = 0.0006;
-  const anchorOffset = () => (window.innerWidth <= 840 ? 0.42 : 0.34);
-  const readTargetAnchor = () => {
-    if (!sections.length) return anchorOffset();
-    const anchor = window.scrollY + window.innerHeight * 0.68;
-    const centers = sections.map((section) => section.offsetTop + section.offsetHeight * 0.5);
-    let index = centers.findIndex((center) => center > anchor);
-    if (index < 0) index = centers.length;
-    const nextIndex = Math.min(Math.max(index, 1), centers.length - 1);
-    const currentIndex = Math.max(0, nextIndex - 1);
-    const span = Math.max(1, centers[nextIndex] - centers[currentIndex]);
-    const progress = currentIndex === nextIndex ? 0 : Math.min(1, Math.max(0, (anchor - centers[currentIndex]) / span));
-    const selected = sections[progress < 0.5 ? currentIndex : nextIndex];
-    stage.dataset.state = selected?.dataset.geometryState || '0';
-    stage.dataset.side = selected?.dataset.geometrySide === 'left' ? 'left' : 'right';
-    // The target is a continuous function of scroll — smoothly blended between the
-    // authored section sides — so travel never jumps at section cut-offs; the
-    // heavy anchor spring adds the momentum lag on top.
-    const currentSide = sections[currentIndex]?.dataset.geometrySide === 'left' ? -1 : 1;
-    const nextSide = sections[nextIndex]?.dataset.geometrySide === 'left' ? -1 : 1;
-    const eased = progress * progress * (3 - 2 * progress);
-    return (currentSide + (nextSide - currentSide) * eased) * anchorOffset();
+  const readScrollProgress = () => {
+    const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    return Math.min(1, Math.max(0, window.scrollY / maxScroll));
   };
-  const panel = { x: readTargetAnchor(), velocity: 0, lift: 0, liftVelocity: 0, angle: BASE_TURN };
-  let targetAnchor = panel.x;
-  let scrollImpulse = 0;
-  let lastScrollTop = window.scrollY;
-  let lastScrollTime = 0;
+  let targetProgress = readScrollProgress();
+  let timeline = targetProgress;
+  let timelineVelocity = 0;
   let physicsAccumulator = 0;
   let lastPhysicsTime = 0;
   let settling = false;
@@ -316,35 +283,22 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     }
   };
 
-  const advancePanel = (timestamp) => {
+  const advanceTimeline = (timestamp) => {
     const elapsed = lastPhysicsTime ? Math.min(MAX_DT_SECONDS, Math.max(0, (timestamp - lastPhysicsTime) / 1000)) : FIXED_STEP_SECONDS;
     lastPhysicsTime = timestamp;
     physicsAccumulator = Math.min(MAX_DT_SECONDS, physicsAccumulator + elapsed);
     while (physicsAccumulator >= FIXED_STEP_SECONDS) {
-      const anchorForce = ANCHOR_STIFFNESS * (targetAnchor - panel.x) - ANCHOR_DAMPING * panel.velocity;
-      panel.velocity = Math.max(-MAX_PANEL_VELOCITY, Math.min(MAX_PANEL_VELOCITY, panel.velocity + anchorForce * FIXED_STEP_SECONDS));
-      panel.x += panel.velocity * FIXED_STEP_SECONDS;
-      const liftTarget = Math.max(-0.022, Math.min(0.022, -scrollImpulse * 0.035));
-      const liftForce = LIFT_STIFFNESS * (liftTarget - panel.lift) - LIFT_DAMPING * panel.liftVelocity;
-      panel.liftVelocity += liftForce * FIXED_STEP_SECONDS;
-      panel.lift += panel.liftVelocity * FIXED_STEP_SECONDS;
-      scrollImpulse *= Math.exp(-FIXED_STEP_SECONDS / 0.24);
-      const tiltTarget = BASE_TURN + Math.max(-MAX_TILT, Math.min(MAX_TILT, panel.velocity * TILT_FROM_TRAVEL + panel.liftVelocity * TILT_FROM_LIFT));
-      panel.angle += (tiltTarget - panel.angle) * (1 - Math.exp(-FIXED_STEP_SECONDS / 0.42));
+      const force = TIMELINE_STIFFNESS * (targetProgress - timeline) - TIMELINE_DAMPING * timelineVelocity;
+      timelineVelocity = Math.max(-MAX_TIMELINE_VELOCITY, Math.min(MAX_TIMELINE_VELOCITY, timelineVelocity + force * FIXED_STEP_SECONDS));
+      timeline += timelineVelocity * FIXED_STEP_SECONDS;
       physicsAccumulator -= FIXED_STEP_SECONDS;
     }
-    const panelSettled = Math.abs(targetAnchor - panel.x) <= SETTLE_DISTANCE && Math.abs(panel.velocity) <= SETTLE_VELOCITY &&
-      Math.abs(panel.lift) <= SETTLE_DISTANCE && Math.abs(panel.liftVelocity) <= SETTLE_VELOCITY &&
-      Math.abs(panel.angle - BASE_TURN) <= 0.0008 && Math.abs(scrollImpulse) <= 0.002;
-    if (panelSettled) {
-      panel.x = targetAnchor;
-      panel.velocity = 0;
-      panel.lift = 0;
-      panel.liftVelocity = 0;
-      panel.angle = BASE_TURN;
-      scrollImpulse = 0;
+    const timelineSettled = Math.abs(targetProgress - timeline) <= SETTLE_DISTANCE && Math.abs(timelineVelocity) <= SETTLE_VELOCITY;
+    if (timelineSettled) {
+      timeline = targetProgress;
+      timelineVelocity = 0;
     }
-    settling = !panelSettled;
+    settling = !timelineSettled;
     if (!settling) {
       physicsAccumulator = 0;
       lastPhysicsTime = 0;
@@ -358,7 +312,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     if (!alive || paused || document.hidden) return;
     try {
       const started = performance.now();
-      const moving = advancePanel(timestamp);
+      const moving = advanceTimeline(timestamp);
       const canvasRect = canvas.getBoundingClientRect();
       const referenceHeight = Math.max(1, canvasRect.height);
       const interactionX = ((interaction.x - canvasRect.left) * 2 - canvasRect.width) / referenceHeight;
@@ -366,9 +320,14 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
       const cssPixelRatio = canvas.height / referenceHeight;
       const visibleHalfWidth = window.innerWidth / referenceHeight;
       const visibleHalfHeight = window.innerHeight / referenceHeight;
+      const startOffset = window.innerWidth <= 840 ? 0.42 : 0.34;
+      const panelX = startOffset - 0.46 * timeline;
+      const panelTurn = BASE_TURN + 0.3 * timeline;
+      const panelZoom = 1 - 0.22 * timeline;
+      const revealRadius = 1.5 + 1.1 * timeline;
       device.queue.writeBuffer(uniformBuffer, 0, new Float32Array([
-        canvas.width, canvas.height, panel.lift, panel.angle,
-        panel.x, 0, 0, 0,
+        canvas.width, canvas.height, revealRadius, panelTurn,
+        panelX, panelZoom, 0, 0,
         interactionX, interactionY, interaction.strength, interaction.phase,
         cssPixelRatio, visibleHalfWidth, visibleHalfHeight, 0,
       ]));
@@ -403,14 +362,9 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     frame = requestAnimationFrame(draw);
   };
   const onScroll = () => {
-    const now = performance.now();
-    const scrollTop = window.scrollY;
-    const elapsed = lastScrollTime ? Math.min(0.25, Math.max(0.008, (now - lastScrollTime) / 1000)) : 0.016;
-    const normalizedVelocity = ((scrollTop - lastScrollTop) / Math.max(1, window.innerHeight)) / elapsed;
-    scrollImpulse = Math.max(-3, Math.min(3, scrollImpulse * 0.72 + normalizedVelocity * 0.28));
-    lastScrollTop = scrollTop;
-    lastScrollTime = now;
-    targetAnchor = readTargetAnchor();
+    const nextTarget = readScrollProgress();
+    if (Math.abs(nextTarget - targetProgress) <= Number.EPSILON) return;
+    targetProgress = nextTarget;
     settling = true;
     stage.dataset.spring = 'settling';
     requestDraw();
@@ -424,7 +378,7 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     active() { return alive; },
     pause() { paused = true; if (frame) cancelAnimationFrame(frame); if (delayedFrame) window.clearTimeout(delayedFrame); frame = 0; delayedFrame = 0; lastPhysicsTime = 0; },
     resume() { paused = false; requestDraw(); },
-    resize() { targetAnchor = readTargetAnchor(); settling = true; lastPhysicsTime = 0; resize(); requestDraw(); },
+    resize() { targetProgress = readScrollProgress(); settling = true; lastPhysicsTime = 0; resize(); requestDraw(); },
     setInteraction(next = {}) {
       interaction.x = Number.isFinite(next.x) ? next.x : interaction.x;
       interaction.y = Number.isFinite(next.y) ? next.y : interaction.y;

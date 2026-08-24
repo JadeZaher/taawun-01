@@ -195,16 +195,14 @@ The Islamic geometric scene is progressive decoration. It occupies one
 transparent full-viewport layer rather than a framed object. Six authored
 content and static-fallback states place geometry right, right, left, left,
 right, right while readable content uses the inverse sequence. Enhanced WebGPU
-treats the whole tessellation as one rigid inertial panel: scroll never sets
-its position, it applies impulses, while soft anchors on the authored section
-sides pull the panel home. The panel carries mass — it starts slowly, lags
-scrolling like a heavy suspended screen, lifts a few thousandths of the frame
-against fast scrolling, and leans into travel with a bounded full-tile rotation
-of about a degree before settling back to its resting turn. A fixed 60Hz
-physics step with capped elapsed time, a velocity ceiling, and over-critical
-anchor damping keeps travel monotonic: no bounce, no oscillation, no wiggle
-after scrolling stops, and no scale pulses, softness changes, or shimmer
-phases. Renderer eligibility follows the
+treats the whole tessellation as one rigid body on a single scroll timeline: a
+heavy over-critically damped spring chases normalized scroll progress at a
+fixed 60Hz physics step with capped elapsed time and a velocity ceiling, and
+every visual dimension — the lateral slide, a slow one-direction full-tile
+rotation, a gentle zoom-in, and a growing reveal radius — derives from that
+one lagged value. Motion therefore only progresses start-to-finish with
+momentum: no side-to-side returns, no lift or lean, no bounce, and no wiggle
+after scrolling stops. Renderer eligibility follows the
 entire public `main` region rather than ending with the sixth marker. The three
 post-Templates sections add no geometry states: they retain state 5 on the right
 and use a left-weighted translucent background so cards and text stay readable
@@ -245,18 +243,17 @@ reflections smear and flow like molten metal — that melt lives entirely in
 reflection space, so lattice coordinates never deform. Neither path uses blur
 or filters. In CSS the fallback keeps its stable 6px/-4px, 3.25-degree
 authored refraction overlap beneath an aligned halo. WebGPU composites panes,
-rails, and glare as premultiplied layers. Scroll never changes rail width,
-material, or softness. The static HTML and CSS fallback carry the complete
+rails, and glare as premultiplied layers. Scroll never changes the exact core
+width, the material, or the softness; the timeline's gentle zoom scales the
+tessellation as one whole. The static HTML and CSS fallback carry the complete
 product story.
 
 WebGPU may enhance only on capable devices after idle, never moves text
-or captures scrolling. Scroll events update only the target anchor and a
-decaying impulse estimate; the anchor, lift, and tilt springs advance at a
-fixed 60Hz physics step with capped elapsed time and a velocity ceiling, and a
-tiny final positional normalization happens only inside the settlement
-tolerances. There is no crossing wiggle or moving-frame blur.
-Pointer/touch input counter-rotates and scales the outer star and inner rosette
-inside rigid cells, and it still settles through the one guarded interaction
+or captures scrolling. Scroll events update only the normalized timeline
+target; a tiny final positional normalization happens only inside the
+settlement tolerances. There is no crossing wiggle or moving-frame blur.
+Pointer/touch input is a light source only — the star geometry never
+articulates — and it still settles through the one guarded interaction
 frame. Base lattice coordinates, octagonal connectors, bridge rails, and
 over/under straps remain fixed spatial anchors throughout that bounded local
 envelope. The CSS fallback expresses the same intent with cell-sized rosette
@@ -304,9 +301,8 @@ does not use an opacity fade that a reload or browser history restoration can
 strand at its initial value. Decorative movement combines the inertial panel
 with one separately guarded, slowly eased local pointer/touch light.
 The CSS fallback masks separate refraction, halo, cell-local shape, and
-crisp-main copies around the input; WebGPU applies the same bounded falloff,
-the cell-internal star morph, and its light-and-melt response through the
-existing draw scheduler. Neither path deforms the base lattice, intercepts
+crisp-main copies around the input; WebGPU applies its light-and-melt response
+through the existing draw scheduler. Neither path deforms the base lattice, intercepts
 touch scrolling, or creates another renderer loop; the only whole-field
 transform is the panel's own rigid inertial motion. Touch release, pointer
 leave, blur, hidden-page, preference, pause, and pagehide paths clear the

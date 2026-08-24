@@ -307,7 +307,7 @@ test('landing design contract smoke: layers, core, overscan, accessibility gates
   // The chrome material and inertial panel are present as structures, not pinned constants.
   assert.match(renderer, /fn environmentColor\(/u);
   assert.match(renderer, /fn railDistance\(/u);
-  assert.match(renderer, /const ANCHOR_STIFFNESS/u);
+  assert.match(renderer, /const TIMELINE_STIFFNESS/u);
   assert.match(renderer, /while \(physicsAccumulator >= FIXED_STEP_SECONDS\)/u);
   assert.match(renderer, /device\.lost/u);
   assert.match(renderer, /if \(elapsed > 50 \|\| \(elapsed > 20 && lastFrameCostExceeded\)\)/u, 'slow frames still fail to the still design');
