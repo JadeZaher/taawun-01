@@ -85,13 +85,13 @@ const shaderSource = `
     var color = mix(vec3f(0.012, 0.03, 0.026), vec3f(0.34, 0.42, 0.4), smoothstep(-0.02, 0.3, elevation));
     color = mix(color, vec3f(0.97, 0.99, 0.98), smoothstep(0.34, 0.72, elevation));
     color = mix(color, vec3f(0.05, 0.1, 0.09), smoothstep(-0.1, -0.42, elevation));
-    let horizonFlash = exp(-abs(elevation - 0.05) * 42.0);
+    let horizonFlash = exp(-abs(elevation) * 70.0);
     color += vec3f(1.0, 1.0, 0.98) * horizonFlash * 0.85;
-    color += vec3f(0.92, 0.66, 0.28) * horizonFlash * smoothstep(0.08, 0.55, direction.x) * 0.8;
-    color += vec3f(0.16, 0.62, 0.46) * horizonFlash * smoothstep(-0.08, -0.55, direction.x) * 0.8;
+    color += vec3f(0.92, 0.66, 0.28) * horizonFlash * smoothstep(0.08, 0.55, direction.x) * 0.4;
+    color += vec3f(0.16, 0.62, 0.46) * horizonFlash * smoothstep(-0.08, -0.55, direction.x) * 0.4;
     color += vec3f(0.09, 0.46, 0.34) * exp(-abs(elevation + 0.4) * 7.5) * 1.1;
     color += vec3f(0.9, 0.64, 0.25) * exp(-abs(elevation - 0.58) * 17.0) * 0.6;
-    color += vec3f(0.66, 0.26, 0.1) * exp(-abs(dot(direction.xz, vec2f(0.94, 0.34)) - 0.6) * 20.0) * 0.24;
+    color += vec3f(0.66, 0.26, 0.1) * exp(-abs(dot(direction.xz, vec2f(0.94, 0.34)) - 0.6) * 20.0) * 0.12;
     color += vec3f(1.0, 0.99, 0.95) * pow(max(dot(direction, lightDirection), 0.0), 26.0) * lightEnergy;
     return color;
   }
@@ -129,13 +129,17 @@ const shaderSource = `
 
     let rails = railDistance(cell, tiledPoint, interactionEnvelope, phase);
     let railField = clamp(1.0 - rails.x, 0.0, 1.0);
-    let railAA = clamp(fwidth(rails.x), 0.001, 0.35);
+    let railAA = clamp(fwidth(rails.x), 0.001, 0.18);
     let coverage = 1.0 - smoothstep(1.0 - railAA, 1.0 + railAA, rails.x);
     // Molten zone: reflections smear and the bevel rounds, while every rail stays put.
     let liquid = (1.0 - smoothstep(0.0, 0.16, length(p - lightPoint))) * strength;
-    let bevelHeight = sqrt(clamp(railField * (2.0 - railField), 0.0, 1.0));
-    let bevelSlope = vec2f(dpdx(bevelHeight), dpdy(bevelHeight)) * resolution.y * 0.014 * (1.0 - liquid * 0.45);
-    let railNormal = normalize(vec3f(-bevelSlope, 1.0));
+    // Plateau profile: flat polished face, hard shoulder. The rim normal comes
+    // from the distance-field gradient (stable along each rail) so edge shading
+    // stays a clean consistent band instead of per-pixel speckle.
+    let railGradient = vec2f(dpdx(rails.x), dpdy(rails.x));
+    let railGradientDirection = railGradient / max(length(railGradient), 0.0001);
+    let rim = smoothstep(0.45, 1.0, rails.x) * coverage;
+    let railNormal = normalize(vec3f(-railGradientDirection * rim * 1.2 * (1.0 - liquid * 0.45), 1.0));
     var railReflect = reflect(vec3f(0.0, 0.0, -1.0), railNormal);
     let flow = vec2f(sin(p.y * 34.0 + phase * 3.1 + p.x * 9.0), cos(p.x * 30.0 - phase * 2.6 + p.y * 7.0));
     railReflect = normalize(railReflect + vec3f(flow * liquid * 0.4, 0.0));
@@ -143,8 +147,8 @@ const shaderSource = `
     let fresnel = pow(1.0 - clamp(railNormal.z, 0.0, 1.0), 2.0);
     railColor = railColor * (0.72 + 0.5 * fresnel);
     // Palette lives in the reflections: gold catches one bevel flank, emerald the other.
-    railColor += vec3f(0.58, 0.4, 0.15) * max(railNormal.x, 0.0) * 0.55;
-    railColor += vec3f(0.07, 0.32, 0.23) * max(-railNormal.x, 0.0) * 0.6;
+    railColor += vec3f(0.58, 0.4, 0.15) * max(railNormal.x, 0.0) * 0.22;
+    railColor += vec3f(0.07, 0.32, 0.23) * max(-railNormal.x, 0.0) * 0.25;
     railColor = clamp(railColor * railColor * (vec3f(3.0) - 2.0 * railColor), vec3f(0.0), vec3f(1.0));
 
     // Ayeneh-kari ground: diamond mirror panes whose corners sit exactly on star
@@ -188,8 +192,6 @@ const shaderSource = `
     var outputAlpha = facetAlpha * (1.0 - railAlpha) + railAlpha;
     outputPremultiplied += glarePremultiplied;
     outputAlpha = clamp(outputAlpha + glare * 0.5, 0.0, 1.0);
-    let grain = fract(sin(dot(position.xy, vec2f(12.9898, 78.233))) * 43758.5453);
-    outputPremultiplied *= 0.985 + 0.015 * grain;
     return vec4f(outputPremultiplied, outputAlpha);
   }
 `;
@@ -232,9 +234,9 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
   const LIFT_STIFFNESS = 14;
   const LIFT_DAMPING = 2 * Math.sqrt(LIFT_STIFFNESS) * 1.2;
   const MAX_PANEL_VELOCITY = 0.55;
-  const TILT_FROM_TRAVEL = 0.28;
-  const TILT_FROM_LIFT = 0.3;
-  const MAX_TILT = 0.02;
+  const TILT_FROM_TRAVEL = 0.18;
+  const TILT_FROM_LIFT = 0.25;
+  const MAX_TILT = 0.016;
   const SETTLE_DISTANCE = 0.0004;
   const SETTLE_VELOCITY = 0.0006;
   const anchorOffset = () => (window.innerWidth <= 840 ? 0.42 : 0.34);
@@ -250,9 +252,14 @@ export async function createGeometricRenderer({ canvas, stage, onFailure = () =>
     const progress = currentIndex === nextIndex ? 0 : Math.min(1, Math.max(0, (anchor - centers[currentIndex]) / span));
     const selected = sections[progress < 0.5 ? currentIndex : nextIndex];
     stage.dataset.state = selected?.dataset.geometryState || '0';
-    const side = selected?.dataset.geometrySide === 'left' ? -1 : 1;
-    stage.dataset.side = side < 0 ? 'left' : 'right';
-    return side * anchorOffset();
+    stage.dataset.side = selected?.dataset.geometrySide === 'left' ? 'left' : 'right';
+    // The target is a continuous function of scroll — smoothly blended between the
+    // authored section sides — so travel never jumps at section cut-offs; the
+    // heavy anchor spring adds the momentum lag on top.
+    const currentSide = sections[currentIndex]?.dataset.geometrySide === 'left' ? -1 : 1;
+    const nextSide = sections[nextIndex]?.dataset.geometrySide === 'left' ? -1 : 1;
+    const eased = progress * progress * (3 - 2 * progress);
+    return (currentSide + (nextSide - currentSide) * eased) * anchorOffset();
   };
   const panel = { x: readTargetAnchor(), velocity: 0, lift: 0, liftVelocity: 0, angle: BASE_TURN };
   let targetAnchor = panel.x;
