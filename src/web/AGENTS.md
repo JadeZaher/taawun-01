@@ -96,6 +96,38 @@ Removing the cockpit's public runtime import also removes its incidental
 the plain App name in `.sample-title`, stay explicit vanilla DOM updates; they do
 not justify fetching or executing unsigned runtime bytes in the parent cockpit.
 
+## Protected review links
+
+A review URL is a locator for an immutable signed track, never a bearer grant.
+Its fragment carries the exact track plus a non-authoritative workspace hint so
+an already-authorized multi-workspace recipient lands deterministically. The
+hint is accepted only when the workspace appears in the authenticated workspace
+list; normal track membership authorization still decides access.
+
+Opening the link must run the same verified reopen path as Build History: fetch
+the exact track with `includeVerifiedPreview=true`, validate the receipt and
+every manifest-listed file, then replace the trusted iframe. Retained fragments
+are retried after invitation acceptance and deliberate workspace selection.
+Draft edits immediately disable copying because the visible preview no longer
+matches the draft. An old URL still locates its old immutable build until its
+server authorization expires or membership is removed; it is not independently
+revocable until a review-session grant primitive is implemented.
+
+## Guided builder continuity
+
+Empty workspaces must expose workspace creation immediately; the first required
+action cannot live behind an unopened disclosure. The planned Guided mode maps
+plain-language intent into the same catalog and component-document contracts as
+Advanced mode. It may recommend and explain, but it does not create another
+authority path or a second draft representation.
+
+Custom-field name and value edits commit into the validated draft on input
+without rerendering the editor row. Rerendering on every rename discards focus
+and can let the visible control diverge from the document signed by a subsequent
+build. The row updates its own key metadata and accessibility labels in place;
+type changes replace only the value control, while full rerenders remain for
+structural add, remove, and advanced-JSON operations.
+
 ## Destructive workspace controls
 
 People offboarding is an Architect-only presentation of the existing membership

@@ -348,6 +348,10 @@
     .preview-frame-wrap { position: relative; min-height: 540px; background: #0b0f12; }
     .preview-frame { width: 100%; height: 610px; display: block; border: 0; background: #f5f0e5; }
     .preview-frame[data-stale="true"] { opacity: .82; outline: 2px dashed var(--gold); outline-offset: -2px; }
+    .preview-share { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border: 1px solid var(--line); border-top: 0; background: rgba(17, 22, 26, 0.72); }
+    .preview-share strong { display: block; font: 500 15px/1.3 var(--serif); }
+    .preview-share p { max-width: 62ch; margin-top: 4px; color: var(--parchment-dim); font-size: 11px; line-height: 1.5; }
+    .preview-share .button { flex: 0 0 auto; }
     .preview-empty { min-height: 540px; display: grid; place-items: center; padding: 50px; text-align: center; }
     .empty-star { width: 86px; height: 86px; position: relative; margin: 0 auto 26px; transform: rotate(45deg); border: 1px solid rgba(87, 166, 142, 0.35); }
     .empty-star::before, .empty-star::after { content: ""; position: absolute; inset: 18px -19px; border: 1px solid rgba(87, 166, 142, 0.3); }
@@ -464,6 +468,8 @@
       .starter-steps, .starter-actions { grid-template-columns: 1fr; }
       .starter-action-copy { grid-column: auto; }
       .preview-frame, .preview-frame-wrap, .preview-empty { min-height: 410px; height: 410px; }
+      .preview-share { align-items: stretch; flex-direction: column; }
+      .preview-share .button { width: 100%; }
       .preview-empty { padding: 28px; }
     }
     @media (max-width: 240px) {
@@ -824,7 +830,7 @@
                     Create one below to start building.
                   </div>
                   <button id="retryWorkspaces" class="button tertiary" type="button" hidden>Retry workspaces</button>
-                  <details class="create-workspace">
+                  <details id="createWorkspaceDetails" class="create-workspace">
                     <summary>Create a workspace</summary>
                     <div class="create-fields">
                       <div class="field"><label for="workspaceName">Workspace name</label><input id="workspaceName" maxlength="120" placeholder="Wasatch Community Mosque"></div>
@@ -959,6 +965,10 @@
                 </div>
                 <div id="previewLoading" class="preview-loading" role="status" hidden><div><div class="spinner" aria-hidden="true"></div><p>Building immutable artifact…</p></div></div>
                 <iframe id="previewFrame" class="preview-frame" title="Community Iftar staging preview" sandbox="allow-scripts allow-forms" referrerpolicy="no-referrer" hidden></iframe>
+              </div>
+              <div class="preview-share">
+                <div><strong>Send this preview for review</strong><p>Creates a link to this exact signed build. Recipients must sign in and already belong to its workspace; the link itself never grants access.</p></div>
+                <button id="copyPreviewLinkButton" class="button secondary" type="button" disabled>Copy review link</button>
               </div>
             </section>
 
@@ -1575,9 +1585,41 @@
       element('appView').hidden = false;
       setSkipDestination('mainContent', 'Skip to builder');
       renderProfile(state.user);
-      await Promise.allSettled([loadProfile(), loadWorkspaces(), loadCatalog(), loadFinance(), loadBazaar()]);
+      const sharedReview = sharedPreviewSelection();
+      await Promise.allSettled([loadProfile(), loadWorkspaces(sharedReview.workspaceID), loadCatalog(), loadFinance(), loadBazaar()]);
       updatePreviewAvailability();
+      await openSharedPreviewFromLocation();
       element('mainContent').focus();
+    }
+
+    function sharedPreviewSelection() {
+      if (!location.hash.startsWith('#preview=')) return { trackID: '', workspaceID: '' };
+      const params = new URLSearchParams(location.hash.slice(1));
+      const keys = [...params.keys()];
+      if (keys.some((key) => key !== 'preview' && key !== 'workspace') || params.getAll('preview').length !== 1 || params.getAll('workspace').length > 1) {
+        return { trackID: '', workspaceID: '' };
+      }
+      const trackID = String(params.get('preview') || '');
+      const workspace = String(params.get('workspace') || '');
+      const workspaceID = /^(?:[1-9][0-9]*)$/.test(workspace) ? workspace : '';
+      return {
+        trackID: /^track_[A-Za-z0-9_-]+$/.test(trackID) ? trackID : '',
+        workspaceID,
+      };
+    }
+
+    function sharedPreviewTrackID() {
+      return sharedPreviewSelection().trackID;
+    }
+
+    async function openSharedPreviewFromLocation() {
+      const trackID = sharedPreviewTrackID();
+      if (!trackID || !currentWorkspaceID()) return;
+      element('trackLookup').value = trackID;
+      setNotice(element('builderAlert'), 'Opening the shared build in your currently selected workspace. Access is checked before the signed preview can be shown.', 'gold');
+      const track = await inspectBuildTrack(trackID, { quiet: true });
+      if (!track || String(state.selectedTrack && state.selectedTrack.id || '') !== trackID) return;
+      await reopenSelectedBuildPreview();
     }
 
     function renderProfile(user) {
@@ -2611,6 +2653,7 @@
         if (!currentSession(sessionEpoch) || requestEpoch !== state.workspacesEpoch) return;
         const workspaces = normalizeCollection(payload, 'workspaces');
         state.workspaces = workspaces;
+        element('createWorkspaceDetails').open = workspaces.length === 0;
         const select = element('workspaceSelect');
         select.replaceChildren();
         if (!workspaces.length) {
@@ -3016,6 +3059,7 @@
         next.disabled = readOnly;
         valueInput.replaceWith(next);
         valueInput = next;
+        valueInput.addEventListener('input', apply);
         valueInput.addEventListener('change', apply);
       };
       valueInput.setAttribute('aria-label', `${componentID} ${key} value`);
@@ -3036,15 +3080,22 @@
           candidate[nextKey] = parseFieldText(type.value, valueInput.value);
           if (setComponentDocument(componentID, candidate, errorTarget)) {
             key = nextKey;
-            renderComponentEditors();
+            row.dataset.fieldKey = key;
+            type.setAttribute('aria-label', `${componentID} ${key} JSON value type`);
+            valueInput.setAttribute('aria-label', `${componentID} ${key} value`);
+            remove.setAttribute('aria-label', `Remove ${key} from ${componentID}`);
+            const advancedInput = componentCard(componentID)?.querySelector('.advanced-document textarea');
+            if (advancedInput) advancedInput.value = JSON.stringify(state.componentDocuments[componentID], null, 2);
           }
         } catch (error) {
           errorTarget.textContent = `Component ${componentID}, key ${keyInput.value.trim() || '(empty)'}: ${error.message} The last valid document is retained.`;
           errorTarget.hidden = false;
         }
       };
+      keyInput.addEventListener('input', apply);
       keyInput.addEventListener('change', apply);
       type.addEventListener('change', () => { setValueControl(); apply(); });
+      valueInput.addEventListener('input', apply);
       valueInput.addEventListener('change', apply);
       remove.addEventListener('click', () => {
         const candidate = cloneDocument(state.componentDocuments[componentID]);
@@ -3394,7 +3445,32 @@
       const allowed = hasWorkspace && canBuildWorkspace();
       element('previewButton').disabled = state.building || !state.templateReady || !selectedModules().length || !allowed;
       element('previewButton').title = hasWorkspace && !canBuildWorkspace() ? 'Viewer access is read-only. Ask an Architect for Maintainer access.' : '';
+      syncPreviewShareControl();
       renderSignedStarterPath();
+    }
+
+    function previewShareURL(trackID) {
+      return `${location.origin}/account#preview=${encodeURIComponent(trackID)}&workspace=${currentWorkspaceID()}`;
+    }
+
+    function syncPreviewShareControl() {
+      const trackID = String(state.track && state.track.id || '');
+      const shareable = state.previewReady && /^track_[A-Za-z0-9_-]+$/.test(trackID);
+      const button = element('copyPreviewLinkButton');
+      button.disabled = !shareable;
+      button.title = shareable ? 'Copies a protected link for an existing workspace member.' : 'A currently verified signed preview is required before a review link can be copied.';
+    }
+
+    async function copyPreviewLink() {
+      const trackID = String(state.track && state.track.id || '');
+      if (!state.previewReady || !/^track_[A-Za-z0-9_-]+$/.test(trackID)) return;
+      const link = previewShareURL(trackID);
+      try {
+        await navigator.clipboard.writeText(link);
+        setNotice(element('builderAlert'), 'Protected review link copied. It opens the exact build for a signed-in member of this workspace; it does not grant access or make the preview public.', 'success');
+      } catch {
+        setNotice(element('builderAlert'), `Copy is unavailable. Share this protected review link through a trusted channel: ${link}`, 'gold');
+      }
     }
 
     function currentWorkspaceID() {
@@ -4699,6 +4775,7 @@
       element('previewButton').textContent = 'Refresh staging preview';
       setLifecycle(2);
       updateDeploymentAvailability();
+      syncPreviewShareControl();
       return true;
     }
 
@@ -4932,6 +5009,7 @@
       element('deployStateHelp').textContent = 'Create a fresh staging preview so its immutable manifest matches these settings.';
       element('previewButton').textContent = 'Refresh staging preview';
       setLifecycle(0);
+      syncPreviewShareControl();
       updateDeploymentAvailability();
       renderSignedStarterPath();
     }
@@ -5814,6 +5892,7 @@
         setNotice(element('acceptInviteResult'), `Invitation accepted as ${invitation.role}. Loading workspace ${invitation.workspace_id}.`, 'success');
         await loadWorkspaces(invitation.workspace_id);
         if (!sessionCurrent() || Number(invitation.workspace_id) !== currentWorkspaceID()) return;
+        await openSharedPreviewFromLocation();
         announce(`Joined workspace ${invitation.workspace_id} as ${invitation.role}.`);
       } catch (error) {
         if (!operationCurrent()) return;
@@ -6632,8 +6711,10 @@
       activateWorkspaceScope();
       seedOrganizationFromWorkspace();
       await loadWorkspaceContext();
+      await openSharedPreviewFromLocation();
     });
     element('builderForm').addEventListener('submit', createPreview);
+    element('copyPreviewLinkButton').addEventListener('click', copyPreviewLink);
     element('builderForm').addEventListener('input', (event) => {
       if (!event.target.closest('#moduleList') && event.target !== element('trackLookup')) markPreviewDirty();
     });

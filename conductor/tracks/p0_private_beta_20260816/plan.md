@@ -7,7 +7,10 @@ title: P0 Sellable MVP Execution Plan
 
 1. Make the existing trust primitives usable: citable policy retrieval, signed capabilities, authenticated relay, and an explicit zero-custody boundary.
 2. Build the composable signed-card modules and browser SDK/runtime, with monolithic, isolated embed, and dedicated-domain Datastar adapters.
-3. Complete the central builder workflow: prompt or select, compose, theme, audit, preview, publish, install, invite, and deploy.
+3. Complete the central builder workflow: prompt or select, compose, theme,
+   audit, preview, protected review, publish, install, invite, and deploy. The
+   focused review and customer-host acceptance lane lives in
+   `../builder_review_delivery_20260902/`.
 4. Replace financial stubs with a sandbox AZOA adapter that owns idempotency, durable state transitions, reconciliation, escrow, splits, donations, Zakat, Qard Hasan, and stipends.
 5. Complete Shura capability issuance/revocation, the Bazaar staging and approval lifecycle, the four-madhhab compliance selector, and opt-in signed relay/AZOA federation.
 6. Package the hosted MCP control plane, Datastar card server, and zero-dependency relay; run the integrated package/browser/security verification once, then deploy the verified start to Railway.

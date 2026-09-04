@@ -1,0 +1,44 @@
+{
+  "id": "mosque_alpha_20260902",
+  "title": "Mosque Alpha — Guided Site, Events, and Registration",
+  "status": "in_progress",
+  "createdAt": "2026-09-02",
+  "scope": [
+    "guided mosque-site builder",
+    "persistent shared draft",
+    "typed assistant proposals",
+    "Taawun-hosted public site",
+    "event registration",
+    "workspace collaboration",
+    "production operations",
+    "accessibility and real-server QA"
+  ],
+  "dependsOn": [],
+  "capabilityDependencies": {
+    "guided_ai_cobuilder_20260902": [
+      "deterministic guided shell",
+      "progressive disclosure",
+      "lossless Advanced switching",
+      "accessibility",
+      "first-use comprehension testing"
+    ],
+    "builder_review_delivery_20260902": [
+      "protected member review",
+      "invitation acceptance and removal",
+      "real-server browser journey",
+      "supported cleanup"
+    ]
+  },
+  "dependencyExclusions": [
+    "builder_review_delivery_20260902 custom-domain completion is optional for mosque alpha",
+    "hosted AI provider and typed-assistant completion are optional for mosque alpha"
+  ],
+  "completionCriteria": [
+    "a non-technical organizer publishes and updates Mosque Essentials through Guided mode",
+    "a visitor uses a stable Taawun-hosted public URL and submits a durable bounded registration",
+    "Architect Maintainer Viewer invitation mutation denial removal and replay gates pass",
+    "replacement rollback unpublish and supported cleanup pass against the real deployed service",
+    "backup restore readiness monitoring support accessibility security and human usability gates pass",
+    "zero open P0 or P1 release findings remain"
+  ]
+}

@@ -321,6 +321,35 @@ test('account document smoke: noindex, no decorative renderer, snippet controls'
   assert.match(html, /data-nosnippet/u);
 });
 
+test('builder review link remains a locator and empty workspaces expose creation', async () => {
+  const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+
+  assert.match(html, /id="copyPreviewLinkButton"[^>]*disabled/u);
+  assert.match(html, /function sharedPreviewSelection\(\)[\s\S]*?new URLSearchParams\(location\.hash\.slice\(1\)\)[\s\S]*?\^track_\[A-Za-z0-9_-\]\+\$/u);
+  assert.match(html, /loadWorkspaces\(sharedReview\.workspaceID\)/u);
+  assert.match(html, /return `\$\{location\.origin\}\/account#preview=\$\{encodeURIComponent\(trackID\)\}&workspace=\$\{currentWorkspaceID\(\)\}`;/u);
+  assert.match(html, /async function openSharedPreviewFromLocation\(\)[\s\S]*?inspectBuildTrack\(trackID, \{ quiet: true \}\)[\s\S]*?reopenSelectedBuildPreview\(\)/u);
+  assert.match(html, /await loadWorkspaces\(invitation\.workspace_id\);[\s\S]*?await openSharedPreviewFromLocation\(\);/u);
+  assert.match(html, /function markPreviewDirty\(\)[\s\S]*?state\.previewReady = false;[\s\S]*?syncPreviewShareControl\(\);/u);
+  assert.match(html, /id="createWorkspaceDetails"/u);
+  assert.match(html, /element\('createWorkspaceDetails'\)\.open = workspaces\.length === 0;/u);
+});
+
+test('custom-field typing commits without rebuilding the editor row', async () => {
+  const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const rowStart = html.indexOf('function renderCustomFieldRow(');
+  const rowEnd = html.indexOf('function renderComponentEditor(', rowStart);
+  assert.ok(rowStart >= 0 && rowEnd > rowStart, 'custom-field editor source is present');
+  const customFieldRow = html.slice(rowStart, rowEnd);
+  const applyBody = customFieldRow.match(/const apply = \(\) => \{[\s\S]*?\r?\n      \};\r?\n      keyInput\.addEventListener/u)?.[0] || '';
+
+  assert.match(customFieldRow, /keyInput\.addEventListener\('input', apply\)/u);
+  assert.match(customFieldRow, /valueInput\.addEventListener\('input', apply\)/u);
+  assert.match(applyBody, /row\.dataset\.fieldKey = key/u);
+  assert.match(applyBody, /advancedInput\.value = JSON\.stringify\(state\.componentDocuments\[componentID\], null, 2\)/u);
+  assert.doesNotMatch(applyBody, /renderComponentEditors\(\)/u, 'typing must preserve the current field controls and focus');
+});
+
 test('browser smoke: desktop enhancement, interaction, pause, reduced motion', { timeout: 90_000 }, async () => {
   const browser = await installedChromium();
   assert.ok(browser, 'Chromium is required for the landing smoke check');

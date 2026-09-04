@@ -1,0 +1,36 @@
+{
+  "id": "guided_ai_cobuilder_20260902",
+  "title": "Guided AI Co-builder for Non-technical Organizers",
+  "status": "in_progress",
+  "createdAt": "2026-09-02",
+  "scope": [
+    "guided builder",
+    "progressive disclosure",
+    "typed AI proposals",
+    "non-technical onboarding",
+    "accessibility",
+    "trust comprehension"
+  ],
+  "dependsOn": [],
+  "capabilityDependencies": {
+    "p0_private_beta_20260816": [
+      "catalog validation",
+      "signed build history",
+      "workspace RBAC"
+    ],
+    "builder_review_delivery_20260902": [
+      "protected review locator and exact preview reopen"
+    ]
+  },
+  "dependencyExclusions": [
+    "broader platform primitive completion",
+    "custom-domain completion"
+  ],
+  "completionCriteria": [
+    "deterministic guided path reaches verified preview",
+    "advanced mode preserves exact draft",
+    "assistant proposals remain typed and non-authoritative",
+    "observed custom-field continuity defect is fixed",
+    "five-person comprehension evidence meets stated thresholds"
+  ]
+}

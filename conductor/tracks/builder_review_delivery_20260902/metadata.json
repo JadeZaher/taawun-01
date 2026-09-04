@@ -1,0 +1,24 @@
+{
+  "id": "builder_review_delivery_20260902",
+  "title": "Builder Review Links and Live Delivery QA",
+  "status": "in_progress",
+  "createdAt": "2026-09-02",
+  "scope": [
+    "src/web",
+    "protected preview review links",
+    "workspace role boundaries",
+    "approved-domain publication",
+    "browser end-to-end QA",
+    "Railway deployment",
+    "operator runbook"
+  ],
+  "dependsOn": ["p0_private_beta_20260816"],
+  "completionCriteria": [
+    "protected review-link acceptance criteria pass",
+    "full local release sweep passes",
+    "Railway deployment reaches terminal SUCCESS",
+    "live organizer and Viewer journey completes with supported cleanup",
+    "controlled-domain gate passes or is explicitly recorded as externally blocked",
+    "pain-point remedies are tracked"
+  ]
+}

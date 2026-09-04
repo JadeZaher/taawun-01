@@ -16,6 +16,9 @@ The MVP is successful when a three-device community can use one app offline for 
 
 - An Architect selects or prompts a community-ops template and composes the registration, scheduling, donation, governance, compliance, and collaboration modules.
 - The build produces an immutable surface bundle with an explicit manifest and a live Datastar staging preview.
+- An Architect can hand an exact signed build to an existing workspace member
+  through a protected review locator; the locator never grants membership or
+  substitutes for an anonymous verified-domain publication.
 - The same approved signed cards render as a monolithic app, dedicated-domain surfaces, and isolated cross-origin embeds without forking business logic.
 - The bundle stores only convergent content locally and synchronizes encrypted bytes through an authenticated relay.
 - An Architect can invite Maintainers and Viewers; Shura capabilities are signed, scoped, revocable, and enforced at the runtime boundary.
@@ -37,6 +40,9 @@ The MVP is successful when a three-device community can use one app offline for 
 - [ ] Donation actions use a contract-tested AZOA sandbox adapter with idempotency, durable status, reconciliation, and fail-closed outcomes.
 - [ ] Compliance results name the source record, version, baseline, and review status; unreviewed policy never masquerades as a fatwa or scholar approval.
 - [ ] Shura invitation, capability issuance, revocation, and role enforcement can be completed from the product UI and MCP tools.
+- [ ] The protected-review and real customer-host journey in
+  `../builder_review_delivery_20260902/` passes from fresh signup through
+  Viewer removal and supported cleanup; controlled DNS/TLS is never simulated.
 - [ ] Bazaar templates can be submitted, staged, audited, approved, versioned, installed, and exercised through sandbox escrow without an arbitrary-code execution path.
 - [ ] The relay binary has a documented one-command deployment path; two configured nodes can exchange signed, replay-protected federation envelopes while an unconfigured node remains safely standalone.
 - [ ] Each supported madhhab baseline can be selected and retrieved through the same citable compliance contract; neutral mode clearly preserves multi-baseline differences.
