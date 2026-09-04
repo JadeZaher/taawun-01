@@ -906,6 +906,16 @@
                   <label for="accentColor">Accent color</label>
                   <div class="color-control"><input id="accentColor" type="color" value="#57a68e" data-bind:_accent-color aria-label="Choose accent color"><input id="accentHex" type="text" value="#57A68E" maxlength="7" inputmode="text" pattern="#[0-9A-Fa-f]{6}" aria-label="Accent color hex value"></div>
                 </div>
+                <div class="field">
+                  <label for="previewTTLHours">Review-link lifetime</label>
+                  <select id="previewTTLHours" aria-describedby="previewTTLHelp">
+                    <option value="24">1 day</option>
+                    <option value="168" selected>7 days</option>
+                    <option value="720">30 days</option>
+                    <option value="2160">90 days</option>
+                  </select>
+                  <div id="previewTTLHelp" class="field-help">A preview stops serving when its signed authorization expires. Maintainers and Architects can re-sign an expired build as a new immutable preview and review link.</div>
+                </div>
                 <div class="compliance-note">
                   <strong>Reference-only jurisprudence baseline</strong>
                   <p>The selected madhhab filters seed compliance references pending qualified scholarly review. It is not a fatwa, certification, or substitute for a local scholar.</p>
@@ -936,6 +946,7 @@
                       <div class="copy-field"><input id="buildRecordTrackID" readonly aria-label="Selected build track ID"><button id="copyBuildTrackButton" class="button secondary" type="button">Copy track ID</button></div>
                       <div class="surface-actions">
                         <button id="reopenBuildPreviewButton" class="button secondary" type="button">Reopen signed preview</button>
+                        <button id="reissueBuildPreviewButton" class="button" type="button">Re-sign as new preview</button>
                         <button id="restoreBuildDraftButton" class="button secondary" type="button">Start new draft from build</button>
                         <button id="resumeBuildButton" class="button tertiary" type="button">Resume build</button>
                       </div>
@@ -1274,6 +1285,7 @@
       announcementEpoch: 0,
       selectedTrack: null,
       expiredPreviewTrackId: '',
+      previewReissueAttempt: null,
       trackEvents: [],
       domainClaims: [],
       domainPublications: [],
@@ -1451,6 +1463,7 @@
       state.starterCustomizationInteracted = false;
       state.selectedTrack = null;
       state.expiredPreviewTrackId = '';
+      state.previewReissueAttempt = null;
       state.trackEvents = [];
       state.domainClaims = [];
       state.domainPublications = [];
@@ -2029,6 +2042,7 @@
       const buildAllowed = workspaceID > 0 && accessResolved && canBuildWorkspace();
       const publishAllowed = workspaceID > 0 && accessResolved && canPublishWorkspace();
       element('templateSelect').disabled = !buildAllowed || !state.templates.length || !state.catalogHealthy;
+      element('previewTTLHours').disabled = !buildAllowed;
       if (element('loadTrackButton').getAttribute('aria-busy') !== 'true') element('loadTrackButton').disabled = !workspaceID || !accessResolved;
       element('retryBuildHistory').disabled = !workspaceID;
       element('loadMoreBuildHistory').disabled = !workspaceID;
@@ -2295,6 +2309,7 @@
     function clearSelectedBuildRecord() {
       state.selectedTrack = null;
       state.expiredPreviewTrackId = '';
+      state.previewReissueAttempt = null;
       state.trackEvents = [];
       element('buildRecord').hidden = true;
       element('buildRecordTrackID').value = '';
@@ -2370,9 +2385,19 @@
       reopenButton.disabled = authorizationExpired || !track.preview || !track.artifact;
       reopenButton.textContent = authorizationExpired ? 'Signed preview expired' : 'Reopen signed preview';
       reopenButton.title = authorizationExpired ? 'This signed authorization expired. The old preview cannot be reopened or extended.' : 'Fetches and verifies the exact signed preview without changing the local draft.';
+      const reissueButton = element('reissueBuildPreviewButton');
+      const reissueBusy = Boolean(state.previewReissueAttempt && state.previewReissueAttempt.inFlight
+        && state.previewReissueAttempt.trackID === String(track.id || ''));
+      reissueButton.hidden = !track.preview || !track.artifact;
+      reissueButton.disabled = reissueBusy || !canBuild || !track.preview || !track.artifact;
+      reissueButton.textContent = reissueBusy ? 'Re-signing…' : 'Re-sign as new preview';
+      reissueButton.setAttribute('aria-busy', String(reissueBusy));
+      reissueButton.title = canBuild
+        ? 'Creates a new immutable signed preview and review link. The expired track remains unchanged.'
+        : 'Viewer access is inspect-only. Ask an Architect for Maintainer access to re-sign this preview.';
       const restoreButton = element('restoreBuildDraftButton');
       restoreButton.disabled = !canBuild || !track.request || Number(track.workspaceId) !== currentWorkspaceID();
-      restoreButton.textContent = authorizationExpired && canBuild ? 'Prepare fresh preview' : 'Start new draft from build';
+      restoreButton.textContent = 'Start new draft from build';
       restoreButton.title = canBuild
         ? 'Creates a new local draft from curated request data only; signer, creator, lifecycle, origins, and idempotency authority are never copied.'
         : (authorizationExpired ? 'Viewer access is inspect-only. Ask an Architect for Maintainer access to prepare a fresh signed preview.' : 'Viewer access is inspect-only.');
@@ -2389,7 +2414,7 @@
       state.expiredPreviewTrackId = String(trackID);
       renderSelectedBuild();
       const guidance = canBuildWorkspace()
-        ? 'The old signed preview cannot be reopened. Use Prepare fresh preview to copy its exact curated documents into a new local draft, then review the current workspace and approved origins before creating a new signature.'
+        ? 'The old signed preview cannot be reopened or extended. Choose Re-sign as new preview to create a fresh immutable successor and review link, or start a draft if the content also needs editing.'
         : 'Viewer access is inspect-only. Ask an Architect for Maintainer access to prepare a fresh signed preview.';
       setNotice(element('buildRecordAlert'), `${copy} ${guidance}`, 'gold');
       return true;
@@ -4334,6 +4359,7 @@
         theme: { accentColor: element('accentColor').value.toUpperCase() },
         modules: selectedModules(),
         components: selectedComponents(),
+        ttlHours: Number(element('previewTTLHours').value),
         requestedOrigins: {
           surfaces: state.domainOrigin ? [window.location.origin, state.domainOrigin] : [],
           embedders: [], connections: [], resources: [],
@@ -4883,6 +4909,8 @@
           element('accentColor').value = accent;
           element('accentHex').value = accent;
         }
+        const restoredTTL = Number(restored.request.ttlHours);
+        element('previewTTLHours').value = ['24', '168', '720', '2160'].includes(String(restoredTTL)) ? String(restoredTTL) : '168';
         renderComponentEditors();
         markPreviewDirty();
         saveComponentDraft();
@@ -4897,6 +4925,59 @@
         }
       } catch (error) {
         setNotice(element('buildRecordAlert'), `${error.message || 'The build request could not start a new draft.'} The current draft and verified preview were retained.`, 'error');
+      }
+    }
+
+    async function reissueSelectedBuildPreview() {
+      const selected = state.selectedTrack;
+      if (!selected || !selected.id || !selected.preview || !selected.artifact || !canBuildWorkspace()) return;
+      const marker = workspaceMarker();
+      const selectedTrackID = String(selected.id);
+      const ttlHours = Number(element('previewTTLHours').value);
+      const trackRecordEpoch = state.trackRecordEpoch;
+      const previewEpoch = ++state.previewEpoch;
+      const priorAttempt = state.previewReissueAttempt;
+      const attempt = priorAttempt && priorAttempt.trackID === selectedTrackID && priorAttempt.version === selected.version && priorAttempt.ttlHours === ttlHours
+        ? priorAttempt
+        : { trackID: selectedTrackID, version: selected.version, ttlHours, idempotencyKey: `reissue-${crypto.randomUUID()}`, inFlight: false };
+      if (attempt.inFlight) return;
+      attempt.inFlight = true;
+      state.previewReissueAttempt = attempt;
+      const operationCurrent = () => currentWorkspace(marker) && trackRecordEpoch === state.trackRecordEpoch
+        && selectedTrackID === String(state.selectedTrack && state.selectedTrack.id || '') && previewEpoch === state.previewEpoch
+        && state.previewReissueAttempt === attempt;
+      renderSelectedBuild();
+      setNotice(element('buildRecordAlert'), 'Creating a new signed preview from the exact curated build. The old track and expired authorization will remain unchanged…', 'gold');
+      try {
+        const result = await api(`/conductor/tracks/${encodeURIComponent(selectedTrackID)}/reissue`, {
+          method: 'POST',
+          body: { expectedVersion: selected.version, ttlHours, idempotencyKey: attempt.idempotencyKey },
+        });
+        if (!operationCurrent()) return;
+        const replacementID = String(result && result.track && result.track.id || '');
+        const active = await applyVerifiedPreview(result, operationCurrent, {
+          restoreDraft: false,
+          expectedComponents: selected.request && selected.request.components,
+          expectedTrackID: replacementID,
+        });
+        if (!operationCurrent() || !active || !replacementID || replacementID === selectedTrackID) throw new Error('The replacement preview was not independently verified.');
+        state.expiredPreviewTrackId = '';
+        state.previewReissueAttempt = null;
+        state.selectedTrack = state.track;
+        renderSelectedBuild();
+        await loadBuildHistory();
+        if (!currentWorkspace(marker)) return;
+        setNotice(element('buildRecordAlert'), `New signed preview ${replacementID} is active. Copy its new review link from the preview panel; the expired track ${selectedTrackID} was not changed.`, 'success');
+        announce('Replacement signed preview created. The new review link is ready to copy.');
+      } catch (error) {
+        if (!operationCurrent()) return;
+        const definitiveRejection = error instanceof ApiError && [400, 401, 403, 404, 415, 422].includes(error.status);
+        if (definitiveRejection) state.previewReissueAttempt = null;
+        if (error.code === 'composition_conflict' || error.status === 409) await inspectBuildTrack(selectedTrackID, { quiet: true });
+        if (currentWorkspace(marker)) setNotice(element('buildRecordAlert'), `${error.message || 'The preview could not be re-signed.'} The expired track remains unchanged; ${definitiveRejection ? 'reload the build record before retrying if it changed.' : 'retry Re-sign safely—the same request identity will be reused.'}`, 'error');
+      } finally {
+        attempt.inFlight = false;
+        if (currentWorkspace(marker)) renderSelectedBuild();
       }
     }
 
@@ -6739,6 +6820,7 @@
       }
     });
     element('reopenBuildPreviewButton').addEventListener('click', reopenSelectedBuildPreview);
+    element('reissueBuildPreviewButton').addEventListener('click', reissueSelectedBuildPreview);
     element('restoreBuildDraftButton').addEventListener('click', restoreSelectedBuildAsDraft);
     element('resumeBuildButton').addEventListener('click', resumeSelectedBuild);
     element('domainOrigin').addEventListener('input', () => resetDomainClaim());

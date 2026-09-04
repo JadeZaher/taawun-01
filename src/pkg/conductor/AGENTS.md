@@ -45,6 +45,13 @@ Build, original-creator, expected-version, and status checks; authorization and
 creator checks happen before version comparison so track IDs cannot be used as
 version oracles.
 
+Preview reissue never mutates or extends the source track. It requires a fresh
+Build capability check, an exact source version, and a complete signed preview
+whose durable curated request still matches its build request and manifest.
+Only that curated request is cloned; the current actor subject, preview-origin
+authorization, expiry, compliance evidence, signature, artifact, and track are
+created afresh through the normal composition workflow.
+
 Publication retry uses the domain authority's exact indexed active-row lookup
 and accepts only an exact workspace/claim/artifact/hash match. Publication
 context reverse lookup is one bounded indexed set query and returns a binding

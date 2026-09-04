@@ -28,14 +28,17 @@ status: in-progress
 - [x] Make a review URL automatically inspect and reopen the signed preview.
 - [x] Add an authorized-workspace selection hint and retry after invitation acceptance.
 - [ ] Add deterministic review-link browser coverage.
+- [x] Expose explicit preview lifetimes and a direct immutable re-sign/reissue
+  path for expired protected previews; preserve the old track and URL as expired.
 - [x] Complete the integrated local release sweep.
 - [x] Deploy and capture terminal Railway evidence.
 - [ ] Complete the live organizer and Viewer browser journey.
 - [ ] Complete genuine controlled-domain publication and revocation, or record
   the exact external blocker without claiming the gate.
 - [ ] Apply accepted pain-point remedies and rerun the affected journey once.
-  Workspace creation and custom-field continuity are fixed and promoted; the
-  larger guided co-builder remains in `../guided_ai_cobuilder_20260902/`.
+  Workspace creation and custom-field continuity are fixed and promoted;
+  preview-expiry recovery is implemented and awaiting promotion; the larger
+  guided co-builder remains in `../guided_ai_cobuilder_20260902/`.
 - [ ] Complete supported cleanup and final evidence reconciliation.
 
 ## Follow-on product remedies discovered by the journey

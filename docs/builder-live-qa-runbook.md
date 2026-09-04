@@ -119,6 +119,14 @@ raw controls part of the mosque operator's path.
 3. Exercise an expired preview fixture only through the supported TTL contract;
    confirm files are removed from active presentation and copying/publication are
    disabled. Do not change clocks or database rows.
+4. Confirm the expired record immediately names the expiry and exposes **Re-sign
+   as new preview** to Maintainer and Architect while Viewer receives role guidance.
+5. Select a new review lifetime, re-sign once, and confirm the server returns a
+   different track, artifact, signature, expiry, and review URL. The expired track
+   must remain unchanged and continue returning `410 Gone` for preview files.
+6. Open and copy the replacement link, then retry the re-sign request only through
+   its supported conflict/idempotency behavior. Confirm the new link remains bound
+   to the replacement track and the old selector is never recopied.
 
 ## 5. Revocation behavior
 
@@ -182,6 +190,7 @@ state, or unclear recovery message, append one row:
 | P2 | First workspace | Empty state says “Create one below,” but the fields and button are inside a collapsed disclosure | A new organizer sees no immediate action and must discover the disclosure | Open workspace creation automatically for an empty account; make it the first Guided step | `guided_ai_cobuilder_20260902` Phase 1 | fixed in deployment `671210c5-1151-4af5-af29-cdf13ac92fa7`; live recheck pending |
 | P1 | Component customization | Renaming the new custom field appeared to succeed during editing, but the signed preview rendered the key as `custom_1` | The organizer can sign content different from what they believe they entered | Commit key/value input without rerendering the row; preserve focus and cover exact draft state | `guided_ai_cobuilder_20260902` Phase 1 | fixed and Chromium-covered in deployment `671210c5-1151-4af5-af29-cdf13ac92fa7`; live recheck pending |
 | P2 | First builder view | Build, People, Shura, Finance sandbox, Bazaar, Account, templates, raw component controls, trust evidence, and deployment concepts are exposed before first value | Non-technical users must understand the product architecture to find the next step | Default empty workspaces to the eight-step Guided journey; retain Advanced as an explicit escape hatch | `guided_ai_cobuilder_20260902` Phase 1 | accepted |
+| P1 | Expired protected preview | Browser-created previews silently defaulted to 24 hours, then the only replacement path appeared after a failed reopen and required copying into a draft plus a second build action | Organizers reasonably concluded that authorization was always expired and could not be renewed | Show 1/7/30/90-day lifetime choices with a 7-day guided default; expose one-step re-sign that creates a new immutable track/link while preserving the expired proof | `builder_review_delivery_20260902` expiry recovery | implemented; integrated and live verification pending |
 
 Severity is P0 for authority/data exposure, P1 for blocked completion, P2 for a
 recoverable but material usability failure, and P3 for polish. Every accepted

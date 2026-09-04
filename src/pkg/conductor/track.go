@@ -287,6 +287,59 @@ func (s *Service) Compose(ctx context.Context, actor *models.User, request Compo
 	return &ComposeResult{Track: track, Created: created}, err
 }
 
+// Reissue creates a new signed preview from an immutable track's curated request.
+func (s *Service) Reissue(ctx context.Context, actor *models.User, trackID string, expectedVersion int64, idempotencyKey string, ttlHours int) (*ComposeResult, error) {
+	source, err := s.repository.getTrack(ctx, trackID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.authorize(actor, source.WorkspaceID, models.WorkspaceCapabilityBuild); err != nil {
+		return nil, err
+	}
+	if source.Version != expectedVersion {
+		return nil, ErrTrackVersionConflict
+	}
+	if idempotencyKey == source.Request.IdempotencyKey {
+		return nil, ErrIdempotencyConflict
+	}
+	if !validReissueSource(source) {
+		return nil, ErrTrackTransition
+	}
+
+	request := normalizeCompositionRequest(source.Request)
+	request.IdempotencyKey = idempotencyKey
+	request.TTLHours = ttlHours
+	return s.Compose(ctx, actor, request)
+}
+
+func validReissueSource(track *Track) bool {
+	if track == nil || track.BuildRequest == nil || track.Artifact == nil || track.Preview == nil ||
+		(track.Status != TrackPreviewReady && track.Status != TrackPublicationRequested && track.Status != TrackPublished) ||
+		track.Preview.ArtifactID != track.Artifact.ArtifactID || track.Preview.ContentHash != track.Artifact.ContentHash ||
+		track.Preview.WorkspaceID != track.WorkspaceID || track.BuildRequest.WorkspaceID != track.WorkspaceID ||
+		!track.Preview.AuthenticationRequired || track.Preview.Subject != track.BuildRequest.Subject ||
+		!track.Preview.AuthorizationExpiresAt.Equal(track.Artifact.Manifest.Authorization.ExpiresAt) ||
+		!reflect.DeepEqual(track.Preview.AllowedOrigins, track.BuildRequest.AllowedOrigins) ||
+		track.BuildRequest.Lifecycle != artifacts.BundleLifecyclePreview || validateSignedArtifact(*track.Artifact, *track.BuildRequest) != nil {
+		return false
+	}
+	request := normalizeCompositionRequest(track.Request)
+	expected, err := artifacts.ResolveBuildRequest(artifacts.BuildRequest{
+		TemplateID: request.TemplateID,
+		Modules:    append([]string(nil), request.Modules...),
+		Components: cloneComponents(request.Components),
+	})
+	if err != nil {
+		return false
+	}
+	return request.WorkspaceID == track.WorkspaceID &&
+		request.AppName == track.BuildRequest.AppName && request.OrganizationName == track.BuildRequest.OrganizationName &&
+		request.City == track.BuildRequest.City && request.Madhhab == track.BuildRequest.Madhhab &&
+		request.TemplateID == track.BuildRequest.TemplateID && reflect.DeepEqual(request.Theme, track.BuildRequest.Theme) &&
+		reflect.DeepEqual(expected.Modules, track.BuildRequest.Modules) && reflect.DeepEqual(expected.Components, track.BuildRequest.Components) &&
+		reflect.DeepEqual(request.RequestedOrigins, track.BuildRequest.AllowedOrigins)
+}
+
 func (s *Service) Resume(ctx context.Context, actor *models.User, trackID string, expectedVersion int64) (*Track, error) {
 	track, err := s.repository.getTrack(ctx, trackID)
 	if err != nil {

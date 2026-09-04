@@ -571,6 +571,78 @@ type compositionServiceStub struct {
 	listLimit             int
 	listCursor            string
 	listCalls             int
+	reissueTrackID        string
+	reissueVersion        int64
+	reissueKey            string
+	reissueTTL            int
+	reissueErr            error
+}
+
+func TestCompositionReissueReturnsFreshVerifiedActiveReceipt(t *testing.T) {
+	track := previewTrack()
+	service := &compositionServiceStub{track: track}
+	now := track.Artifact.Manifest.Authorization.ExpiresAt.Add(-time.Minute)
+	handler, err := NewCompositionHTTPHandlerWithClock(service, artifactReaderStub{open: verifiedBuildResult(track)}, CurrentUser, []string{"http://localhost:8080"}, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewCompositionHTTPHandlerWithClock() error = %v", err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/conductor/tracks/source-track/reissue", strings.NewReader(`{"expectedVersion":6,"idempotencyKey":"reissue-test"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request = mux.SetURLVars(request, map[string]string{"track_id": "source-track"})
+	request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7}))
+	response := httptest.NewRecorder()
+
+	handler.Reissue(response, request)
+
+	if response.Code != http.StatusCreated {
+		t.Fatalf("reissue status = %d body=%s", response.Code, response.Body.String())
+	}
+	if service.actor == nil || service.actor.ID != 7 || service.reissueTrackID != "source-track" || service.reissueVersion != 6 || service.reissueTTL != 24 || service.reissueKey != "reissue-test" {
+		t.Fatalf("reissue service call = actor:%+v track:%q version:%d key:%q ttl:%d", service.actor, service.reissueTrackID, service.reissueVersion, service.reissueKey, service.reissueTTL)
+	}
+	var payload struct {
+		Track        conductor.Track `json:"track"`
+		PreviewURL   string          `json:"previewUrl"`
+		Verification struct {
+			Status             string    `json:"status"`
+			Verified           bool      `json:"verified"`
+			AuthorizationState string    `json:"authorizationState"`
+			ServerTime         time.Time `json:"serverTime"`
+		} `json:"verification"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode reissue response: %v", err)
+	}
+	if payload.Track.ID != track.ID || payload.PreviewURL == "" || payload.Verification.Status != "verified" || !payload.Verification.Verified || payload.Verification.AuthorizationState != "active" || !payload.Verification.ServerTime.Equal(now) {
+		t.Fatalf("reissue receipt = %+v", payload)
+	}
+}
+
+func TestCompositionReissueRequiresRetryableIdempotencyKey(t *testing.T) {
+	service := &compositionServiceStub{track: previewTrack()}
+	handler, err := NewCompositionHTTPHandler(service, artifactReaderStub{}, CurrentUser, []string{"http://localhost:8080"})
+	if err != nil {
+		t.Fatalf("NewCompositionHTTPHandler() error = %v", err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/conductor/tracks/source-track/reissue", strings.NewReader(`{"expectedVersion":6}`))
+	request.Header.Set("Content-Type", "application/json")
+	request = mux.SetURLVars(request, map[string]string{"track_id": "source-track"})
+	request = request.WithContext(WithCurrentUser(request.Context(), &models.User{ID: 7}))
+	response := httptest.NewRecorder()
+
+	handler.Reissue(response, request)
+
+	if response.Code != http.StatusBadRequest || service.reissueTrackID != "" || !strings.Contains(response.Body.String(), "idempotency_key_required") {
+		t.Fatalf("missing reissue key status=%d serviceTrack=%q body=%s", response.Code, service.reissueTrackID, response.Body.String())
+	}
+}
+
+func (s *compositionServiceStub) Reissue(_ context.Context, actor *models.User, trackID string, expectedVersion int64, idempotencyKey string, ttlHours int) (*conductor.ComposeResult, error) {
+	s.actor, s.reissueTrackID, s.reissueVersion, s.reissueKey, s.reissueTTL = actor, trackID, expectedVersion, idempotencyKey, ttlHours
+	if s.reissueErr != nil {
+		return nil, s.reissueErr
+	}
+	return &conductor.ComposeResult{Track: s.track, Created: true}, nil
 }
 
 func (s *compositionServiceStub) Compose(_ context.Context, actor *models.User, request conductor.CompositionRequest) (*conductor.ComposeResult, error) {

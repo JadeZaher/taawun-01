@@ -335,6 +335,22 @@ test('builder review link remains a locator and empty workspaces expose creation
   assert.match(html, /element\('createWorkspaceDetails'\)\.open = workspaces\.length === 0;/u);
 });
 
+test('expired previews expose an immutable re-sign path with an explicit lifetime', async () => {
+  const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+
+  assert.match(html, /id="previewTTLHours"[\s\S]*?<option value="168" selected>7 days<\/option>/u);
+  assert.match(html, /function buildPayload\(\)[\s\S]*?ttlHours: Number\(element\('previewTTLHours'\)\.value\)/u);
+  assert.match(html, /id="reissueBuildPreviewButton"[^>]*>Re-sign as new preview<\/button>/u);
+  assert.match(html, /function renderSelectedBuild\(\)[\s\S]*?reissueButton\.hidden = !track\.preview \|\| !track\.artifact/u);
+  assert.match(html, /async function reissueSelectedBuildPreview\(\)[\s\S]*?idempotencyKey: `reissue-\$\{crypto\.randomUUID\(\)\}`[\s\S]*?\/reissue`[\s\S]*?expectedVersion: selected\.version[\s\S]*?ttlHours, idempotencyKey: attempt\.idempotencyKey/u);
+  assert.match(html, /reissueBusy = Boolean\(state\.previewReissueAttempt[\s\S]*?state\.previewReissueAttempt\.trackID === String\(track\.id \|\| ''\)[\s\S]*?reissueButton\.setAttribute\('aria-busy', String\(reissueBusy\)\)/u);
+  assert.match(html, /definitiveRejection = error instanceof ApiError && \[400, 401, 403, 404, 415, 422\]\.includes\(error\.status\)[\s\S]*?if \(definitiveRejection\) state\.previewReissueAttempt = null/u);
+  assert.match(html, /retry Re-sign safely—the same request identity will be reused/u);
+  assert.match(html, /finally \{[\s\S]*?attempt\.inFlight = false;[\s\S]*?if \(currentWorkspace\(marker\)\) renderSelectedBuild\(\)/u);
+  assert.match(html, /replacementID === selectedTrackID/u);
+  assert.match(html, /the expired track \$\{selectedTrackID\} was not changed/u);
+});
+
 test('custom-field typing commits without rebuilding the editor row', async () => {
   const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const rowStart = html.indexOf('function renderCustomFieldRow(');

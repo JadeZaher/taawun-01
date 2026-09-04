@@ -285,6 +285,7 @@ func main() {
 				{"path": "/api/ethics/audit", "method": "POST", "desc": "Taqwa ethics & Anti-Gharar audit engine"},
 				{"path": "/api/artifacts/preview", "method": "POST", "desc": "Create an authenticated signed staging preview"},
 				{"path": "/api/conductor/tracks/{track_id}", "method": "GET", "desc": "Inspect a workspace-authorized composition track"},
+				{"path": "/api/conductor/tracks/{track_id}/reissue", "method": "POST", "desc": "Re-sign a curated preview into a new immutable track"},
 				{"path": "/api/conductor/tracks/{track_id}/publication", "method": "POST", "desc": "Request a verified-domain publication"},
 				{"path": "/api/conductor/spec", "method": "GET", "desc": "Platform specification & ergonomics doc"},
 			},
@@ -330,6 +331,7 @@ func main() {
 	api.HandleFunc("/conductor/tracks", compositionHandler.ListTracks).Methods(http.MethodGet)
 	api.HandleFunc("/conductor/tracks/{track_id}", compositionHandler.GetTrack).Methods(http.MethodGet)
 	api.HandleFunc("/conductor/tracks/{track_id}/events", compositionHandler.Events).Methods(http.MethodGet)
+	api.HandleFunc("/conductor/tracks/{track_id}/reissue", compositionHandler.Reissue).Methods(http.MethodPost)
 	api.HandleFunc("/conductor/tracks/{track_id}/resume", compositionHandler.Resume).Methods(http.MethodPost)
 	api.HandleFunc("/conductor/tracks/{track_id}/publication", compositionHandler.RequestPublication).Methods(http.MethodPost)
 	api.HandleFunc("/conductor/tracks/{track_id}/activate", compositionHandler.ActivatePublication).Methods(http.MethodPost)

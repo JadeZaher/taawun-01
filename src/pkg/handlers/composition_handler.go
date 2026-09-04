@@ -33,12 +33,19 @@ const maximumCompositionBodyBytes = 64 << 10
 // CompositionService is the authenticated control-plane workflow used by the builder UI.
 type CompositionService interface {
 	Compose(context.Context, *models.User, conductor.CompositionRequest) (*conductor.ComposeResult, error)
+	Reissue(context.Context, *models.User, string, int64, string, int) (*conductor.ComposeResult, error)
 	Resume(context.Context, *models.User, string, int64) (*conductor.Track, error)
 	RequestPublication(context.Context, *models.User, string, int64, string) (*conductor.Track, error)
 	ActivatePublication(context.Context, *models.User, string, int64) (*conductor.Track, error)
 	ListTracks(context.Context, *models.User, int, int, string) (conductor.TrackSummaryPage, error)
 	GetTrack(context.Context, *models.User, string) (*conductor.Track, error)
 	Events(context.Context, *models.User, string) ([]conductor.TrackEvent, error)
+}
+
+type reissueCompositionInput struct {
+	ExpectedVersion int64  `json:"expectedVersion"`
+	IdempotencyKey  string `json:"idempotencyKey"`
+	TTLHours        int    `json:"ttlHours,omitempty"`
 }
 
 type compositionArtifactReader interface {
@@ -331,6 +338,51 @@ func (h *CompositionHTTPHandler) Events(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeCompositionJSON(w, http.StatusOK, map[string]any{"events": events})
+}
+
+// Reissue signs an existing curated composition into a new immutable preview track.
+func (h *CompositionHTTPHandler) Reissue(w http.ResponseWriter, r *http.Request) {
+	requestNow := h.now().UTC()
+	actor, ok := h.actor(w, r)
+	if !ok {
+		return
+	}
+	if mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mediaType != "application/json" {
+		writeCompositionError(w, http.StatusUnsupportedMediaType, "content_type_required", "Content-Type must be application/json.")
+		return
+	}
+	var input reissueCompositionInput
+	if !decodeCompositionJSON(w, r, &input) {
+		return
+	}
+	if input.IdempotencyKey == "" {
+		writeCompositionError(w, http.StatusBadRequest, "idempotency_key_required", "A stable idempotency key is required so this re-sign request can be retried safely.")
+		return
+	}
+	if input.TTLHours == 0 {
+		input.TTLHours = 24
+	}
+	result, err := h.service.Reissue(r.Context(), actor, mux.Vars(r)["track_id"], input.ExpectedVersion, input.IdempotencyKey, input.TTLHours)
+	if err != nil {
+		writeCompositionServiceError(w, err)
+		return
+	}
+	if result == nil || result.Track == nil || result.Track.Preview == nil || result.Track.Artifact == nil {
+		writeCompositionError(w, http.StatusConflict, "preview_not_ready", "The reissued composition did not reach a signed preview.")
+		return
+	}
+	opened, err := h.artifacts.Open(r.Context(), result.Track.Artifact.ContentHash)
+	if err != nil || opened.ArtifactID != result.Track.Artifact.ArtifactID || opened.ContentHash != result.Track.Artifact.ContentHash ||
+		opened.Manifest.WorkspaceID != result.Track.WorkspaceID || result.Track.Preview.ContentHash != opened.ContentHash || !verifiedTrackComponentBinding(result.Track, opened) {
+		writeCompositionError(w, http.StatusConflict, "preview_integrity_error", "The reissued signed preview could not be verified.")
+		return
+	}
+	response, err := verifiedCompositionResponse(result.Track, result.Created, opened, requestNow)
+	if err != nil {
+		writeCompositionError(w, http.StatusInternalServerError, "composition_unavailable", "The signed preview receipt could not be prepared.")
+		return
+	}
+	writeCompositionJSON(w, http.StatusCreated, response)
 }
 
 // Resume retries a durable partially completed composition with optimistic version control.

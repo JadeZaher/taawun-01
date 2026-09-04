@@ -12,13 +12,17 @@ idempotency authority. Viewer access is inspect-only; Maintainer and Architect
 editing still results in a new server-authorized track.
 
 Server-confirmed preview expiry keeps the immutable build record but removes its
-iframe, receipt, and active trust presentation. For Maintainer and Architect,
-the existing curated restore control becomes “Prepare fresh preview”; it remains
-a zero-network local draft action and then focuses the separate explicit staging
-preview submit. Current workspace and approved origins must be reviewed before
-that submit creates a distinct signature. Viewer guidance remains inspect-only,
-and no path extends or rewrites the old authorization. Once exact expiry is
-established, the old record's reopen control becomes a disabled “Signed preview
+iframe, receipt, and active trust presentation. The builder exposes the signed
+lifetime before creation and uses seven days as its guided default; the server
+still validates the one-hour through 90-day boundary. Every signed build exposes
+“Re-sign as new preview” to a current Maintainer or Architect, so recovery does
+not depend on a client-clock guess or a failed reopen attempt. That action asks
+the server to copy only the exact curated request into a new composition, while
+rechecking present workspace capability and origins and issuing a new subject,
+artifact, signature, track, expiry, and review URL. The old authorization and
+track remain unchanged. The separate restore control remains available when the
+content also needs editing. Viewer guidance stays inspect-only. Once expiry is
+known, the old record's reopen control becomes a disabled “Signed preview
 expired” state rather than inviting another request that must fail.
 
 All async workspace evidence uses principal/workspace generation guards.

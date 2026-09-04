@@ -23,6 +23,13 @@ server time plus `authorizationState=active|expired`. An expired verified track
 may still supply curated copy evidence, but preview-file GET/HEAD must reject it
 at the exact boundary and never load signed runtime or file bytes.
 
+Preview reissue accepts only expected version, a required stable idempotency
+key, and bounded TTL. The handler never accepts replacement composition or
+authority fields. Requiring the caller's key makes an ambiguous delivery safe
+to retry, including when successor creation completed before receipt reopening
+failed. A successful request returns a full reopened and verified composition
+receipt so the client can switch to the new immutable track immediately.
+
 Composition outcome logs contain only a bounded correlation ID, outcome,
 reason class, and HTTP status. Railway's request ID is accepted only from the
 same trusted direct-proxy boundary as client attribution; otherwise the handler
