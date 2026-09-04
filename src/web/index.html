@@ -3478,6 +3478,15 @@
       return `${location.origin}/account#preview=${encodeURIComponent(trackID)}&workspace=${currentWorkspaceID()}`;
     }
 
+    function synchronizePreviewLocation(trackID) {
+      const workspaceID = currentWorkspaceID();
+      if (!/^track_[A-Za-z0-9_-]+$/.test(String(trackID || '')) || !workspaceID) return false;
+      const locationURL = new URL(window.location.href);
+      locationURL.hash = `preview=${encodeURIComponent(trackID)}&workspace=${workspaceID}`;
+      history.replaceState(history.state, '', locationURL);
+      return true;
+    }
+
     function syncPreviewShareControl() {
       const trackID = String(state.track && state.track.id || '');
       const shareable = state.previewReady && /^track_[A-Za-z0-9_-]+$/.test(trackID);
@@ -4964,6 +4973,7 @@
         state.expiredPreviewTrackId = '';
         state.previewReissueAttempt = null;
         state.selectedTrack = state.track;
+        synchronizePreviewLocation(replacementID);
         renderSelectedBuild();
         await loadBuildHistory();
         if (!currentWorkspace(marker)) return;

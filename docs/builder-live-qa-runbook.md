@@ -126,7 +126,9 @@ raw controls part of the mosque operator's path.
    must remain unchanged and continue returning `410 Gone` for preview files.
 6. Open and copy the replacement link, then retry the re-sign request only through
    its supported conflict/idempotency behavior. Confirm the new link remains bound
-   to the replacement track and the old selector is never recopied.
+   to the replacement track, the address bar replaces the old fragment without a
+   navigation or extra history entry, the current path/query remains intact, and
+   refresh or address-bar copy never reopens or recopies the expired selector.
 
 ## 5. Revocation behavior
 

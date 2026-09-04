@@ -348,6 +348,8 @@ test('expired previews expose an immutable re-sign path with an explicit lifetim
   assert.match(html, /retry Re-sign safely—the same request identity will be reused/u);
   assert.match(html, /finally \{[\s\S]*?attempt\.inFlight = false;[\s\S]*?if \(currentWorkspace\(marker\)\) renderSelectedBuild\(\)/u);
   assert.match(html, /replacementID === selectedTrackID/u);
+  assert.match(html, /function synchronizePreviewLocation\(trackID\)[\s\S]*?new URL\(window\.location\.href\)[\s\S]*?locationURL\.hash = `preview=\$\{encodeURIComponent\(trackID\)\}&workspace=\$\{workspaceID\}`[\s\S]*?history\.replaceState\(history\.state, '', locationURL\)/u);
+  assert.match(html, /state\.selectedTrack = state\.track;[\s\S]*?synchronizePreviewLocation\(replacementID\);[\s\S]*?renderSelectedBuild\(\);/u);
   assert.match(html, /the expired track \$\{selectedTrackID\} was not changed/u);
 });
 
